@@ -1,0 +1,32 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# ComfyUI
+output/
+temp/
+*.log
+ComfyUI/
+
+# Config
+api_key_config.json
+config.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup
+*.bak
+*.backup_*
+*.old
+*.new
