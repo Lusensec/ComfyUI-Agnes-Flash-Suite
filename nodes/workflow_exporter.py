@@ -23,15 +23,20 @@ import time
 import folder_paths
 
 from ..api import get_api_key, BASE_URL, CHAT_MODEL
+from ._output_docs import OutputDocsMixin
 
 # 定妆图默认目录（ComfyUI output 下）
 DEFAULT_ASSET_DIR = "agnes_assets"
 
 
-class AgnesWorkflowExporter:
+class AgnesWorkflowExporter(OutputDocsMixin):
     """将前置定妆结果导出为「漫剧创作工作流 B」的 JSON"""
 
     DESCRIPTION = "读取场景映射+定妆图清单，导出工作流 B 的 JSON 文件（两段式管线的衔接节点）"
+    OUTPUT_DOCS = {
+        "workflow_b_path": "导出的工作流 B JSON 文件路径（ComfyUI output 下），新建页面 Load 该文件即可跑漫剧创作",
+        "status": "导出状态：成功（文件路径）/ 失败原因",
+    }
 
     @classmethod
     def INPUT_TYPES(cls):

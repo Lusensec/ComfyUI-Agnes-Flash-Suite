@@ -8,15 +8,20 @@ that describes the image. Uses Agnes-2.0-Flash vision capability.
 from typing import Tuple
 
 from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, tensor_to_pil
+from ._output_docs import OutputDocsMixin
 
 
-class AgnesNovelImageReverse:
+class AgnesNovelImageReverse(OutputDocsMixin):
     """Agnes AI Image Reverse Prompt node - generates prompts from images."""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING", "STRING",)
     RETURN_NAMES = ("prompt", "brief_prompt",)
     RETURN_LABELS = ('详细提示词', '简洁提示词')
+    OUTPUT_DOCS = {
+        "prompt": "详细版提示词：完整描述画面主体/场景/风格/光照/构图，可直接用于文生图节点",
+        "brief_prompt": "简洁版提示词：压缩后的关键词形式，适合快速生图或作为基础提示词再加工",
+    }
     FUNCTION = "reverse"
 
     @classmethod

@@ -18,13 +18,23 @@ AgnesNovelTextToImage（生成定妆图）和 SaveImage（持久化）直接使�
 import json
 import re
 
+from ._output_docs import OutputDocsMixin
+
 DEFAULT_ASSET_DIR = "agnes_assets"
 
 
-class AgnesAssetJsonSplitter:
+class AgnesAssetJsonSplitter(OutputDocsMixin):
     """将资产提取 JSON 拆分为定妆提示词 + 保存前缀"""
 
     DESCRIPTION = "把资产提取 JSON 拆成定妆图提示词+保存前缀（工作流A定妆区核心节点）"
+    OUTPUT_DOCS = dict(
+        (k, (
+            f"资产 {k.split('_')[1]} 的保存前缀（如 agnes_assets/characters_白奕），连接 SaveImage.filename_prefix 使定妆图按资产自动命名"
+            if k.startswith("prefix_")
+            else f"资产 {k.split('_')[1]} 的定妆图英文提示词，连接 AgnesNovelTextToImage.prompt / AgnesAssetMaker.prompt；空字符串=该槽位无资产，可 Mute 下游节点"
+        )) for k in [f"{p}_{i}" for i in range(1, 13) for p in ("prefix", "prompt")]
+    )
+    OUTPUT_DOCS["json_ok"] = "解析状态：ok=正常 / truncated=资产数超出截断 / empty=空 JSON / 具体错误信息"
 
     @classmethod
     def INPUT_TYPES(cls):

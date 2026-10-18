@@ -13,17 +13,25 @@ import json
 import os
 from typing import Tuple
 
+from ._output_docs import OutputDocsMixin
+
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(PLUGIN_DIR, "api_key_config.json")
 
 
-class AgnesNovelAPIKeyConfig:
+class AgnesNovelAPIKeyConfig(OutputDocsMixin):
     """Persist Agnes API key and Base URL to a local config file for all nodes to share."""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("status", "masked_key", "full_key", "base_url")
     RETURN_LABELS = ('状态信息', '已掩码的Key', '完整Key', '请求地址')
+    OUTPUT_DOCS = {
+        "status": "保存/清除结果信息（成功或失败原因）",
+        "masked_key": "掩码后的 API Key（前8+****+后4），用于确认保存成功，可安全显示",
+        "full_key": "完整 API Key（本节点内部使用；如需在其他节点手动粘贴请用此项输出）",
+        "base_url": "本次保存的模型请求地址（留空时回显内置默认值）",
+    }
     FUNCTION = "save_key"
     OUTPUT_NODE = True
 

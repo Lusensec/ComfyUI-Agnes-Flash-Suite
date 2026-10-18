@@ -5,141 +5,449 @@
     {
       "id": 5,
       "type": "PrimitiveNode",
-      "pos": [100, 500],
-      "size": [400, 100],
+      "pos": [
+        100,
+        500
+      ],
+      "size": [
+        400,
+        100
+      ],
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [
-        {"name": "STRING", "type": "STRING", "links": [1]}
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            1
+          ]
+        }
       ],
-      "properties": {"run_in_background": false, "final_only": true},
-      "widgets_values": ["请输入小说章节内容..."]
+      "properties": {
+        "run_in_background": false,
+        "final_only": true
+      },
+      "widgets_values": [
+        "请输入小说章节内容..."
+      ]
     },
     {
       "id": 1,
       "type": "AgnesSceneSplitter",
-      "pos": [600, 100],
-      "size": [400, 300],
+      "pos": [
+        600,
+        100
+      ],
+      "size": [
+        400,
+        300
+      ],
       "flags": {},
       "order": 1,
       "mode": 0,
       "inputs": [
-        {"name": "chapter_text", "type": "STRING", "link": 1},
-        {"name": "api_key", "type": "STRING", "link": null},
-        {"name": "base_url", "type": "STRING", "link": null, "widget": {"name": "base_url"}},
-        {"name": "model", "type": "STRING", "link": null, "widget": {"name": "model"}}
+        {
+          "name": "chapter_text",
+          "type": "STRING",
+          "link": 1
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "base_url"
+          }
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "model"
+          }
+        }
       ],
       "outputs": [
-        {"name": "log_text", "type": "STRING"},
-        {"name": "scene_1", "type": "STRING", "links": [2]},
-        {"name": "scene_2", "type": "STRING"},
-        {"name": "scene_3", "type": "STRING"},
-        {"name": "scene_4", "type": "STRING"},
-        {"name": "scene_5", "type": "STRING"}
+        {
+          "name": "log_text",
+          "type": "STRING"
+        },
+        {
+          "name": "scene_1",
+          "type": "STRING",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "scene_2",
+          "type": "STRING"
+        },
+        {
+          "name": "scene_3",
+          "type": "STRING"
+        },
+        {
+          "name": "scene_4",
+          "type": "STRING"
+        },
+        {
+          "name": "scene_5",
+          "type": "STRING"
+        }
       ],
-      "properties": {"Node name for S&R": "AgnesSceneSplitter"},
-      "widgets_values": ["", "sk-你的Key", "https://api.agnes-ai.cn/v1", "agnes-2.5-flash"]
+      "properties": {
+        "Node name for S&R": "AgnesSceneSplitter"
+      },
+      "widgets_values": [
+        "",
+        "sk-你的Key",
+        "https://api.agnes-ai.cn/v1",
+        "agnes-2.5-flash"
+      ]
     },
     {
       "id": 2,
       "type": "AgnesScenePromptGenerator",
-      "pos": [600, 500],
-      "size": [400, 250],
+      "pos": [
+        600,
+        500
+      ],
+      "size": [
+        400,
+        250
+      ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
-        {"name": "scene_text", "type": "STRING", "link": 2},
-        {"name": "api_key", "type": "STRING", "link": null},
-        {"name": "style", "type": "COMBO", "widget": {"name": "style"}, "links": null},
-        {"name": "base_url", "type": "STRING", "link": null, "widget": {"name": "base_url"}},
-        {"name": "model", "type": "STRING", "link": null, "widget": {"name": "model"}}
+        {
+          "name": "scene_text",
+          "type": "STRING",
+          "link": 2
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "style",
+          "type": "COMBO",
+          "widget": {
+            "name": "style"
+          },
+          "links": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "base_url"
+          }
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "model"
+          }
+        }
       ],
       "outputs": [
-        {"name": "detailed_prompt", "type": "STRING", "links": [3]}
+        {
+          "name": "detailed_prompt",
+          "type": "STRING",
+          "links": [
+            3
+          ]
+        }
       ],
-      "properties": {"Node name for S&R": "AgnesScenePromptGenerator"},
-      "widgets_values": ["", "sk-你的Key", "cinematic", "", "", "https://api.agnes-ai.cn/v1", "agnes-2.5-flash"]
+      "properties": {
+        "Node name for S&R": "AgnesScenePromptGenerator"
+      },
+      "widgets_values": [
+        "",
+        "sk-你的Key",
+        "cinematic",
+        "",
+        "",
+        "https://api.agnes-ai.cn/v1",
+        "agnes-2.5-flash"
+      ]
     },
     {
       "id": 3,
       "type": "AgnesImageGen",
-      "pos": [600, 850],
-      "size": [400, 200],
+      "pos": [
+        600,
+        850
+      ],
+      "size": [
+        400,
+        200
+      ],
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [
-        {"name": "prompt", "type": "STRING", "link": 3},
-        {"name": "api_key", "type": "STRING", "link": null},
-        {"name": "width", "type": "INT", "widget": {"name": "width"}, "links": null},
-        {"name": "height", "type": "INT", "widget": {"name": "height"}, "links": null},
-        {"name": "quality", "type": "COMBO", "widget": {"name": "quality"}, "links": null}
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": 3
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "links": null
+        },
+        {
+          "name": "quality",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality"
+          },
+          "links": null
+        }
       ],
       "outputs": [
-        {"name": "image", "type": "IMAGE", "links": [4]},
-        {"name": "url", "type": "STRING"}
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "url",
+          "type": "STRING"
+        }
       ],
-      "properties": {"Node name for S&R": "AgnesImageGen"},
-      "widgets_values": ["", "sk-你的Key", 1920, 1080, "1K"]
+      "properties": {
+        "Node name for S&R": "AgnesImageGen"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "sk-你的Key",
+        1920,
+        1080,
+        "1K",
+        "agnes-image-2.5-flash"
+      ]
     },
     {
       "id": 4,
       "type": "AgnesVideoGen",
-      "pos": [1100, 850],
-      "size": [400, 300],
+      "pos": [
+        1100,
+        850
+      ],
+      "size": [
+        400,
+        300
+      ],
       "flags": {},
       "order": 4,
       "mode": 0,
       "inputs": [
-        {"name": "prompt", "type": "STRING", "link": null},
-        {"name": "api_key", "type": "STRING", "link": null},
-        {"name": "model", "type": "STRING", "widget": {"name": "model"}, "links": null},
-        {"name": "num_frames", "type": "INT", "widget": {"name": "num_frames"}, "links": null},
-        {"name": "frame_rate", "type": "INT", "widget": {"name": "frame_rate"}, "links": null},
-        {"name": "quality", "type": "COMBO", "widget": {"name": "quality"}, "links": null},
-        {"name": "aspect_ratio", "type": "COMBO", "widget": {"name": "aspect_ratio"}, "links": null},
-        {"name": "image", "type": "IMAGE", "link": 4}
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "widget": {
+            "name": "model"
+          },
+          "links": null
+        },
+        {
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "links": null
+        },
+        {
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "links": null
+        },
+        {
+          "name": "quality",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality"
+          },
+          "links": null
+        },
+        {
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "links": null
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 4
+        }
       ],
       "outputs": [
-        {"name": "video", "type": "VIDEO", "links": [5]},
-        {"name": "video_id", "type": "STRING"},
-        {"name": "task_id", "type": "STRING"}
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "video_id",
+          "type": "STRING"
+        },
+        {
+          "name": "task_id",
+          "type": "STRING"
+        }
       ],
-      "properties": {"Node name for S&R": "AgnesVideoGen"},
-      "widgets_values": ["", "sk-你的Key", "agnes-video-v2.0", 121, 24, "1K", "16:9"]
+      "properties": {
+        "Node name for S&R": "AgnesVideoGen"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "sk-你的Key",
+        "agnes-video-v2.0",
+        121,
+        24,
+        "1K",
+        "16:9"
+      ]
     },
     {
       "id": 6,
       "type": "SaveVideo",
-      "pos": [1100, 500],
-      "size": [300, 100],
+      "pos": [
+        1100,
+        500
+      ],
+      "size": [
+        300,
+        100
+      ],
       "flags": {},
       "order": 5,
       "mode": 0,
       "inputs": [
-        {"name": "video", "type": "VIDEO", "link": 5}
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 5
+        }
       ],
       "outputs": [],
-      "properties": {"cnr_id": "comfy-core", "ver": "0.3.49", "Node name for S&R": "SaveVideo"},
-      "widgets_values": ["agnes_video"]
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.49",
+        "Node name for S&R": "SaveVideo"
+      },
+      "widgets_values": [
+        "agnes_video"
+      ]
     }
   ],
   "links": [
-    [1, 5, 0, 1, 0, "STRING"],
-    [2, 1, 1, 2, 0, "STRING"],
-    [3, 2, 0, 3, 0, "STRING"],
-    [4, 3, 0, 4, 7, "IMAGE"],
-    [5, 4, 0, 6, 0, "VIDEO"]
+    [
+      1,
+      5,
+      0,
+      1,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      1,
+      1,
+      2,
+      0,
+      "STRING"
+    ],
+    [
+      3,
+      2,
+      0,
+      3,
+      0,
+      "STRING"
+    ],
+    [
+      4,
+      3,
+      0,
+      4,
+      7,
+      "IMAGE"
+    ],
+    [
+      5,
+      4,
+      0,
+      6,
+      0,
+      "VIDEO"
+    ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
       "scale": 1.0,
-      "offset": [0, 0]
+      "offset": [
+        0,
+        0
+      ]
     }
   },
   "version": 0.4

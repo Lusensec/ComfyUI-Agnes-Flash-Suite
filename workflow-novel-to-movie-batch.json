@@ -523,14 +523,12 @@
       },
       "widgets_values": [
         "",
-        "16:9",
-        false,
+        "",
+        "",
         640,
         360,
-        "https://api.agnes-ai.cn/v1",
-        "none",
-        false,
-        ""
+        "1K",
+        "agnes-image-2.5-flash"
       ]
     },
     {
@@ -596,11 +594,12 @@
       "widgets_values": [
         "",
         "",
-        8,
         "",
-        "https://api.agnes-ai.cn/v1",
         "agnes-video-v2.0",
-        false
+        121,
+        24,
+        "1K",
+        "16:9"
       ]
     },
     {

@@ -22,6 +22,38 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 4. `config.yaml` 的 `api.base_url`
 5. 内置默认 `https://api.agnes-ai.cn/v1`
 
+### 5. 输出描述机制
+
+ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 描述机制**，
+而**输出（RETURN_*）只有短标签（RETURN_NAMES/RETURN_LABELS），没有长描述字段**——
+这就是"每个输入都有说明、输出却没有"的原因。本插件通过官方扩展点补齐：
+
+- 每个节点类实现 `get_extra_output_methods() → ["get_extra_pnginfo"]` 和 `get_extra_pnginfo()`，
+  保存图像/视频时把每个输出的**含义与去向**写入文件元数据（PNG info / 文件说明）；
+- 共享实现见 `nodes/_output_docs.py`（OutputDocsMixin），各节点在类属性
+  `OUTPUT_DOCS = {输出名: 描述}` 中声明；
+- 查看方式：ComfyUI 画廊的图片元数据、或用任意 PNG-info 查看工具打开
+  `output/` 下的保存文件。
+
+### 6. Agnes API 参数可用性对照（生图/生视频参数与真实 API 参数的对应关系）
+
+| 节点参数 | 新图像接口 image-2.5-flash | 旧图像接口 2.1/2.0 | 新视频接口 video-2.5-flash | 旧视频接口 v2.0 |
+|---|---|---|---|---|
+| model | ✅ | ✅ | ✅ | ✅ |
+| prompt | ✅ | ✅ | ✅ | ✅ |
+| 尺寸 | size 档位 1K/2K/3K/4K + ratio | width/height(WxH) | aspect_ratio（固定 720P） | width/height(WxH) |
+| n（张数） | ❌ API 不支持，固定 1 张 | ✅ 1-4 | ❌ 固定 1 | - |
+| seed（种子） | ❌ | ❌ | ✅ 可选（0=随机） | ✅ 可选 |
+| strength（强度） | ❌ 无此参数，节点将其转成提示词指令 | 同左 | - | - |
+| 时长 | - | - | seconds "4"~"12"（节点用 帧数/帧率 换算） | num_frames（8n+1） |
+| frame_rate | - | - | ❌ API 无此参数 | ✅ 传给 API |
+| quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
+| max_wait | 客户端轮询超时，非 API 参数 | 同左 | 同左 | 同左 |
+
+> 结论：新 2.5 系列模型**不再支持 n/strength/seed（图）/frame_rate（视）等参数**，
+> 节点中保留这些输入框是为了兼容旧模型和习惯；使用新模型时它们不生效（已在各
+> widget 的 tooltip 中注明）。视频 2.5 支持 seed，可直接传入做可复现实验。
+
 ---
 
 ## 节点配置说明
@@ -108,15 +140,17 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | prompt | STRING | "" | 英文图像描述 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | width | INT | 1920 | 图像宽度（旧接口 WxH 像素；新接口 agnes-image-2.5-flash 自动映射到支持的比例） |
 | height | INT | 1080 | 图像高度（同上） |
-| quality | COMBO | 1K | 画质：1K=标准，2K=高清（新图像模型 agnes-image-2.5-flash 按档位计费，2K 性价比最高） |
+| quality | COMBO | 1K | 画质档位：1K/2K/3K/4K（新图像模型 agnes-image-2.5-flash 按档位出图，2K 性价比最高） |
+| model | COMBO | agnes-image-2.5-flash | 图像生成模型，可选 2.5-flash / 2.1-flash / 2.0-flash（选旧模型时 width/height 按像素生效） |
 
-**输出：**
-- image: 图像张量（连接视频生成节点）
-- url: 图片 URL
+**输出（含输出描述）：**
+- image: 图像张量（连接视频生成节点或 SaveImage）
+- url: 图片 URL（保存的文件路径/下载 URL）
 
 ---
 
@@ -126,19 +160,20 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | prompt | STRING | "" | 视频描述（可选） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| model | STRING | agnes-video-2.5-flash | 视频生成模型（新 2.5 Flash：4-12s/720P；旧 agnes-video-v2.0：帧数模式） |
+| model | COMBO | agnes-video-2.5-flash | 视频生成模型，可选 2.5-flash（4-12s/720P）/ agnes-video-v2.0（帧数模式） |
 | num_frames | INT | 121 | 旧接口帧数（121≈5秒 @ 24fps）；新接口自动换算为秒数（4-12s） |
-| frame_rate | INT | 24 | 帧率（旧接口生效；新接口用于换算时长） |
-| quality | COMBO | 1K | 画质（旧接口 1K/2K；新接口固定 720P） |
+| frame_rate | INT | 24 | 帧率（旧接口生效；新接口仅用于换算时长，API 无此参数） |
+| quality | COMBO | 1K | 画质（旧接口 1K/2K；新接口固定 720P，API 无此参数） |
 | aspect_ratio | COMBO | 16:9 | 宽高比：16:9/9:16/1:1/4:3/3:4 |
-| image | IMAGE | - | 参考图片（可选） |
+| image | IMAGE | - | 参考图片（可选；连接后走图生视频） |
 
-**输出：**
-- video: 视频文件路径
-- video_id: 视频 ID
-- task_id: 任务 ID
+**输出（含输出描述）：**
+- video: 视频文件路径（MP4 保存到 ComfyUI output/agnes_videos/）
+- video_id: 视频任务唯一标识（可用于查询重试）
+- task_id: API 返回的任务 ID
 
 ---
 
@@ -240,5 +275,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.0.0  
-**更新日期**: 2026-08-18
+**版本**: 1.1.0  
+**更新日期**: 2026-10-19

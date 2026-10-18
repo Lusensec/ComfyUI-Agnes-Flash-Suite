@@ -21,6 +21,8 @@ import time
 import torch
 import folder_paths
 
+from ._output_docs import OutputDocsMixin
+
 # 尝试从jimeng节点导入客户端
 try:
     import sys
@@ -112,10 +114,14 @@ def compute_size(ratio: str, resolution: str) -> str:
     return f"{width}x{height}"
 
 
-class JimengAssetMaker:
+class JimengAssetMaker(OutputDocsMixin):
     """使用Jimeng生成定妆图：已存在则复用，不存在则生成"""
 
     DESCRIPTION = "Jimeng定妆图生成器：检查本地已有定妆图→复用；没有→调用即梦API生成"
+    OUTPUT_DOCS = {
+        "images": "定妆图张量（复用本地或即梦新生成），可连接 SaveImage 或视频节点作为参考图",
+        "status": "处理状态：♻️ 复用已有定妆图 / 🆕 生成并保存 / ⏭️ 空槽位跳过 / 错误信息",
+    }
 
     @classmethod
     def INPUT_TYPES(cls):

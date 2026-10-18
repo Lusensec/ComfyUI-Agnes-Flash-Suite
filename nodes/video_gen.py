@@ -1,6 +1,6 @@
 """
 Agnes 视频生成节点
-使用 Agnes Video API (agnes-video-v2.0)
+使用 Agnes Video API（默认 agnes-video-2.5-flash，可选旧 v2.0）
 已修复超时问题：使用 video_id 轮询替代 task_id
 """
 import requests
@@ -19,6 +19,7 @@ from ..api import (
     VIDEO_MAX_WAIT,
     VIDEO_POLL_INTERVAL,
     NEW_VIDEO_MODELS,
+    AVAILABLE_VIDEO_MODELS,
     tensor_to_pil,
 )
 
@@ -48,9 +49,9 @@ class AgnesVideoGen:
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key"
                 }),
-                "model": ("STRING", {
+                "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
-                    "tooltip": "视频生成模型，推荐使用 agnes-video-v2.0"
+                    "tooltip": "视频生成模型（当前默认 agnes-video-2.5-flash；选旧模型时 num_frames/quality 按帧数接口生效）"
                 }),
                 "num_frames": ("INT", {
                     "default": 121,

@@ -27,6 +27,7 @@ from ..api import (
     AVAILABLE_IMAGE_MODELS,
     NEW_IMAGE_MODELS,
 )
+from ._output_docs import OutputDocsMixin
 
 QUALITY_MAP = {"1K": 1024, "2K": 2048, "3K": 1536, "4K": 4096}
 ASPECT_RATIOS = ["1:1", "2:3", "3:4", "4:5", "9:16", "9:21",
@@ -49,10 +50,14 @@ def compute_size(quality, aspect_ratio):
     return f"{width}x{height}"
 
 
-class AgnesAssetMaker:
+class AgnesAssetMaker(OutputDocsMixin):
     """定妆图生成器：已存在则复用，不存在则生成并保存"""
 
     DESCRIPTION = "定妆图生成器：检查本地已有定妆图→复用；没有→生成并保存（跨章节一致性核心）"
+    OUTPUT_DOCS = {
+        "images": "定妆图张量（复用本地或新生成），可连接 SaveImage 或图生视频节点作为参考图",
+        "status": "处理状态：♻️ 复用已有定妆图 / 🆕 生成并保存 / ⏭️ 空槽位跳过 / 错误信息",
+    }
 
     @classmethod
     def INPUT_TYPES(cls):

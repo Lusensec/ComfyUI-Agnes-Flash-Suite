@@ -1,6 +1,6 @@
 """
 Agnes 图像生成节点
-使用 Agnes Image API (agnes-image-2.1-flash)
+使用 Agnes Image API（默认 agnes-image-2.5-flash，可选旧 2.1/2.0）
 """
 import requests
 import torch
@@ -14,6 +14,7 @@ from ..api import (
     BASE_URL,
     IMAGE_MODEL,
     NEW_IMAGE_MODELS,
+    AVAILABLE_IMAGE_MODELS,
 )
 
 # 宽高比就近匹配表（节点 width/height → 新图像接口支持的 8 种 ratio）
@@ -59,18 +60,22 @@ class AgnesImageGen:
                     "min": 512,
                     "max": 2048,
                     "step": 64,
-                    "tooltip": "图像宽度，推荐 1920（16:9）或 1080（9:16）"
+                    "tooltip": "图像宽度：旧接口按 WxH 像素；新接口 agnes-image-2.5-flash 自动就近映射到支持的比例（W/H 像素本身不被 2.5 使用）"
                 }),
                 "height": ("INT", {
                     "default": 1080,
                     "min": 512,
                     "max": 2048,
                     "step": 64,
-                    "tooltip": "图像高度，推荐 1080（16:9）或 1920（9:16）"
+                    "tooltip": "图像高度：旧接口按 WxH 像素；新接口 agnes-image-2.5-flash 自动就近映射到支持的比例"
                 }),
-                "quality": (["1K", "2K"], {
+                "quality": (["1K", "2K", "3K", "4K"], {
                     "default": "1K",
-                    "tooltip": "画质等级：1K=性价比最高，2K=更高分辨率（消耗更多配额）"
+                    "tooltip": "画质档位：新接口 agnes-image-2.5-flash 按 1K/2K/3K/4K 档位出图；旧接口 1K/2K"
+                }),
+                "model": (AVAILABLE_IMAGE_MODELS, {
+                    "default": IMAGE_MODEL,
+                    "tooltip": "图像生成模型（当前默认 agnes-image-2.5-flash；选旧模型时 width/height 按像素生效）"
                 }),
             },
         }
@@ -94,7 +99,7 @@ class AgnesImageGen:
             extra["url"] = {"description": "图片的 URL 地址"}
         return extra
 
-    def generate(self, base_url="", prompt="", api_key="", width=1920, height=1080, quality="1K"):
+    def generate(self, base_url="", prompt="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -104,19 +109,19 @@ class AgnesImageGen:
             return (black, err_msg)
         print(f"\n[Agnes Image] 开始生成...")
         print(f"Prompt: {prompt[:80]}...")
-        print(f"Size: {width}x{height}, Quality: {quality}, Model: {IMAGE_MODEL}")
+        print(f"Model: {model}, Quality: {quality}, 尺寸: {width}x{height}")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            if IMAGE_MODEL in NEW_IMAGE_MODELS:
-                # 新接口：档位（1K/2K）+ 比例，客户端已下载并转 PIL
+            if model in NEW_IMAGE_MODELS:
+                # 新接口：档位（1K/2K/3K/4K）+ 比例，客户端已下载并转 PIL
                 size_arg, ratio_arg = quality.upper(), _nearest_ratio(width, height)
             else:
                 # 旧接口：WxH 像素
                 size_arg, ratio_arg = f"{width}x{height}", None
             pil_images = client.generate_image(
                 prompt=prompt,
-                model=IMAGE_MODEL,
+                model=model,
                 size=size_arg,
                 ratio=ratio_arg,
                 n=1,

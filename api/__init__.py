@@ -416,10 +416,10 @@ class AgnesClient:
         payload: Dict[str, Any] = {
             "model": model,
             "prompt": prompt,
-            "n": n,
         }
 
         if tier_mode:
+            # 新接口 agnes-image-2.5-flash：档位 size + ratio；API 不支持 n/seed/strength
             payload["size"] = tier
             if ratio:
                 payload["ratio"] = _IMAGE_RATIO_FALLBACK.get(ratio, ratio)
@@ -433,7 +433,9 @@ class AgnesClient:
                     "response_format": "b64_json" if return_base64 else "url",
                 }
         else:
+            # 旧接口 agnes-image-2.1/2.0：WxH 像素，支持 n
             payload["size"] = size
+            payload["n"] = n
             if mode == "img2img" and reference_images:
                 image_uris = [pil_to_base64_uri(img) for img in reference_images]
                 payload["extra_body"] = {

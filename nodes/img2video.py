@@ -24,6 +24,7 @@ from ..api import (
     NEW_VIDEO_MODELS,
     tensor_to_pil,
 )
+from ._output_docs import OutputDocsMixin
 
 # Quality → short-side pixels
 QUALITY_MAP = {
@@ -109,13 +110,17 @@ if _VIDEO_MODE == "string":
         pass
 
 
-class AgnesNovelImageToVideo:
+class AgnesNovelImageToVideo(OutputDocsMixin):
     """Agnes AI Image-to-Video node for ComfyUI."""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = (_VIDEO_OUTPUT_TYPE, "STRING",)
     RETURN_NAMES = ("video", "resolution",)
     RETURN_LABELS = ('视频', '分辨率')
+    OUTPUT_DOCS = {
+        "video": "生成的视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览",
+        "resolution": "视频目标尺寸（WxH）；新接口 2.5-flash 固定 720P，实际像素随 aspect_ratio 变化",
+    }
     FUNCTION = "generate"
 
     @classmethod
@@ -149,7 +154,7 @@ class AgnesNovelImageToVideo:
                 }),
                 "quality": (["1K", "2K"], {
                     "default": "1K",
-                    "tooltip": "Video quality / short-side resolution. 1K=1024px, 2K=2048px",
+                    "tooltip": "画质档位：仅旧接口 agnes-video-v2.0 生效（映射 WxH 像素）；新接口 2.5-flash 固定 720P，无此参数",
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "16:9",
@@ -160,21 +165,21 @@ class AgnesNovelImageToVideo:
                     "min": 9,
                     "max": 441,
                     "step": 8,
-                    "tooltip": "Number of frames (must be 8n+1). 121=~5s @24fps",
+                    "tooltip": "帧数（旧接口必须 8n+1，121≈5s@24fps）；新接口 2.5-flash 按 帧数/帧率 换算成 4-12 秒时长",
                 }),
                 "frame_rate": ("INT", {
                     "default": DEFAULT_VIDEO_FPS,
                     "min": 8,
                     "max": 60,
                     "step": 1,
-                    "tooltip": "Frame rate in fps",
+                    "tooltip": "帧率：旧接口传给 API；新接口 agnes-video-2.5-flash 无 frame_rate 参数，仅用于把帧数换算成 4-12 秒时长",
                 }),
                 "seed": ("INT", {
                     "default": 0,
                     "min": 0,
                     "max": 2147483647,
                     "step": 1,
-                    "tooltip": "Random seed (0 = random). Set to reuse for reproducible results.",
+                    "tooltip": "随机种子（Agnes 视频 API 支持 seed；0=每次随机，固定值可复现结果）",
                 }),
                 "max_wait_seconds": ("INT", {
                     "default": 600,

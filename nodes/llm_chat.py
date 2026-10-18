@@ -8,15 +8,19 @@ Supports multi-turn dialogue via optional system prompt and conversation history
 from typing import Any, Dict, Tuple
 
 from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS
+from ._output_docs import OutputDocsMixin
 
 
-class AgnesNovelLLMChat:
+class AgnesNovelLLMChat(OutputDocsMixin):
     """Agnes AI LLM Chat node for ComfyUI."""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("response",)
     RETURN_LABELS = ('AI回复',)
+    OUTPUT_DOCS = {
+        "response": "Agnes 对话模型返回的完整文本（可连接任意文本节点，或直接复制使用）",
+    }
     FUNCTION = "chat"
 
     @classmethod

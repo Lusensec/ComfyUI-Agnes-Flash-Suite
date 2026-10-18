@@ -20,6 +20,7 @@ from ..api import (
     pil_to_tensor,
     tensor_to_pil,
 )
+from ._output_docs import OutputDocsMixin
 
 # 三视图固定模板（与用户规格一致：正面→侧面→背面 并排、全身、正交、A-pose、纯白背景）
 TURNAROUND_TEMPLATE = (
@@ -38,7 +39,7 @@ ASPECT_RATIOS = ["1:1", "4:3", "3:2", "16:9", "21:9"]
 QUALITIES = ["1K", "2K", "3K", "4K"]
 
 
-class AgnesNovelCharacterTurnaround:
+class AgnesNovelCharacterTurnaround(OutputDocsMixin):
     """生成角色三视图设定图（正面/侧面/背面并排）"""
 
     DESCRIPTION = "角色三视图设定图：同一角色正面/侧面/背面并排，全身正交视图、细节一致（可选参考图保持一致性）"
@@ -47,6 +48,11 @@ class AgnesNovelCharacterTurnaround:
     RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
     RETURN_NAMES = ("image", "resolution", "final_prompt")
     RETURN_LABELS = ("三视图", "分辨率", "最终提示词")
+    OUTPUT_DOCS = {
+        "image": "三视图设定图张量（正面/侧面/背面并排），可连接 SaveImage 存档或作为角色参考图",
+        "resolution": "三视图实际输出分辨率（WxH）",
+        "final_prompt": "最终拼接的完整提示词（角色描述 + 三视图固定模板 + 补充词），可复制复用或微调",
+    }
     FUNCTION = "generate"
     OUTPUT_NODE = True
 

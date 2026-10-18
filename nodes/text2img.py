@@ -15,6 +15,7 @@ from ..api import (
     pil_to_tensor,
     NEW_IMAGE_MODELS,
 )
+from ._output_docs import OutputDocsMixin
 
 # Quality → short-side pixels
 QUALITY_MAP = {
@@ -68,13 +69,17 @@ def compute_size(quality: str, aspect_ratio: str) -> str:
     return f"{width}x{height}"
 
 
-class AgnesNovelTextToImage:
+class AgnesNovelTextToImage(OutputDocsMixin):
     """Agnes AI Text-to-Image node for ComfyUI."""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("IMAGE", "STRING",)
     RETURN_NAMES = ("images", "resolution",)
     RETURN_LABELS = ('输出图像', '分辨率')
+    OUTPUT_DOCS = {
+        "images": "生成的图像张量（1=单图，n>1 时批量），可连接 SaveImage 或视频节点作为参考图",
+        "resolution": "本次输出的实际分辨率（WxH）；新接口 2.5-flash 按档位+比例出图，分辨率以实际返回为准",
+    }
     FUNCTION = "generate"
 
     @classmethod
@@ -116,7 +121,7 @@ class AgnesNovelTextToImage:
                     "min": 1,
                     "max": 4,
                     "step": 1,
-                    "tooltip": "Number of images to generate (more takes longer)",
+                    "tooltip": "单次请求生成张数：旧接口支持 1-4；新接口 agnes-image-2.5-flash 的 API 不支持 n 参数，固定出 1 张",
                 }),
             },
         }
