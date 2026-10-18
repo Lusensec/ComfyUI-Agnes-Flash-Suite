@@ -1,4 +1,4 @@
-﻿# Agnes Novel Nodes
+# Agnes Novel Nodes
 # 静态导入所有节点，自动合并映射
 
 # Novel 专用节点
@@ -24,6 +24,7 @@ from .img2img import AgnesNovelImageToImage
 from .text2img import AgnesNovelTextToImage
 from .img2video import AgnesNovelImageToVideo
 from .text2video import AgnesNovelTextToVideo
+from .character_turnaround import AgnesNovelCharacterTurnaround
 
 # 合并所有节点映射
 NODE_CLASS_MAPPINGS = {}
@@ -34,12 +35,14 @@ from . import script_generator, director_master, image_gen, asset_extractor
 from . import scene_splitter, prompt_generator, video_gen
 from . import api_key_config, llm_chat, image_reverse
 from . import img2img, text2img, img2video, text2video
+from . import character_turnaround
 from . import workflow_exporter, asset_json_splitter, asset_maker, jimeng_asset_maker
 
 for _mod in [script_generator, director_master, image_gen, asset_extractor,
              scene_splitter, prompt_generator, video_gen,
              api_key_config, llm_chat, image_reverse,
              img2img, text2img, img2video, text2video,
+             character_turnaround,
              workflow_exporter, asset_json_splitter, asset_maker, jimeng_asset_maker]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)

@@ -151,6 +151,27 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 
 ---
 
+### 📐 Agnes 角色三视图设定图 (AgnesNovelCharacterTurnaround)
+
+**功能：** 生成角色三视图设定表（turnaround sheet）：同一角色正面/侧面/背面从左到右并排，全身正交视图、比例与服装发型细节一致
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| character_desc | STRING | "" | 角色名 + 外貌/服装描述（越具体越一致） |
+| api_key | STRING | 留空自动加载 | Agnes AI API Key |
+| model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
+| quality | COMBO | 2K | 档位：1K/2K/3K/4K |
+| aspect_ratio | COMBO | 21:9 | 三视图推荐宽幅 21:9 / 16:9 |
+| reference_image | IMAGE | - | 可选：角色定妆图，连接后走图生图保持一致 |
+| extra_prompt | STRING | "" | 可选：追加风格/质量补充词 |
+
+**输出：**
+- image: 三视图张量（可存图或作为后续视频节点参考）
+- resolution: 实际分辨率
+- final_prompt: 最终拼接的完整提示词
+
+---
+
 ## 推荐配置
 
 ### 快速测试
