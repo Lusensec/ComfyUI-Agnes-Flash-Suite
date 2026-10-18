@@ -1,75 +1,850 @@
 """
-Agnes AI API Client Module
-===========================
-提供核心 API 客户端和配置管理
+Agnes AI API Client
+==================
+Wrapper for all Agnes AI API endpoints.
 
-依赖：
-- 优先使用 comfyui-agnes-ai 插件的 API
-- 如果未安装，使用内置的 fallback API
+Endpoints:
+- Chat Completions:  POST /v1/chat/completions
+- Image Generation:  POST /v1/images/generations
+- Video Generation:  POST /v1/video/generations (async with polling)
+
+Supported Models:
+- agnes-3.0-flash : Agent 编程/工具编排（Thinking 7 档），推荐用于复杂任务
+- agnes-2.5-flash : LLM chat / vision / tools（默认文本模型，Thinking 5 档）
+- agnes-2.0-flash : 旧版 LLM
+- agnes-image-2.5-flash (默认): 档位 1K-4K + ratio + extra_body 多图合成
+- agnes-image-2.1/2.0 : 文生图、图生图（WxH 像素）
+- agnes-video-2.5-flash (默认): seconds 4-12s + mode text/keyframe/reference, 720P
+- agnes-video-v2.0 : 文生视频、图生视频（num_frames 轮询）
 """
 
+import base64
+import json
 import os
+import re
+import time
+import tempfile
+from io import BytesIO
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
-# 尝试从 comfyui-agnes-ai 导入
-_COMFYUI_AGNES_AI_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "comfyui-agnes-ai",
-    "api",
-    "__init__.py"
-)
+import requests
+import yaml
+from PIL import Image
 
-if os.path.exists(_COMFYUI_AGNES_AI_PATH):
+# torch / numpy are only needed inside ComfyUI (tensor conversions).
+# Lazy-import them to allow the API module to be tested standalone.
+_torch = None
+_np = None
+
+def _get_torch():
+    global _torch
+    if _torch is None:
+        import torch as _t
+        _torch = _t
+    return _torch
+
+def _get_np():
+    global _np
+    if _np is None:
+        import numpy as _n
+        _np = _n
+    return _np
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+DEFAULT_BASE_URL = "https://api.agnes-ai.cn/v1"
+DEFAULT_CHAT_MODEL = "agnes-2.5-flash"
+DEFAULT_IMAGE_MODEL = "agnes-image-2.5-flash"
+DEFAULT_VIDEO_MODEL = "agnes-video-2.5-flash"
+
+DEFAULT_SIZE = "1024x1024"
+DEFAULT_VIDEO_FRAMES = 121
+DEFAULT_VIDEO_FPS = 24
+_DEFAULT_VIDEO_MAX_WAIT = 600  # seconds, also in config.yaml
+_DEFAULT_VIDEO_POLL_INTERVAL = 10  # seconds, also in config.yaml
+VIDEO_TIMEOUT = 600  # video generation can take 2-5 minutes
+
+# Load configuration from config.yaml
+_PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_CONFIG_FILE = os.path.join(_PLUGIN_DIR, "config.yaml")
+
+def _load_config() -> Dict[str, Any]:
+    """Load configuration from config.yaml, falling back to defaults."""
+    config = {
+        "base_url": DEFAULT_BASE_URL,
+        "api_key": "",
+        "chat_model": DEFAULT_CHAT_MODEL,
+        "image_model": DEFAULT_IMAGE_MODEL,
+        "video_model": DEFAULT_VIDEO_MODEL,
+        "video_max_wait": _DEFAULT_VIDEO_MAX_WAIT,
+        "video_poll_interval": _DEFAULT_VIDEO_POLL_INTERVAL,
+    }
     try:
-        # 动态导入 comfyui-agnes-ai 的 API
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "comfyui_agnes_ai_api",
-            _COMFYUI_AGNES_AI_PATH
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        
-        # 导出所有公开接口
-        AgnesClient = module.AgesClient
-        get_api_key = module.get_api_key
-        set_api_key = module.set_api_key
-        BASE_URL = module.BASE_URL
-        CHAT_MODEL = module.CHAT_MODEL
-        IMAGE_MODEL = module.IMAGE_MODEL
-        VIDEO_MODEL = module.VIDEO_MODEL
-        VIDEO_MAX_WAIT = module.VIDEO_MAX_WAIT
-        VIDEO_POLL_INTERVAL = module.VIDEO_POLL_INTERVAL
-        
-        _USES_EXTERNAL_API = True
-        print("[AgnesAPI] 使用 comfyui-agnes-ai API 客户端")
-    except Exception as e:
-        print(f"[AgnesAPI] 导入 comfyui-agnes-ai 失败: {e}，使用内置 API")
-        _USES_EXTERNAL_API = False
-else:
-    # 使用内置 fallback API
-    from .client import (
-        AgnesClient,
-        get_api_key,
-        set_api_key,
-        BASE_URL,
-        CHAT_MODEL,
-        IMAGE_MODEL,
-        VIDEO_MODEL,
-        VIDEO_MAX_WAIT,
-        VIDEO_POLL_INTERVAL,
-    )
-    _USES_EXTERNAL_API = False
-    print("[AgnesAPI] 使用内置 API 客户端")
+        if os.path.exists(_CONFIG_FILE):
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+                yaml_config = yaml.safe_load(f)
+                if yaml_config:
+                    if "api" in yaml_config and "base_url" in yaml_config["api"]:
+                        config["base_url"] = yaml_config["api"]["base_url"]
+                    if "api" in yaml_config and "video_max_wait" in yaml_config["api"]:
+                        config["video_max_wait"] = int(yaml_config["api"]["video_max_wait"])
+                    if "api" in yaml_config and "video_poll_interval" in yaml_config["api"]:
+                        config["video_poll_interval"] = int(yaml_config["api"]["video_poll_interval"])
+                    if "models" in yaml_config:
+                        if "chat" in yaml_config["models"]:
+                            config["chat_model"] = yaml_config["models"]["chat"]
+                        if "image" in yaml_config["models"]:
+                            config["image_model"] = yaml_config["models"]["image"]
+                        if "video" in yaml_config["models"]:
+                            config["video_model"] = yaml_config["models"]["video"]
+                    if "api_key" in yaml_config:
+                        config["api_key"] = yaml_config["api_key"] or ""
+    except Exception:
+        pass  # Fall back to defaults if config loading fails
+    return config
 
-__all__ = [
-    "AgnesClient",
-    "get_api_key",
-    "set_api_key",
-    "BASE_URL",
-    "CHAT_MODEL",
-    "IMAGE_MODEL",
-    "VIDEO_MODEL",
-    "VIDEO_MAX_WAIT",
-    "VIDEO_POLL_INTERVAL",
-    "_USES_EXTERNAL_API",
-]
+_config = _load_config()
+
+BASE_URL = _config["base_url"]
+CHAT_MODEL = _config["chat_model"]
+IMAGE_MODEL = _config["image_model"]
+VIDEO_MODEL = _config["video_model"]
+VIDEO_MAX_WAIT = _config["video_max_wait"]
+VIDEO_POLL_INTERVAL = _config["video_poll_interval"]
+
+AVAILABLE_CHAT_MODELS = list(dict.fromkeys(
+    [CHAT_MODEL, "agnes-3.0-flash", "agnes-2.5-flash", "agnes-2.0-flash"]))
+AVAILABLE_IMAGE_MODELS = list(dict.fromkeys(
+    [IMAGE_MODEL, "agnes-image-2.5-flash", "agnes-image-2.1-flash", "agnes-image-2.0-flash"]))
+AVAILABLE_VIDEO_MODELS = list(dict.fromkeys(
+    [VIDEO_MODEL, "agnes-video-2.5-flash", "agnes-video-v2.0"]))
+
+MIME_MAP = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+    "bmp": "image/bmp",
+}
+
+# ---------------------------------------------------------------------------
+# 新 Flash 2.5 模型族（2026 版接口，参见 Agnes-flash-suite-skills）
+# - 图像: agnes-image-2.5-flash  尺寸档位 1K/2K/3K/4K + ratio，
+#   图生图/多图合成走 extra_body.image[]（URL 或 Base64 Data URI）
+# - 视频: agnes-video-2.5-flash  seconds("4"~"12") + mode(text/keyframe/reference)，
+#   固定 720P；首尾帧 first_frame/last_frame；images<=5；audios<=3（URL 或
+#   Base64 Data URI）；查询端点需附加 &model_name=<model>
+# ---------------------------------------------------------------------------
+NEW_CHAT_MODELS = ("agnes-3.0-flash", "agnes-2.5-flash")
+NEW_IMAGE_MODELS = ("agnes-image-2.5-flash",)
+NEW_VIDEO_MODELS = ("agnes-video-2.5-flash",)
+
+IMAGE_TIER_SIZES = ("1K", "2K", "3K", "4K")
+IMAGE_RATIOS = ("1:1", "3:4", "4:3", "16:9", "9:16", "2:3", "3:2", "21:9")
+# 节点上可选但新图像接口不支持的比例 → 就近映射
+_IMAGE_RATIO_FALLBACK = {"4:5": "3:4", "5:4": "4:3", "9:21": "21:9"}
+
+VIDEO_25_RATIOS = ("21:9", "16:9", "4:3", "1:1", "3:4", "9:16")
+# 节点上常见但新视频接口不支持的比例 → 就近映射
+_VIDEO_RATIO_FALLBACK = {"4:5": "3:4", "5:4": "4:3", "9:21": "21:9"}
+
+
+# ---------------------------------------------------------------------------
+# Helper utilities
+# ---------------------------------------------------------------------------
+
+def tensor_to_pil(tensor) -> Image.Image:
+    """
+    Convert a ComfyUI IMAGE tensor [B, H, W, C] (float32, 0..1) to a PIL Image.
+    Returns the first image in the batch.
+    """
+    np = _get_np()
+    # Take first image: [H, W, C]
+    img = tensor[0].cpu().numpy()
+    img = (img * 255).astype(np.uint8)
+    return Image.fromarray(img)
+
+
+def pil_to_tensor(pil_img: Image.Image):
+    """Convert a PIL Image to a ComfyUI IMAGE tensor [1, H, W, C] float32."""
+    torch = _get_torch()
+    np = _get_np()
+    img = np.array(pil_img.convert("RGB")).astype(np.float32) / 255.0
+    return torch.from_numpy(img).unsqueeze(0)
+
+
+def pil_to_base64_uri(pil_img: Image.Image, fmt: str = "png") -> str:
+    """Convert a PIL Image to a base64 data URI string."""
+    buf = BytesIO()
+    pil_img.save(buf, format=fmt.upper())
+    raw = buf.getvalue()
+    b64 = base64.b64encode(raw).decode("ascii")
+    # Safety: ensure padding is correct (b64encode already pads, but belt-and-suspenders)
+    pad = len(b64) % 4
+    if pad:
+        b64 += "=" * (4 - pad)
+    mime = MIME_MAP.get(fmt.lower(), "image/png")
+    return f"data:{mime};base64,{b64}"
+
+
+def pil_to_base64_raw(pil_img: Image.Image, fmt: str = "png") -> str:
+    """Convert a PIL Image to raw base64 string (no data URI prefix)."""
+    buf = BytesIO()
+    pil_img.save(buf, format=fmt.upper())
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    pad = len(b64) % 4
+    if pad:
+        b64 += "=" * (4 - pad)
+    return b64
+
+
+def download_url_to_pil(url: str, timeout: int = 120) -> Optional[Image.Image]:
+    """Download an image from a URL and return as PIL Image."""
+    try:
+        resp = requests.get(url, timeout=timeout)
+        if resp.status_code == 200:
+            return Image.open(BytesIO(resp.content)).convert("RGB")
+    except Exception:
+        pass
+    return None
+
+
+def download_url_to_bytes(url: str, timeout: int = 120) -> Optional[bytes]:
+    """Download content from a URL and return raw bytes."""
+    try:
+        resp = requests.get(url, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.content
+    except Exception:
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# API Client
+# ---------------------------------------------------------------------------
+
+class AgnesClient:
+    """Unified client for all Agnes AI API endpoints."""
+
+    # HTTP statuses that trigger an automatic retry.
+    _RETRY_STATUSES = {429, 500, 502, 503, 504, 524}
+    _MAX_RETRIES = 3
+    _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        })
+
+    # ------------------------------------------------------------------
+    # Error helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _clean_error(status_code: int, body_text: str, api_name: str = "API") -> str:
+        """Parse an error response and return a clean, human-readable message."""
+        text = body_text.strip() if body_text else ""
+
+        # Cloudflare HTML error page
+        if text.startswith("<!DOCTYPE") or text.startswith("<html"):
+            # Try to extract Cloudflare error info
+            title_match = re.search(r"<title>[^<]*?(\d{3}):\s*([^<]*)</title>", text)
+            if title_match:
+                code = title_match.group(1)
+                desc = title_match.group(2)
+            else:
+                code = str(status_code)
+                desc = "server error"
+
+            # Map Cloudflare codes to Chinese messages
+            cf_map = {
+                "520": "服务器返回未知错误",
+                "521": "服务器已宕机",
+                "522": "连接超时（服务器未响应）",
+                "523": "服务器不可达",
+                "524": "服务器处理超时（任务过重）",
+                "525": "SSL 握手失败",
+                "526": "SSL 证书无效",
+                "530": "服务器错误",
+            }
+
+            extra = cf_map.get(code, desc)
+            return (
+                f"[{api_name} 错误] 服务器 {extra} (HTTP {status_code})。\n"
+                f"原因：Agnes AI 服务器繁忙或请求处理超时。\n"
+                f"建议：稍等 1-2 分钟后重试。"
+            )
+
+        # JSON error response
+        try:
+            if text:
+                error_data = json.loads(text)
+                error_msg = error_data.get("error", {}).get("message", "")
+                if not error_msg and isinstance(error_data.get("error"), str):
+                    error_msg = error_data["error"]
+                if error_msg:
+                    return f"[{api_name} 错误] {error_msg} (HTTP {status_code})"
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+        # Fallback: truncate long responses
+        if len(text) > 300:
+            text = text[:300] + "..."
+        return f"[{api_name} 错误] HTTP {status_code}: {text}" if text else f"[{api_name} 错误] HTTP {status_code}"
+
+    def _request_with_retry(self, method: str, url: str, api_name: str,
+                            json_payload: dict = None, timeout: int = 300) -> requests.Response:
+        """Make an HTTP request with automatic retry on transient server errors."""
+        last_error = None
+        for attempt in range(1, self._MAX_RETRIES + 1):
+            try:
+                if method == "POST":
+                    resp = self.session.post(url, json=json_payload, timeout=timeout)
+                else:
+                    resp = self.session.get(url, timeout=timeout)
+
+                if resp.status_code == 200:
+                    return resp
+
+                if resp.status_code in self._RETRY_STATUSES and attempt < self._MAX_RETRIES:
+                    delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    last_error = (resp.status_code, resp.text)
+                    time.sleep(delay)
+                    continue
+
+                # Not retryable or last attempt → raise
+                raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name))
+
+            except requests.exceptions.Timeout:
+                if attempt < self._MAX_RETRIES:
+                    delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    time.sleep(delay)
+                    continue
+                raise RuntimeError(
+                    f"[{api_name} 错误] 请求超时 (>{timeout}秒)。\n"
+                    f"建议：Agnes 服务器可能繁忙，请稍后重试。"
+                )
+            except requests.exceptions.ConnectionError:
+                if attempt < self._MAX_RETRIES:
+                    delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    time.sleep(delay)
+                    continue
+                raise RuntimeError(
+                    f"[{api_name} 错误] 无法连接到 Agnes 服务器。\n"
+                    f"建议：请检查网络连接或访问 https://platform.agnes-ai.cn/ 确认服务状态。"
+                )
+
+        # Should not reach here, but handle gracefully
+        if last_error:
+            raise RuntimeError(self._clean_error(last_error[0], last_error[1], api_name))
+        raise RuntimeError(f"[{api_name} 错误] 请求失败（已重试 {self._MAX_RETRIES} 次）")
+
+    # ------------------------------------------------------------------
+    # Chat / LLM
+    # ------------------------------------------------------------------
+
+    def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str = CHAT_MODEL,
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
+        stream: bool = False,
+        chat_template_kwargs: Optional[Dict[str, Any]] = None,
+        reasoning_effort: Optional[str] = None,
+    ) -> str:
+        """Call the chat completions endpoint."""
+        url = f"{BASE_URL}/chat/completions"
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": stream,
+        }
+        # Thinking 模式（2.5-flash 5 档 none~max；3.0-flash 7 档）
+        if chat_template_kwargs:
+            payload["chat_template_kwargs"] = chat_template_kwargs
+        if reasoning_effort:
+            payload["reasoning_effort"] = reasoning_effort
+        resp = self._request_with_retry("POST", url, "Chat", json_payload=payload)
+
+        data = resp.json()
+        try:
+            return data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError):
+            raise RuntimeError(f"[Chat 错误] 意外的响应格式: {data}")
+
+    # ------------------------------------------------------------------
+    # Image Generation
+    # ------------------------------------------------------------------
+
+    def generate_image(
+        self,
+        prompt: str,
+        mode: str = "text2img",
+        reference_images: Optional[List[Image.Image]] = None,
+        size: str = DEFAULT_SIZE,
+        n: int = 1,
+        model: str = IMAGE_MODEL,
+        ratio: Optional[str] = None,
+        return_base64: bool = False,
+    ) -> List[Image.Image]:
+        """Generate images via the Agnes image generation API.
+
+        支持两代接口（按 size 传参自动区分，无需指定模型）：
+        - 新接口 agnes-image-2.5-flash：size 传档位 "1K"/"2K"/"3K"/"4K"，
+          可选 ratio（1:1,3:4,4:3,16:9,9:16,2:3,3:2,21:9）；
+          图生图/多图合成通过 extra_body.image[] 传参考图（URL 或 Base64 Data URI）；
+          return_base64=True 时响应为 b64_json，直接解码为 PIL。
+        - 旧接口 agnes-image-2.1/2.0：size 传 "WxH" 像素串。
+        """
+        url = f"{BASE_URL}/images/generations"
+        tier = str(size).strip().upper()
+        tier_mode = tier in IMAGE_TIER_SIZES
+        payload: Dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "n": n,
+        }
+
+        if tier_mode:
+            payload["size"] = tier
+            if ratio:
+                payload["ratio"] = _IMAGE_RATIO_FALLBACK.get(ratio, ratio)
+            if mode == "img2img" and reference_images:
+                uris = [
+                    img if isinstance(img, str) else pil_to_base64_uri(img)
+                    for img in reference_images
+                ]
+                payload["extra_body"] = {
+                    "image": uris,
+                    "response_format": "b64_json" if return_base64 else "url",
+                }
+        else:
+            payload["size"] = size
+            if mode == "img2img" and reference_images:
+                image_uris = [pil_to_base64_uri(img) for img in reference_images]
+                payload["extra_body"] = {
+                    "image": image_uris,
+                    "response_format": "url",
+                }
+
+        resp = self._request_with_retry("POST", url, "Image", json_payload=payload)
+
+        data = resp.json()
+        images = []
+        for item in data.get("data", []):
+            b64 = item.get("b64_json")
+            if b64:
+                raw = base64.b64decode(b64)
+                images.append(Image.open(BytesIO(raw)).convert("RGB"))
+                continue
+            image_url = item.get("url") or item.get("image_url")
+            if image_url:
+                pil_img = download_url_to_pil(image_url)
+                if pil_img:
+                    images.append(pil_img)
+
+        if not images:
+            raise RuntimeError("[Image 错误] 服务器未返回任何图片，请尝试修改提示词或重试。")
+
+        return images
+
+    # ------------------------------------------------------------------
+    # Video Generation (async with polling)
+    # ------------------------------------------------------------------
+
+    def generate_video(
+        self,
+        prompt: str,
+        mode: str = "text2video",
+        reference_images: Optional[List[Image.Image]] = None,
+        model: str = VIDEO_MODEL,
+        num_frames: int = DEFAULT_VIDEO_FRAMES,
+        frame_rate: int = DEFAULT_VIDEO_FPS,
+        seed: Optional[int] = None,
+        size: Optional[str] = None,
+        max_wait: int = 600,
+        output_dir: Optional[str] = None,
+        seconds: Optional[int] = None,
+        aspect_ratio: Optional[str] = None,
+        first_frame=None,
+        last_frame=None,
+        audio_refs: Optional[List] = None,
+        return_ids: bool = False,
+    ) -> Optional[str]:
+        """
+        Generate a video via the Agnes video generation API.
+
+        支持两代接口（按 model 自动区分）：
+
+        - 新 agnes-video-2.5-flash（4-12 秒 720P）：
+            payload: seconds("4"~"12", 默认"5") + mode(text|keyframe|reference)
+            + size="720P" + aspect_ratio；
+            keyframe 模式: first_frame / last_frame（URL 或 Base64 Data URI）；
+            reference 模式: images<=5、audios<=3（URL 或 Base64 Data URI）；
+            查询: GET /agnesapi?video_id=<ID>&model_name=<model>。
+        - 旧 agnes-video-v2.0：
+            payload: num_frames(8n+1, <=441)/frame_rate/width/height；
+            查询: GET /agnesapi?video_id=<ID>。
+
+        Args:
+            prompt: 视频描述。
+            mode: 旧接口 "text2video"/"img2video"；新接口 "text"/"keyframe"/"reference"
+                   （"text2video"→"text"、"img2video"→"reference" 自动映射）。
+            reference_images: PIL 参考图列表；新接口 keyframe 取 [0]=首帧 [1]=尾帧，
+                   reference 模式作为 images[]（最多取 5 张）。
+            seconds: 新接口视频时长（秒，4-12，默认 5）。
+            aspect_ratio: 新接口宽高比（21:9/16:9/4:3/1:1/3:4/9:16；其他值就近映射）。
+            first_frame / last_frame: 新接口 keyframe 模式首尾帧（PIL/URL/bytes）。
+            audio_refs: 新接口音频参考（URL 字符串或 bytes，最多 3 个）。
+            return_ids: True 时返回 (save_path, task_id, video_id) 三元组。
+        """
+        new_model = model in NEW_VIDEO_MODELS
+
+        # --- Build submission payload ---
+        url = f"{BASE_URL}/videos"
+        payload: Dict[str, Any] = {"model": model, "prompt": prompt}
+
+        if new_model:
+            secs = int(seconds if seconds is not None else 5)
+            payload["seconds"] = str(min(12, max(4, secs)))
+            m = {"text2video": "text", "img2video": "reference"}.get(mode, mode)
+            if m not in ("text", "keyframe", "reference"):
+                m = "text"
+            payload["mode"] = m
+            payload["size"] = "720P"
+            ar = aspect_ratio or "16:9"
+            payload["aspect_ratio"] = _VIDEO_RATIO_FALLBACK.get(ar, ar)
+            payload["n"] = 1
+            if seed is not None:
+                payload["seed"] = seed
+
+            def _enc_ref(v):
+                """参考素材编码：str 原样（URL 或 Data URI），bytes→PNG，PIL→Data URI"""
+                if isinstance(v, str):
+                    return v
+                if isinstance(v, (bytes, bytearray)):
+                    return "data:image/png;base64," + base64.b64encode(bytes(v)).decode("ascii")
+                return pil_to_base64_uri(v)
+
+            if m == "keyframe":
+                ff = first_frame if first_frame is not None else (
+                    reference_images[0] if reference_images else None)
+                lf = last_frame if last_frame is not None else (
+                    reference_images[1] if reference_images and len(reference_images) > 1 else None)
+                if ff is not None:
+                    payload["first_frame"] = _enc_ref(ff)
+                if lf is not None:
+                    payload["last_frame"] = _enc_ref(lf)
+            elif m == "reference":
+                if reference_images:
+                    payload["images"] = [_enc_ref(i) for i in reference_images[:5]]
+                if audio_refs:
+                    audios = []
+                    for a in audio_refs[:3]:
+                        if isinstance(a, str):
+                            audios.append(a)
+                        else:
+                            audios.append("data:audio/mpeg;base64," +
+                                          base64.b64encode(bytes(a)).decode("ascii"))
+                    payload["audios"] = audios
+        else:
+            # 旧接口 agnes-video-v2.0
+            # Validate num_frames
+            if (num_frames - 1) % 8 != 0:
+                raise ValueError("num_frames must satisfy (num_frames - 1) % 8 == 0")
+            if num_frames > 441:
+                raise ValueError("num_frames must be <= 441")
+            payload["num_frames"] = num_frames
+            payload["frame_rate"] = frame_rate
+            width = None
+            height = None
+            if size:
+                try:
+                    parts = size.split("x")
+                    width = int(parts[0])
+                    height = int(parts[1])
+                except (ValueError, IndexError):
+                    pass  # fall through, API will use defaults
+            if width is not None:
+                payload["width"] = width
+            if height is not None:
+                payload["height"] = height
+            if seed is not None:
+                payload["seed"] = seed
+            # Image-to-video: single image or multi-image via extra_body
+            if mode == "img2video" and reference_images:
+                image_uris = [pil_to_base64_raw(img) for img in reference_images]
+                if len(image_uris) == 1:
+                    payload["image"] = image_uris[0]
+                else:
+                    payload["extra_body"] = {
+                        "image": image_uris,
+                    }
+
+        # --- Submit task ---
+        resp = self._request_with_retry("POST", url, "Video", json_payload=payload, timeout=60)
+        data = resp.json()
+
+        task_id = data.get("id")
+        video_id = data.get("video_id", task_id)  # Prefer video_id for polling
+        if not task_id:
+            raise RuntimeError(f"[Video 错误] 服务器未返回任务ID: {data}")
+
+        # --- Poll for result ---
+        # 新接口需附加 model_name；轮询策略：先等 60s（任务排队期），之后每 5s 一次
+        status_url = f"{BASE_URL}/agnesapi?video_id={video_id}"
+        if new_model:
+            status_url += f"&model_name={model}"
+        poll_interval = 60 if (new_model and max_wait > 90) else VIDEO_POLL_INTERVAL
+        elapsed = 0
+
+        while elapsed < max_wait:
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+            poll_interval = 5 if new_model else VIDEO_POLL_INTERVAL
+
+            try:
+                status_resp = self.session.get(status_url, timeout=30)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                continue
+
+            if status_resp.status_code != 200:
+                continue
+
+            status_data = status_resp.json()
+            state = status_data.get("status")
+
+            if state == "completed":
+                # Try multiple possible locations for the video URL
+                # （新接口结果在 metadata.url / url）
+                video_url = None
+                for sub in ("metadata", "result", "output"):
+                    obj = status_data.get(sub, {})
+                    if isinstance(obj, dict):
+                        for key in ("url", "video_url"):
+                            val = obj.get(key)
+                            if val and isinstance(val, str) and val.startswith("http"):
+                                video_url = val
+                                break
+                    if video_url:
+                        break
+                if not video_url:
+                    for key in ("video_url", "url", "output_url", "download_url"):
+                        val = status_data.get(key)
+                        if val and isinstance(val, str) and val.startswith("http"):
+                            video_url = val
+                            break
+                if not video_url:
+                    # Check data array
+                    for item in status_data.get("data", []):
+                        for key in ("url", "video_url"):
+                            val = item.get(key)
+                            if val and isinstance(val, str) and val.startswith("http"):
+                                video_url = val
+                                break
+                        if video_url:
+                            break
+
+                if not video_url:
+                    # Dump raw response for debugging
+                    resp_dump = str(status_data)
+                    if len(resp_dump) > 600:
+                        resp_dump = resp_dump[:600] + "..."
+                    raise RuntimeError(
+                        f"[Video 错误] 任务状态为 completed，但未找到 video_url。\n"
+                        f"API 原始响应: {resp_dump}"
+                    )
+
+                # Download and save
+                video_bytes = download_url_to_bytes(video_url, timeout=120)
+                if not video_bytes:
+                    raise RuntimeError("[Video 错误] 视频文件下载失败。")
+
+                save_dir = output_dir if output_dir else tempfile.gettempdir()
+                os.makedirs(save_dir, exist_ok=True)
+                timestamp = int(time.time())
+                mode_tag = str(payload.get("mode", mode)) if new_model else str(mode)
+                filename = f"agnes_video_{mode_tag}_{timestamp}_{task_id[:8]}.mp4"
+                save_path = os.path.join(save_dir, filename)
+                with open(save_path, "wb") as f:
+                    f.write(video_bytes)
+
+                if return_ids:
+                    return (save_path, task_id, video_id)
+                return save_path
+
+            elif state in ("failed", "error"):
+                error_msg = status_data.get("error", "Unknown error")
+                # Clean up nested error dicts
+                if isinstance(error_msg, dict):
+                    error_msg = error_msg.get("message", str(error_msg))
+                # Detect common server errors for user-friendly advice
+                hint = ""
+                error_lower = str(error_msg).lower()
+                if "cuda out of memory" in error_lower or "oom" in error_lower:
+                    hint = "\n原因：Agnes 服务器 GPU 显存不足，当前排队人数较多。\n建议：降低画质（1K）或减少帧数后重试。"
+                elif "no available channel" in error_lower or "503" in error_lower:
+                    hint = "\n原因：Agnes 视频模型无可用计算节点。\n建议：稍等 2-5 分钟后重试。"
+                raise RuntimeError(f"[Video 错误] 视频生成失败: {error_msg}{hint}")
+
+        raise TimeoutError(
+            f"[Video 错误] 视频生成超时（已等待 {max_wait} 秒，任务ID: {task_id}，video_id: {video_id}）。\n"
+            f"建议：减少时长（新接口）或帧数（旧接口），或稍后重试。"
+        )
+
+    # ------------------------------------------------------------------
+    # Image Understanding / Reverse Prompt (via vision chat)
+    # ------------------------------------------------------------------
+
+    def reverse_prompt(
+        self,
+        image: Image.Image,
+        model: str = CHAT_MODEL,
+        detail: str = "detailed",
+    ) -> str:
+        """
+        Analyze an image and generate a prompt that could reproduce it.
+
+        Args:
+            image: Input PIL Image.
+            model: Vision-capable model identifier.
+            detail: "brief" or "detailed" analysis level.
+
+        Returns:
+            Generated prompt / description.
+        """
+        image_uri = pil_to_base64_uri(image)
+
+        if detail == "detailed":
+            system_prompt = (
+                "You are an expert at analyzing images and writing prompts for "
+                "AI image generation models. Describe the image in extreme detail: "
+                "subject, composition, lighting, color palette, style, mood, camera angle, "
+                "depth of field, textures, and any distinctive elements. "
+                "Output ONLY the prompt, no additional commentary."
+            )
+        else:
+            system_prompt = (
+                "You are an expert at analyzing images and writing prompts for "
+                "AI image generation models. Write a concise prompt describing the key "
+                "elements of this image. Output ONLY the prompt, no additional commentary."
+            )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_uri}},
+                    {
+                        "type": "text",
+                        "text": "Please describe this image as an AI image generation prompt.",
+                    },
+                ],
+            },
+        ]
+
+        return self.chat(messages, model=model, temperature=0.3, max_tokens=2048)
+
+
+# ---------------------------------------------------------------------------
+# Global state helper (shared across nodes)
+# ---------------------------------------------------------------------------
+
+# Path to the persistent API key config file (in plugin root).
+# _PLUGIN_DIR is now defined above in _load_config()
+_API_KEY_CONFIG_FILE = os.path.join(_PLUGIN_DIR, "api_key_config.json")
+
+_GLOBAL_CONFIG: Dict[str, Any] = {
+    "api_key": os.environ.get("AGNES_API_KEY", "") or _config.get("api_key", ""),
+    "chat_model": CHAT_MODEL,
+    "image_model": IMAGE_MODEL,
+    "video_model": VIDEO_MODEL,
+}
+
+# Attempt to load API key from config file on module init.
+# Priority: env var > config file.
+def _load_key_from_config_file() -> str:
+    """Try to load the API key from the plugin's api_key_config.json."""
+    try:
+        if os.path.exists(_API_KEY_CONFIG_FILE):
+            with open(_API_KEY_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("api_key", "")
+    except Exception:
+        pass
+    return ""
+
+# Load from config file if env var not set.
+if not _GLOBAL_CONFIG["api_key"]:
+    _GLOBAL_CONFIG["api_key"] = _load_key_from_config_file() or _config.get("api_key", "")
+
+
+def _mask_key(key: str) -> str:
+    if not key:
+        return "(empty)"
+    if len(key) > 12:
+        return key[:8] + "****" + key[-4:]
+    elif len(key) > 6:
+        return key[:3] + "****" + key[-3:]
+    return "****"
+
+def get_api_key() -> str:
+    # 1. Env var has highest priority
+    key = os.environ.get("AGNES_API_KEY", "").strip()
+    if key:
+        print(f"[AgnesAPI] API Key source: env var AGNES_API_KEY = {_mask_key(key)}")
+        return key
+    # 2. Read from api_key_config.json
+    key = _load_key_from_config_file().strip()
+    if key:
+        _GLOBAL_CONFIG["api_key"] = key
+        print(f"[AgnesAPI] API Key source: api_key_config.json = {_mask_key(key)}")
+        return key
+    # 3. Read from config.yaml
+    yaml_key = _config.get("api_key", "").strip()
+    if yaml_key:
+        _GLOBAL_CONFIG["api_key"] = yaml_key
+        print(f"[AgnesAPI] API Key source: config.yaml = {_mask_key(yaml_key)}")
+        return yaml_key
+    # 4. Fallback to cached value
+    cached = _GLOBAL_CONFIG["api_key"].strip()
+    if cached:
+        print(f"[AgnesAPI] API Key source: global cache = {_mask_key(cached)}")
+    else:
+        print("[AgnesAPI] No API Key found in any source (env var, api_key_config.json, config.yaml, cache)")
+    return cached
+
+
+def set_api_key(key: str) -> None:
+    _GLOBAL_CONFIG["api_key"] = key
+
+
+def get_client() -> AgnesClient:
+    key = get_api_key()
+    if not key:
+        raise ValueError(
+            "Agnes API key is not set. Please provide your API key in the node settings.\n"
+            "Get a free key at: https://platform.agnes-ai.cn/"
+        )
+    return AgnesClient(key)
+
+
+def get_global_config() -> Dict[str, Any]:
+    return dict(_GLOBAL_CONFIG)
+
+
+def set_global_model(model_type: str, model_name: str) -> None:
+    _GLOBAL_CONFIG[model_type] = model_name

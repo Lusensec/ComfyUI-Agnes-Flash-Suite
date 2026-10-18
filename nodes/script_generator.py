@@ -1,14 +1,16 @@
-"""
+﻿"""
 Agnes 剧本生成节点
 使用 Agnes LLM 生成影视解说文案
 """
 import requests
 import re
-from ..api import AgnesClient, BASE_URL, CHAT_MODEL
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL
 
 
 class AgnesScriptGenerator:
     """使用 Agnes LLM 生成解说文案"""
+    
+    DESCRIPTION = "根据故事大纲生成影视解说文案，支持多种风格和时长"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -16,30 +18,69 @@ class AgnesScriptGenerator:
             "required": {
                 "story_outline": ("STRING", {
                     "multiline": True,
-                    "default": ""
+                    "default": "",
+                    "placeholder": "输入故事大纲或章节摘要...",
+                    "tooltip": "故事大纲，用于生成解说文案"
                 }),
                 "api_key": ("STRING", {
-                    "default": "sk-你的Key",
-                    "placeholder": "Agnes API Key"
+                    "default": "",
+                    "placeholder": "sk-xxxxxxxx",
+                    "tooltip": "Agnes AI API Key"
                 }),
-                "style": (["casual", "professional", "humorous", "dramatic"], {"default": "casual"}),
-                "target_duration": ("INT", {"default": 180, "min": 60, "max": 600}),
-                "temperature": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "style": (["casual", "professional", "humorous", "dramatic"], {
+                    "default": "casual",
+                    "tooltip": "解说风格：casual=风趣幽默，professional=深度解读，humorous=轻松搞笑，dramatic=情感饱满"
+                }),
+                "target_duration": ("INT", {
+                    "default": 180,
+                    "min": 60,
+                    "max": 600,
+                    "tooltip": "目标时长（秒），约等于文案字数/5"
+                }),
+                "temperature": ("FLOAT", {
+                    "default": 0.8,
+                    "min": 0.0,
+                    "max": 1.0,
+                    "step": 0.05,
+                    "tooltip": "生成温度，越高越有创意，越低越稳定"
+                }),
             },
             "optional": {
-                "base_url": ("STRING", {"default": BASE_URL}),
-                "model": ("STRING", {"default": CHAT_MODEL}),
+                "base_url": ("STRING", {
+                    "default": BASE_URL,
+                    "tooltip": "API 地址"
+                }),
+                "model": ("STRING", {
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型"
+                }),
             }
         }
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("script",)
+    RETURN_LABELS = ("解说文案")
     FUNCTION = "generate"
-    CATEGORY = "🎬 Agnes Novel"
+    CATEGORY = "Agnes Novel"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def get_extra_output_methods(cls):
+        return ["get_extra_pnginfo"]
+
+    def get_extra_pnginfo(self, **kwargs):
+        extra = {}
+        if "script" in kwargs:
+            extra["script"] = {
+                "description": "影视解说文案，包含开场、讲解、结尾等完整内容"
+            }
+        return extra
 
     def generate(self, story_outline, api_key, style, target_duration, temperature, base_url=BASE_URL, model=CHAT_MODEL):
-        if not api_key:
-            raise ValueError("Agnes API Key required")
+        if not api_key.strip():
+            api_key = get_api_key()
+        if not api_key.strip():
+            return ("[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]",)
 
         target_chars = target_duration * 5
 
@@ -96,7 +137,7 @@ class AgnesScriptGenerator:
 
         except Exception as e:
             print(f"[Agnes Script] Failed: {e}")
-            raise
+            return (f"[Error] {str(e)}",)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScriptGenerator": AgnesScriptGenerator}

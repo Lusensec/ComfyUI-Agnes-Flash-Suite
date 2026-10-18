@@ -39,6 +39,7 @@ def _load_config() -> Dict[str, Any]:
         "video_model": DEFAULT_VIDEO_MODEL,
         "video_max_wait": DEFAULT_VIDEO_MAX_WAIT,
         "video_poll_interval": DEFAULT_VIDEO_POLL_INTERVAL,
+        "api_key": "",
     }
     try:
         if os.path.exists(_CONFIG_FILE):
@@ -58,6 +59,8 @@ def _load_config() -> Dict[str, Any]:
                             config["image_model"] = yaml_config["models"]["image"]
                         if "video" in yaml_config["models"]:
                             config["video_model"] = yaml_config["models"]["video"]
+                if "api_key" in yaml_config:
+                    config["api_key"] = yaml_config["api_key"] or ""
     except Exception as e:
         print(f"[AgnesAPI] 配置加载失败: {e}")
     return config
@@ -77,7 +80,7 @@ VIDEO_POLL_INTERVAL = _config["video_poll_interval"]
 # API Key 管理
 _API_KEY_CONFIG_FILE = os.path.join(_PLUGIN_DIR, "api_key_config.json")
 _GLOBAL_CONFIG: Dict[str, Any] = {
-    "api_key": os.environ.get("AGNES_API_KEY", ""),
+    "api_key": os.environ.get("AGNES_API_KEY", "") or _config.get("api_key", ""),
 }
 
 
@@ -95,17 +98,44 @@ def _load_key_from_config_file() -> str:
 
 # 初始化 API Key
 if not _GLOBAL_CONFIG["api_key"]:
-    _GLOBAL_CONFIG["api_key"] = _load_key_from_config_file()
+    _GLOBAL_CONFIG["api_key"] = _load_key_from_config_file() or _config.get("api_key", "")
 
+
+def _mask_key(key: str) -> str:
+    if not key:
+        return "(empty)"
+    if len(key) > 12:
+        return key[:8] + "****" + key[-4:]
+    elif len(key) > 6:
+        return key[:3] + "****" + key[-3:]
+    return "****"
 
 def get_api_key() -> str:
     """获取当前 API Key"""
-    key = _GLOBAL_CONFIG["api_key"]
-    if not key:
-        key = _load_key_from_config_file()
-        if key:
-            _GLOBAL_CONFIG["api_key"] = key
-    return key
+    # 1. Env var has highest priority
+    key = os.environ.get("AGNES_API_KEY", "").strip()
+    if key:
+        print(f"[AgnesAPI] API Key source: env var AGNES_API_KEY = {_mask_key(key)}")
+        return key
+    # 2. Try to load from api_key_config.json
+    key = _load_key_from_config_file()
+    if key:
+        _GLOBAL_CONFIG["api_key"] = key
+        print(f"[AgnesAPI] API Key source: api_key_config.json = {_mask_key(key)}")
+        return key
+    # 3. Try to load from config.yaml
+    yaml_key = _config.get("api_key", "").strip()
+    if yaml_key:
+        _GLOBAL_CONFIG["api_key"] = yaml_key
+        print(f"[AgnesAPI] API Key source: config.yaml = {_mask_key(yaml_key)}")
+        return yaml_key
+    # 4. Fallback to cached value
+    cached = _GLOBAL_CONFIG["api_key"].strip()
+    if cached:
+        print(f"[AgnesAPI] API Key source: global cache = {_mask_key(cached)}")
+    else:
+        print("[AgnesAPI] No API Key found in any source (env var, api_key_config.json, config.yaml, cache)")
+    return cached
 
 
 def set_api_key(key: str) -> None:

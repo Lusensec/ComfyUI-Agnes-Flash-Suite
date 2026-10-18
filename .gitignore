@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,3 +30,4 @@ Thumbs.db
 *.backup_*
 *.old
 *.new
+api/__init__.py.backup

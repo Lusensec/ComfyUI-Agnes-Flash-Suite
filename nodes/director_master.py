@@ -14,6 +14,8 @@ class AgnesDirectorMaster:
     Agnes 总导演 v1
     使用 agnes-2.5-flash 生成完整分镜脚本
     """
+    
+    DESCRIPTION = "将小说章节生成为完整的编号分镜脚本，包含角色、场景、动作、情绪、台词等详细信息"
 
     @classmethod
     def INPUT_TYPES(s):
@@ -22,16 +24,24 @@ class AgnesDirectorMaster:
                 "chapter_text": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "输入小说章节全文..."
+                    "placeholder": "输入小说章节全文...\n建议 3000-8000 字",
+                    "tooltip": "待处理的小说章节文本，将生成完整分镜脚本"
                 }),
                 "api_key": ("STRING", {
-                    "default": "sk-你的Key",
-                    "placeholder": "Agnes API Key"
+                    "default": "",
+                    "placeholder": "sk-xxxxxxxx",
+                    "tooltip": "Agnes AI API Key，从 https://platform.agnes-ai.com 获取"
                 }),
             },
             "optional": {
-                "base_url": ("STRING", {"default": BASE_URL}),
-                "model": ("STRING", {"default": CHAT_MODEL}),
+                "base_url": ("STRING", {
+                    "default": BASE_URL,
+                    "tooltip": "API 地址，默认使用 Agnes AI 官方地址"
+                }),
+                "model": ("STRING", {
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型，推荐使用 agnes-2.5-flash"
+                }),
             }
         }
         return inputs
@@ -51,10 +61,57 @@ class AgnesDirectorMaster:
         "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
     )
+    RETURN_LABELS = (
+        "处理日志",
+        "分镜 1", "分镜 2", "分镜 3", "分镜 4", "分镜 5",
+        "分镜 6", "分镜 7", "分镜 8", "分镜 9", "分镜 10",
+        "分镜 11", "分镜 12", "分镜 13", "分镜 14", "分镜 15",
+        "分镜 16", "分镜 17", "分镜 18", "分镜 19", "分镜 20",
+        "分镜 21", "分镜 22", "分镜 23", "分镜 24", "分镜 25",
+        "分镜 26", "分镜 27", "分镜 28", "分镜 29", "分镜 30",
+        "分镜 31", "分镜 32", "分镜 33", "分镜 34", "分镜 35",
+        "分镜 36", "分镜 37", "分镜 38", "分镜 39", "分镜 40",
+        "分镜 41", "分镜 42", "分镜 43", "分镜 44", "分镜 45",
+        "分镜 46", "分镜 47", "分镜 48", "分镜 49", "分镜 50",
+        "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+    )
     FUNCTION = "split_scenes"
-    CATEGORY = "🎬 Agnes Novel"
+    CATEGORY = "Agnes Novel"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def get_extra_output_methods(cls):
+        return ["get_extra_pnginfo"]
+
+    def get_extra_pnginfo(self, **kwargs):
+        extra = {}
+        outputs = {
+            "log_text": "处理日志，包含成功/失败信息和输出文件路径",
+            "scene_1": "第 1 个分镜脚本，包含角色、场景、动作、情绪、台词",
+            "scene_2": "第 2 个分镜脚本",
+            "scene_3": "第 3 个分镜脚本",
+            "scene_4": "第 4 个分镜脚本",
+            "scene_5": "第 5 个分镜脚本",
+        }
+        for i in range(1, 51):
+            outputs[f"scene_{i}"] = f"第 {i} 个分镜脚本（如果存在）"
+        outputs["chapter_text_out"] = "原始小说章节文本（透传）"
+        outputs["api_key_out"] = "API Key（透传）"
+        outputs["base_url_out"] = "API 地址（透传）"
+        outputs["model_out"] = "使用的模型名称（透传）"
+        
+        for key in outputs:
+            if key in kwargs:
+                extra[key] = {"description": outputs[key]}
+        return extra
 
     def split_scenes(self, chapter_text, api_key, base_url=BASE_URL, model=CHAT_MODEL):
+        if not api_key.strip():
+            api_key = get_api_key()
+        if not api_key.strip():
+            error_msg = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
+            return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes Director Master - {model}]")
         print(f"{'='*60}")
@@ -152,7 +209,7 @@ class AgnesDirectorMaster:
 
             result = [log]
             for i in range(1, 51):
-                result.append(shots[i] if i <= len(shots) else "")
+                result.append(shots.get(i, ""))
             result.append(chapter_text)
             result.append(api_key)
             result.append(base_url)

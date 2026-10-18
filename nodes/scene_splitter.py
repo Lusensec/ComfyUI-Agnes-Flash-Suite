@@ -15,6 +15,8 @@ class AgnesSceneSplitter:
     Agnes 场景拆分 v32
     使用 agnes-2.5-flash 进行场景切分
     """
+    
+    DESCRIPTION = "将小说章节切分为多个场景段落，每个段落约对应 5 秒视频内容，包含角色、动作、场景标注"
 
     @classmethod
     def INPUT_TYPES(s):
@@ -23,26 +25,29 @@ class AgnesSceneSplitter:
                 "chapter_text": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "输入小说章节全文..."
+                    "placeholder": "输入小说章节全文...\n建议 3000-8000 字",
+                    "tooltip": "待处理的小说章节文本，单章建议 3000-8000 字"
                 }),
                 "api_key": ("STRING", {
-                    "default": "sk-你的Key",
-                    "placeholder": "Agnes API Key"
+                    "default": "",
+                    "placeholder": "sk-xxxxxxxx",
+                    "tooltip": "Agnes AI API Key，从 https://platform.agnes-ai.com 获取"
                 }),
             },
             "optional": {
                 "base_url": ("STRING", {
-                    "default": BASE_URL
+                    "default": BASE_URL,
+                    "tooltip": "API 地址，默认使用 Agnes AI 官方地址"
                 }),
                 "model": ("STRING", {
-                    "default": CHAT_MODEL
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型，推荐使用 agnes-2.5-flash"
                 }),
             }
         }
         return inputs
 
-    RETURN_TYPES = (
-        "STRING",) * 55  # log + 50 scenes + 4 pass-through
+    RETURN_TYPES = ("STRING",) * 55
     RETURN_NAMES = (
         "log_text",
         "scene_1", "scene_2", "scene_3", "scene_4", "scene_5",
@@ -57,10 +62,57 @@ class AgnesSceneSplitter:
         "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
     )
+    RETURN_LABELS = (
+        "处理日志",
+        "场景 1", "场景 2", "场景 3", "场景 4", "场景 5",
+        "场景 6", "场景 7", "场景 8", "场景 9", "场景 10",
+        "场景 11", "场景 12", "场景 13", "场景 14", "场景 15",
+        "场景 16", "场景 17", "场景 18", "场景 19", "场景 20",
+        "场景 21", "场景 22", "场景 23", "场景 24", "场景 25",
+        "场景 26", "场景 27", "场景 28", "场景 29", "场景 30",
+        "场景 31", "场景 32", "场景 33", "场景 34", "场景 35",
+        "场景 36", "场景 37", "场景 38", "场景 39", "场景 40",
+        "场景 41", "场景 42", "场景 43", "场景 44", "场景 45",
+        "场景 46", "场景 47", "场景 48", "场景 49", "场景 50",
+        "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+    )
     FUNCTION = "split_scenes"
-    CATEGORY = "🎬 Agnes Novel"
+    CATEGORY = "Agnes Novel"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def get_extra_output_methods(cls):
+        return ["get_extra_pnginfo"]
+
+    def get_extra_pnginfo(self, **kwargs):
+        extra = {}
+        outputs = {
+            "log_text": "处理日志，包含成功/失败信息和输出文件路径",
+            "scene_1": "第 1 个场景段落",
+            "scene_2": "第 2 个场景段落",
+            "scene_3": "第 3 个场景段落",
+            "scene_4": "第 4 个场景段落",
+            "scene_5": "第 5 个场景段落",
+        }
+        for i in range(1, 51):
+            outputs[f"scene_{i}"] = f"第 {i} 个场景段落（如果存在）"
+        outputs["chapter_text_out"] = "原始小说章节文本（透传）"
+        outputs["api_key_out"] = "API Key（透传）"
+        outputs["base_url_out"] = "API 地址（透传）"
+        outputs["model_out"] = "使用的模型名称（透传）"
+        
+        for key in outputs:
+            if key in kwargs:
+                extra[key] = {"description": outputs[key]}
+        return extra
 
     def split_scenes(self, chapter_text, api_key, base_url=BASE_URL, model=CHAT_MODEL):
+        if not api_key.strip():
+            api_key = get_api_key()
+        if not api_key.strip():
+            error_msg = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
+            return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes Scene Splitter - {model}]")
         print(f"{'='*60}")
@@ -155,7 +207,7 @@ class AgnesSceneSplitter:
 
             result = [log]
             for i in range(1, 51):
-                result.append(scenes[i] if i <= len(scenes) else "")
+                result.append(scenes.get(i, ""))
             result.append(chapter_text)
             result.append(api_key)
             result.append(base_url)
@@ -170,18 +222,26 @@ class AgnesSceneSplitter:
             return tuple(result)
 
     def _parse_scenes(self, content):
+        """解析 [SCENE_n] / [TRANSITION] 块。
+
+        场景按模型给出的编号存入对应槽位；过渡段 [TRANSITION] 统一追加到
+        「最大场景编号之后」的槽位，避免被随后同编号的 [SCENE_n] 块覆盖丢失。
+        """
         scenes = {}
+        transitions = []
         blocks = re.split(r'\[(SCENE_\d+|TRANSITION)\]', content)
-        current_num = 0
         for i in range(1, len(blocks), 2):
             tag = blocks[i]
             text = blocks[i+1].strip() if i+1 < len(blocks) else ""
             if tag.startswith("SCENE_"):
-                current_num = int(re.search(r'\d+', tag).group())
-                scenes[current_num] = text
+                num = int(re.search(r'\d+', tag).group())
+                scenes[num] = text
             elif tag == "TRANSITION":
-                current_num += 1
-                scenes[current_num] = "[TRANSITION] " + text
+                transitions.append(text)
+        # 过渡段排在所有场景之后
+        base = max(scenes.keys()) if scenes else 0
+        for i, t in enumerate(transitions, 1):
+            scenes[base + i] = f"[TRANSITION] {t}"
         return scenes
 
 

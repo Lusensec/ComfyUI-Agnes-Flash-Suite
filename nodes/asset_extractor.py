@@ -1,16 +1,17 @@
-"""
+﻿"""
 Agnes 资产提取节点
 从小说文本中提取角色、场景、道具等资产信息
 """
 import requests
 import json
 import re
-import os
-from ..api import AgnesClient, BASE_URL, CHAT_MODEL
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL
 
 
 class AgnesAssetExtractor:
     """使用 Agnes LLM 提取资产信息"""
+    
+    DESCRIPTION = "从小说章节中提取角色、场景、道具、服装、天气等资产信息，输出为 JSON 格式"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -19,25 +20,64 @@ class AgnesAssetExtractor:
                 "chapter_text": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "输入小说章节全文..."
+                    "placeholder": "输入小说章节全文...",
+                    "tooltip": "待处理的小说章节文本，建议 3000-8000 字"
                 }),
                 "api_key": ("STRING", {
-                    "default": "sk-你的Key",
-                    "placeholder": "Agnes API Key"
+                    "default": "",
+                    "placeholder": "sk-xxxxxxxx",
+                    "tooltip": "Agnes AI API Key，从 https://platform.agnes-ai.com 获取"
                 }),
             },
             "optional": {
-                "base_url": ("STRING", {"default": BASE_URL}),
-                "model": ("STRING", {"default": CHAT_MODEL}),
+                "base_url": ("STRING", {
+                    "default": BASE_URL,
+                    "tooltip": "API 地址，默认使用 Agnes AI 官方地址"
+                }),
+                "model": ("STRING", {
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型，推荐使用 agnes-2.5-flash"
+                }),
             }
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING",)
-    RETURN_NAMES = ("characters_json", "locations_json", "props_json", "costumes_json", "weather_json",)
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("characters_json", "locations_json", "props_json", "costumes_json", "weather_json")
+    RETURN_LABELS = (
+        "角色信息 JSON",
+        "场景信息 JSON",
+        "道具列表 JSON",
+        "服装信息 JSON",
+        "天气信息 JSON"
+    )
     FUNCTION = "extract"
-    CATEGORY = "🎬 Agnes Novel"
+    CATEGORY = "Agnes Novel"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def get_extra_output_methods(cls):
+        return ["get_extra_pnginfo"]
+
+    def get_extra_pnginfo(self, **kwargs):
+        extra = {}
+        outputs = {
+            "characters_json": "提取的角色列表，包含姓名、性别、年龄、外貌、性格等信息",
+            "locations_json": "提取的场景列表，包含地点名称、环境描述、时代背景等",
+            "props_json": "提取的道具列表，包含重要物品的名称和描述",
+            "costumes_json": "提取的服装列表，包含角色名和对应的服装描述",
+            "weather_json": "提取的天气信息，包含场景中的天气状况描述",
+        }
+        for key in outputs:
+            if key in kwargs:
+                extra[key] = {"description": outputs[key]}
+        return extra
 
     def extract(self, chapter_text, api_key, base_url=BASE_URL, model=CHAT_MODEL):
+        if not api_key.strip():
+            api_key = get_api_key()
+        if not api_key.strip():
+            err = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            return (err, "", "", "", "")
         print(f"\n{'='*50}")
         print(f"📋 Agnes 资产提取")
         print(f"{'='*50}")

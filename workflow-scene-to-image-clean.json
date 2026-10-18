@@ -1,0 +1,128 @@
+{
+  "last_node_id": 5,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "AgnesSceneSplitter",
+      "pos": [100, 100],
+      "size": [400, 300],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"name": "chapter_text", "type": "STRING", "link": null},
+        {"name": "api_key", "type": "STRING", "link": null},
+        {"name": "base_url", "type": "STRING", "link": null, "widget": {"name": "base_url"}},
+        {"name": "model", "type": "STRING", "link": null, "widget": {"name": "model"}}
+      ],
+      "outputs": [
+        {"name": "log_text", "type": "STRING"},
+        {"name": "scene_1", "type": "STRING", "links": [1]},
+        {"name": "scene_2", "type": "STRING"},
+        {"name": "scene_3", "type": "STRING"},
+        {"name": "scene_4", "type": "STRING"},
+        {"name": "scene_5", "type": "STRING"}
+      ],
+      "properties": {"Node name for S&R": "AgnesSceneSplitter"},
+      "widgets_values": ["", "sk-你的Key", "https://api.agnes-ai.cn/v1", "agnes-2.5-flash"]
+    },
+    {
+      "id": 2,
+      "type": "AgnesAssetExtractor",
+      "pos": [100, 500],
+      "size": [400, 200],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "chapter_text", "type": "STRING", "link": null},
+        {"name": "api_key", "type": "STRING", "link": null},
+        {"name": "base_url", "type": "STRING", "link": null, "widget": {"name": "base_url"}},
+        {"name": "model", "type": "STRING", "link": null, "widget": {"name": "model"}}
+      ],
+      "outputs": [
+        {"name": "characters_json", "type": "STRING", "links": [2]},
+        {"name": "locations_json", "type": "STRING", "links": [3]},
+        {"name": "props_json", "type": "STRING"},
+        {"name": "costumes_json", "type": "STRING"},
+        {"name": "weather_json", "type": "STRING"}
+      ],
+      "properties": {"Node name for S&R": "AgnesAssetExtractor"},
+      "widgets_values": ["", "sk-你的Key", "https://api.agnes-ai.cn/v1", "agnes-2.5-flash"]
+    },
+    {
+      "id": 3,
+      "type": "AgnesScenePromptGenerator",
+      "pos": [600, 100],
+      "size": [400, 250],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "scene_text", "type": "STRING", "link": 1},
+        {"name": "api_key", "type": "STRING", "link": null},
+        {"name": "style", "type": "COMBO", "widget": {"name": "style"}, "links": null},
+        {"name": "characters_json", "type": "STRING", "link": 2},
+        {"name": "locations_json", "type": "STRING", "link": 3},
+        {"name": "base_url", "type": "STRING", "link": null, "widget": {"name": "base_url"}},
+        {"name": "model", "type": "STRING", "link": null, "widget": {"name": "model"}}
+      ],
+      "outputs": [
+        {"name": "detailed_prompt", "type": "STRING", "links": [4]}
+      ],
+      "properties": {"Node name for S&R": "AgnesScenePromptGenerator"},
+      "widgets_values": ["", "sk-你的Key", "cinematic", "", "", "https://api.agnes-ai.cn/v1", "agnes-2.5-flash"]
+    },
+    {
+      "id": 4,
+      "type": "AgnesImageGen",
+      "pos": [600, 500],
+      "size": [400, 200],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "prompt", "type": "STRING", "link": 4},
+        {"name": "api_key", "type": "STRING", "link": null},
+        {"name": "width", "type": "INT", "widget": {"name": "width"}, "links": null},
+        {"name": "height", "type": "INT", "widget": {"name": "height"}, "links": null},
+        {"name": "quality", "type": "COMBO", "widget": {"name": "quality"}, "links": null}
+      ],
+      "outputs": [
+        {"name": "image", "type": "IMAGE", "links": []},
+        {"name": "url", "type": "STRING"}
+      ],
+      "properties": {"Node name for S&R": "AgnesImageGen"},
+      "widgets_values": ["", "sk-你的Key", 1920, 1080, "1K"]
+    },
+    {
+      "id": 5,
+      "type": "Note",
+      "pos": [600, 800],
+      "size": [400, 100],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {"text": "工作流说明：\n1. 场景切分 → 资产提取\n2. 场景 1 + 角色/场景 JSON → 提示词生成\n3. 提示词 → 图像生成"},
+      "widgets_values": ["工作流说明：\n1. 场景切分 → 资产提取\n2. 场景 1 + 角色/场景 JSON → 提示词生成\n3. 提示词 → 图像生成"]
+    }
+  ],
+  "links": [
+    [1, 1, 1, 3, 0, "STRING"],
+    [2, 2, 0, 3, 3, "STRING"],
+    [3, 2, 1, 3, 4, "STRING"],
+    [4, 3, 0, 4, 0, "STRING"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [0, 0]
+    }
+  },
+  "version": 0.4
+}

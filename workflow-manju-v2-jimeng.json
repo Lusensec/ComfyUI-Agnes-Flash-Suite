@@ -1,0 +1,793 @@
+{
+  "last_node_id": 0,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        50,
+        50
+      ],
+      "size": [
+        400,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "在此粘贴小说章节全文（建议 3000-8000 字，场景用 --- 分隔）",
+        true
+      ]
+    },
+    {
+      "id": 2,
+      "type": "AgnesSceneSplitter",
+      "pos": [
+        50,
+        250
+      ],
+      "size": [
+        420,
+        280
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "chapter_text",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "log_text",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "scene_1",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "scene_2",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "scene_3",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "scene_4",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "scene_5",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AgnesSceneSplitter"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "https://api.agnes-ai.cn/v1",
+        "agnes-2.5-flash"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "AgnesAssetExtractor",
+      "pos": [
+        50,
+        580
+      ],
+      "size": [
+        420,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "chapter_text",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "characters_json",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "locations_json",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "props_json",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "costumes_json",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "weather_json",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AgnesAssetExtractor"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "https://api.agnes-ai.cn/v1",
+        "agnes-2.5-flash"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "JimengAssetMaker",
+      "pos": [
+        550,
+        50
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prefix",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "ratio",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "resolution",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JimengAssetMaker"
+      },
+      "widgets_values": [
+        "characters_主角",
+        "Character concept sheet, full body, three views, anime style, white background",
+        "",
+        "http://127.0.0.1:8001",
+        "jimeng-image-5.0-lite",
+        "1:1",
+        "2k"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "JimengAssetMaker",
+      "pos": [
+        550,
+        320
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prefix",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "ratio",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "resolution",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JimengAssetMaker"
+      },
+      "widgets_values": [
+        "locations_主要场景",
+        "Wide shot of ancient Chinese martial arts arena, stone platform, banners, dramatic lighting, cinematic",
+        "",
+        "http://127.0.0.1:8001",
+        "jimeng-image-5.0-lite",
+        "16:9",
+        "2k"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "JimengAssetMaker",
+      "pos": [
+        550,
+        590
+      ],
+      "size": [
+        380,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prefix",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "ratio",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "resolution",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JimengAssetMaker"
+      },
+      "widgets_values": [
+        "props_关键道具",
+        "Close-up of mystical artifact, glowing, detailed, fantasy style",
+        "",
+        "http://127.0.0.1:8001",
+        "jimeng-image-5.0-lite",
+        "1:1",
+        "2k"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "PrimitiveStringMultiline",
+      "pos": [
+        50,
+        850
+      ],
+      "size": [
+        400,
+        120
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveStringMultiline"
+      },
+      "widgets_values": [
+        "请输入场景描述文本（用于图生图提示词）",
+        true
+      ]
+    },
+    {
+      "id": 8,
+      "type": "JimengImageToImage",
+      "pos": [
+        550,
+        850
+      ],
+      "size": [
+        380,
+        240
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "base_url",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "ratio",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "resolution",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "sample_strength",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "negative_prompt",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": []
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JimengImageToImage"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "",
+        "http://127.0.0.1:8001",
+        "jimeng-image-5.0-lite",
+        "16:9",
+        "2k",
+        0.55,
+        ""
+      ]
+    },
+    {
+      "id": 9,
+      "type": "AgnesNovelImageToVideo",
+      "pos": [
+        1000,
+        850
+      ],
+      "size": [
+        380,
+        180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "api_key",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "quality",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "aspect_ratio",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "num_frames",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "frame_rate",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "max_wait_seconds",
+          "type": "INT",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": []
+        },
+        {
+          "name": "resolution",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AgnesNovelImageToVideo"
+      },
+      "widgets_values": [
+        "",
+        "",
+        "Smooth camera pan, subtle character motion, cinematic lighting",
+        "agnes-video-v2.0",
+        "2k",
+        "16:9",
+        121,
+        24,
+        0,
+        600
+      ]
+    },
+    {
+      "id": 10,
+      "type": "SaveVideo",
+      "pos": [
+        1450,
+        850
+      ],
+      "size": [
+        280,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": null
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "format",
+          "type": "COMBO",
+          "link": null
+        },
+        {
+          "name": "codec",
+          "type": "COMBO",
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveVideo"
+      },
+      "widgets_values": [
+        "漫剧输出",
+        "auto",
+        "auto"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "AgnesWorkflowExporter",
+      "pos": [
+        50,
+        1020
+      ],
+      "size": [
+        420,
+        200
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "asset_map_json",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "workflow_b_path",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AgnesWorkflowExporter"
+      },
+      "widgets_values": [
+        "{}"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "Note",
+      "pos": [
+        50,
+        1280
+      ],
+      "size": [
+        1400,
+        180
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "Note"
+      },
+      "widgets_values": [
+        "工作流说明：\n1. 阶段一：小说文本 → 场景切分 → 资产提取\n2. 阶段二：Jimeng定妆图生成（角色/场景/道具）\n3. 阶段三：Jimeng图生图 → Agnes图生视频 → 保存\n4. 使用 AgnesWorkflowExporter 节点可自动生成工作流B JSON\n   需要填入 asset_map_json: {\"scene_1\": [\"角色名\", \"场景名\"], ...}"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      1,
+      0,
+      3,
+      0,
+      "STRING"
+    ],
+    [
+      3,
+      8,
+      0,
+      9,
+      1,
+      "STRING"
+    ],
+    [
+      4,
+      9,
+      0,
+      10,
+      0,
+      "STRING"
+    ],
+    [
+      5,
+      7,
+      0,
+      8,
+      1,
+      "STRING"
+    ]
+  ],
+  "groups": [],
+  "config": {
+    "workflow_name": "漫剧工作流 V2（Jimeng定妆图 + Agnes视频）",
+    "source": "workbuddy-assistant"
+  },
+  "extra": {
+    "ds": {
+      "scale": 1.0,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

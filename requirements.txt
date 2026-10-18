@@ -1,9 +1,4 @@
-﻿# Agnes Novel Plugin Requirements
-# ================================
-# Core dependencies (provided by comfyui-agnes-ai)
-# - requests
-# - Pillow
-# - pyyaml
-
-# Optional dependencies
-# openai>=1.0.0  # 如需使用 OpenAI SDK
+requests>=2.28.0
+Pillow>=9.0.0
+torch>=2.0.0
+numpy>=1.21.0
