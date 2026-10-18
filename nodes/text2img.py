@@ -81,6 +81,12 @@ class AgnesNovelTextToImage:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "api_key": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -113,24 +119,17 @@ class AgnesNovelTextToImage:
                     "tooltip": "Number of images to generate (more takes longer)",
                 }),
             },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
-            },
         }
 
     def generate(
         self,
-        api_key: str,
-        prompt: str,
+        base_url: str = "",
+        api_key: str = "",
+        prompt: str = "",
         model: str = IMAGE_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "1:1",
         n: int = 1,
-        base_url: str = "",
     ):
         size = compute_size(quality, aspect_ratio)
         w, h = map(int, size.split("x"))

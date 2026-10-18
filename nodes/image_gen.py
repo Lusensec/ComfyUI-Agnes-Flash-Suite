@@ -38,6 +38,11 @@ class AgnesImageGen:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
+                }),
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -68,13 +73,6 @@ class AgnesImageGen:
                     "tooltip": "画质等级：1K=性价比最高，2K=更高分辨率（消耗更多配额）"
                 }),
             },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
-                }),
-            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING",)
@@ -96,7 +94,7 @@ class AgnesImageGen:
             extra["url"] = {"description": "图片的 URL 地址"}
         return extra
 
-    def generate(self, prompt, api_key, width, height, quality, base_url=""):
+    def generate(self, base_url="", prompt="", api_key="", width=1920, height=1080, quality="1K"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

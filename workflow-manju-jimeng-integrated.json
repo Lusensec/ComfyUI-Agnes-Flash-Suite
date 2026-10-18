@@ -50,6 +50,7 @@
       },
       "widgets_values": [
         "",
+        "",
         false
       ],
       "title": "AgnesNovelAPIKeyConfig"
@@ -4184,6 +4185,7 @@
       "widgets_values": [
         "",
         "",
+        "",
         "agnes-video-v2.0",
         "1K",
         "9:16",
@@ -4442,6 +4444,7 @@
       "widgets_values": [
         "",
         "",
+        "",
         "agnes-video-v2.0",
         "1K",
         "9:16",
@@ -4698,6 +4701,7 @@
         "_node_version": "1.0.0"
       },
       "widgets_values": [
+        "",
         "",
         "",
         "agnes-video-v2.0",

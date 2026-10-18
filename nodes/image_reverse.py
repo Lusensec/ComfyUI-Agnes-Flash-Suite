@@ -23,6 +23,12 @@ class AgnesNovelImageReverse:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "api_key": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -37,16 +43,9 @@ class AgnesNovelImageReverse:
                     "tooltip": "Vision-capable model for image analysis",
                 }),
             },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
-            },
         }
 
-    def reverse(self, api_key: str, image, model: str = CHAT_MODEL, base_url: str = "") -> Tuple[str, str]:
+    def reverse(self, base_url: str = "", api_key: str = "", image=None, model: str = CHAT_MODEL) -> Tuple[str, str]:
         # Runtime fallback: try config file if widget value is empty
         if not api_key.strip():
             api_key = get_api_key()

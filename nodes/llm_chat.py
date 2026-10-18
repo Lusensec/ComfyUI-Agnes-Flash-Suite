@@ -23,6 +23,12 @@ class AgnesNovelLLMChat:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "api_key": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -71,25 +77,20 @@ class AgnesNovelLLMChat:
                     "default": "auto",
                     "tooltip": "思考强度：2.5-flash 支持 none/low/medium/high/max；3.0-flash 支持 7 档；auto=不传该参数",
                 }),
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
             },
         }
 
     def chat(
         self,
-        api_key: str,
-        prompt: str,
+        base_url: str = "",
+        api_key: str = "",
+        prompt: str = "",
         model: str = CHAT_MODEL,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         system_prompt: str = "",
         enable_thinking: bool = False,
         reasoning_effort: str = "auto",
-        base_url: str = "",
     ) -> Tuple[str]:
         if not prompt.strip():
             return ("[Error: Prompt is empty]",)

@@ -54,6 +54,12 @@ class AgnesNovelCharacterTurnaround:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "character_desc": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -88,24 +94,19 @@ class AgnesNovelCharacterTurnaround:
                     "placeholder": "额外的风格/质量补充词...",
                     "tooltip": "追加在提示词末尾的补充要求（可选）",
                 }),
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
             },
         }
 
     def generate(
         self,
-        character_desc: str,
-        api_key: str,
+        base_url: str = "",
+        character_desc: str = "",
+        api_key: str = "",
         model: str = IMAGE_MODEL,
         quality: str = "2K",
         aspect_ratio: str = "21:9",
         reference_image=None,
         extra_prompt: str = "",
-        base_url: str = "",
     ):
         character_desc = (character_desc or "").strip()
         if not character_desc:

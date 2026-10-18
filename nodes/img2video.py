@@ -122,6 +122,12 @@ class AgnesNovelImageToVideo:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "api_key": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -183,19 +189,15 @@ class AgnesNovelImageToVideo:
                     "tooltip": "Optional end frame for keyframe-based animation (image -> image transition). "
                                "新模型 agnes-video-2.5-flash：接尾帧=keyframe 首尾帧模式，不接=reference 参考图模式",
                 }),
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
             },
         }
 
     def generate(
         self,
-        api_key: str,
-        image,
-        prompt: str,
+        base_url: str = "",
+        api_key: str = "",
+        image=None,
+        prompt: str = "",
         model: str = VIDEO_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "16:9",
@@ -204,7 +206,6 @@ class AgnesNovelImageToVideo:
         seed: int = 0,
         max_wait_seconds: int = 600,
         end_frame_image=None,
-        base_url: str = "",
     ) -> Tuple:
         # Runtime fallback: try config file if widget value is empty
         if not api_key.strip():

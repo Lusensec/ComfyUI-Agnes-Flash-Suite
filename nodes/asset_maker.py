@@ -58,6 +58,11 @@ class AgnesAssetMaker:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
+                }),
                 "prefix": ("STRING", {
                     "default": "",
                     "placeholder": "agnes_assets/characters_白奕",
@@ -87,13 +92,6 @@ class AgnesAssetMaker:
                     "tooltip": "图像生成模型"
                 }),
             },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
-                }),
-            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING",)
@@ -102,8 +100,8 @@ class AgnesAssetMaker:
     FUNCTION = "make"
     CATEGORY = "Agnes Novel"
 
-    def make(self, prefix, prompt, api_key, quality="2K",
-             aspect_ratio="16:9", model=IMAGE_MODEL, base_url=""):
+    def make(self, base_url="", prefix="", prompt="", api_key="", quality="2K",
+             aspect_ratio="16:9", model=IMAGE_MODEL):
         prefix = (prefix or "").strip()
         prompt = (prompt or "").strip()
 

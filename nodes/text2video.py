@@ -122,6 +122,12 @@ class AgnesNovelTextToVideo:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "api_key": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -175,19 +181,13 @@ class AgnesNovelTextToVideo:
                     "tooltip": "Maximum time to wait for video generation (in seconds)",
                 }),
             },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
-            },
         }
 
     def generate(
         self,
-        api_key: str,
-        prompt: str,
+        base_url: str = "",
+        api_key: str = "",
+        prompt: str = "",
         model: str = VIDEO_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "16:9",
@@ -195,7 +195,6 @@ class AgnesNovelTextToVideo:
         frame_rate: int = DEFAULT_VIDEO_FPS,
         seed: int = 0,
         max_wait_seconds: int = 600,
-        base_url: str = "",
     ) -> Tuple:
         if not prompt.strip():
             return _error("Prompt is empty")

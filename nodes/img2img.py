@@ -81,6 +81,12 @@ class AgnesNovelImageToImage:
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
                 "api_key": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -133,19 +139,15 @@ class AgnesNovelImageToImage:
                 "reference_image_4": ("IMAGE", {
                     "tooltip": "Additional reference image (multi-image input)",
                 }),
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
             },
         }
 
     def edit(
         self,
-        api_key: str,
-        image,
-        prompt: str,
+        base_url: str = "",
+        api_key: str = "",
+        image=None,
+        prompt: str = "",
         model: str = IMAGE_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "1:1",
@@ -154,7 +156,6 @@ class AgnesNovelImageToImage:
         reference_image_2=None,
         reference_image_3=None,
         reference_image_4=None,
-        base_url: str = "",
     ):
         size = compute_size(quality, aspect_ratio)
         w, h = map(int, size.split("x"))

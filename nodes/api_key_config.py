@@ -43,17 +43,17 @@ class AgnesNovelAPIKeyConfig:
 
         return {
             "required": {
-                "api_key": ("STRING", {
-                    "multiline": False,
-                    "default": existing_key,
-                    "placeholder": "sk-xxxxxxxx...",
-                    "tooltip": "Your Agnes AI API key. Will be saved to plugin config and reused by all other nodes.",
-                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": existing_base_url or "https://api.agnes-ai.cn/v1",
                     "placeholder": "https://api.agnes-ai.cn/v1",
                     "tooltip": "模型请求地址（动态 Base URL）。保存后所有留空的节点将使用此地址；也可用环境变量 AGNES_API_BASE_URL 或 config.yaml 的 api.base_url。",
+                }),
+                "api_key": ("STRING", {
+                    "multiline": False,
+                    "default": existing_key,
+                    "placeholder": "sk-xxxxxxxx...",
+                    "tooltip": "Your Agnes AI API key. Will be saved to plugin config and reused by all other nodes.",
                 }),
             },
             "optional": {
@@ -67,7 +67,7 @@ class AgnesNovelAPIKeyConfig:
             "hidden": {},
         }
 
-    def save_key(self, api_key: str, base_url: str = "", clear_key: bool = False) -> Tuple[str, str, str, str]:
+    def save_key(self, base_url: str = "", api_key: str = "", clear_key: bool = False) -> Tuple[str, str, str, str]:
         """
         Save or clear the API key and Base URL in the plugin config file.
         """
