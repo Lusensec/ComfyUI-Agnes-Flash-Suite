@@ -113,6 +113,13 @@ class AgnesNovelTextToImage:
                     "tooltip": "Number of images to generate (more takes longer)",
                 }),
             },
+            "optional": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
+            },
         }
 
     def generate(
@@ -123,6 +130,7 @@ class AgnesNovelTextToImage:
         quality: str = "1K",
         aspect_ratio: str = "1:1",
         n: int = 1,
+        base_url: str = "",
     ):
         size = compute_size(quality, aspect_ratio)
         w, h = map(int, size.split("x"))
@@ -139,7 +147,7 @@ class AgnesNovelTextToImage:
             return (black, "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]")
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_IMAGE_MODELS:
                 # 新接口：size 传档位（1K/2K/3K/4K）+ ratio
                 pil_images = client.generate_image(

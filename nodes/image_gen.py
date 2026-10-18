@@ -68,6 +68,13 @@ class AgnesImageGen:
                     "tooltip": "画质等级：1K=性价比最高，2K=更高分辨率（消耗更多配额）"
                 }),
             },
+            "optional": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
+                }),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING",)
@@ -89,7 +96,7 @@ class AgnesImageGen:
             extra["url"] = {"description": "图片的 URL 地址"}
         return extra
 
-    def generate(self, prompt, api_key, width, height, quality):
+    def generate(self, prompt, api_key, width, height, quality, base_url=""):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -102,7 +109,7 @@ class AgnesImageGen:
         print(f"Size: {width}x{height}, Quality: {quality}, Model: {IMAGE_MODEL}")
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if IMAGE_MODEL in NEW_IMAGE_MODELS:
                 # 新接口：档位（1K/2K）+ 比例，客户端已下载并转 PIL
                 size_arg, ratio_arg = quality.upper(), _nearest_ratio(width, height)

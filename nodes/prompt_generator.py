@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agnes 分镜提示词生成节点
 将分镜脚本转换为 Agnes Image API 可用的详细提示词
 """
@@ -34,8 +34,9 @@ class AgnesScenePromptGenerator:
             },
             "optional": {
                 "base_url": ("STRING", {
-                    "default": BASE_URL,
-                    "tooltip": "API 地址"
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
                 }),
                 "model": ("STRING", {
                     "default": CHAT_MODEL,
@@ -75,7 +76,7 @@ class AgnesScenePromptGenerator:
             }
         return extra
 
-    def generate_prompt(self, scene_text, api_key, style, base_url=BASE_URL, model=CHAT_MODEL, characters_json="", locations_json=""):
+    def generate_prompt(self, scene_text, api_key, style, base_url="", model=CHAT_MODEL, characters_json="", locations_json=""):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -142,7 +143,7 @@ class AgnesScenePromptGenerator:
 - 提示词长度 150-300 词"""
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             content = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,

@@ -87,6 +87,13 @@ class AgnesAssetMaker:
                     "tooltip": "图像生成模型"
                 }),
             },
+            "optional": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
+                }),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING",)
@@ -96,7 +103,7 @@ class AgnesAssetMaker:
     CATEGORY = "Agnes Novel"
 
     def make(self, prefix, prompt, api_key, quality="2K",
-             aspect_ratio="16:9", model=IMAGE_MODEL):
+             aspect_ratio="16:9", model=IMAGE_MODEL, base_url=""):
         prefix = (prefix or "").strip()
         prompt = (prompt or "").strip()
 
@@ -132,7 +139,7 @@ class AgnesAssetMaker:
             return (black, "[Error] API key 缺失，无法生成定妆图")
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_IMAGE_MODELS:
                 # 新接口：size 传档位（1K/2K/3K/4K）+ ratio
                 size_arg, ratio_arg = quality.upper(), aspect_ratio

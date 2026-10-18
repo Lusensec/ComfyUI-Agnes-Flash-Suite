@@ -175,6 +175,13 @@ class AgnesNovelTextToVideo:
                     "tooltip": "Maximum time to wait for video generation (in seconds)",
                 }),
             },
+            "optional": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
+            },
         }
 
     def generate(
@@ -188,6 +195,7 @@ class AgnesNovelTextToVideo:
         frame_rate: int = DEFAULT_VIDEO_FPS,
         seed: int = 0,
         max_wait_seconds: int = 600,
+        base_url: str = "",
     ) -> Tuple:
         if not prompt.strip():
             return _error("Prompt is empty")
@@ -202,7 +210,7 @@ class AgnesNovelTextToVideo:
         output_dir = _get_output_dir()
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_VIDEO_MODELS:
                 # 新接口：seconds(4-12) + aspect_ratio，固定 720P
                 seconds = int(round(num_frames / frame_rate)) if frame_rate else 5

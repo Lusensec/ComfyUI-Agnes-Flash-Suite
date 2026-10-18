@@ -97,6 +97,18 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 $env:AGNES_API_KEY = "sk-你的Key"
 ```
 
+### 动态 Base URL（请求地址）
+
+所有 Agnes 节点均带 `base_url` 输入框（留空 = 跟随全局），可按需动态调整请求地址：
+
+| 优先级 | 来源 | 说明 |
+|------|------|------|
+| 1 | 节点内 `base_url` 输入框 | 单节点覆盖，适合 A/B 对比不同服务商 |
+| 2 | `api_key_config.json`（API Key 配置节点保存） | 全局生效，改一次全部节点跟随 |
+| 3 | 环境变量 `AGNES_API_BASE_URL` | 机器级默认 |
+| 4 | `config.yaml` 的 `api.base_url` | 文件级默认 |
+| 5 | 内置 `https://api.agnes-ai.cn/v1` | 兜底 |
+
 ### 默认配置
 
 | 参数 | 值 |

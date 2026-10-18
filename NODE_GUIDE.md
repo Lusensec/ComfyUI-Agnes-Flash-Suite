@@ -12,6 +12,16 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 
 ### 3. 重启 ComfyUI
 
+### 4. 动态请求地址（Base URL）
+
+所有节点均带 `base_url` 输入框，**留空 = 跟随全局动态值**。优先级（高→低）：
+
+1. 节点内 `base_url` 输入框（单节点覆盖）
+2. API Key 配置节点保存的 `api_key_config.json`（全局）
+3. 环境变量 `AGNES_API_BASE_URL`
+4. `config.yaml` 的 `api.base_url`
+5. 内置默认 `https://api.agnes-ai.cn/v1`
+
 ---
 
 ## 节点配置说明
@@ -24,7 +34,7 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 |------|------|--------|------|
 | chapter_text | STRING | "" | 小说章节文本，建议 3000-8000 字 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| base_url | STRING | https://api.agnes-ai.cn/v1 | API 地址 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | model | STRING | agnes-2.5-flash | 文本生成模型 |
 
 **输出：**
@@ -43,7 +53,7 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 |------|------|--------|------|
 | chapter_text | STRING | "" | 小说章节文本 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| base_url | STRING | https://api.agnes-ai.cn/v1 | API 地址 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | model | STRING | agnes-2.5-flash | 文本生成模型 |
 
 **输出：**
@@ -61,7 +71,7 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 |------|------|--------|------|
 | chapter_text | STRING | "" | 小说章节文本 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| base_url | STRING | https://api.agnes-ai.cn/v1 | API 地址 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | model | STRING | agnes-2.5-flash | 文本生成模型 |
 
 **输出：**
@@ -84,7 +94,7 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 | style | COMBO | cinematic | 图像风格：cinematic/anime/realistic/watercolor/oil_painting |
 | characters_json | STRING | "" | 角色信息 JSON（可选） |
 | locations_json | STRING | "" | 场景信息 JSON（可选） |
-| base_url | STRING | https://api.agnes-ai.cn/v1 | API 地址 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | model | STRING | agnes-2.5-flash | 文本生成模型 |
 
 **输出：**
@@ -143,7 +153,7 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 | style | COMBO | casual | 解说风格：casual/professional/humorous/dramatic |
 | target_duration | INT | 180 | 目标时长（秒） |
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
-| base_url | STRING | https://api.agnes-ai.cn/v1 | API 地址 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | model | STRING | agnes-2.5-flash | 文本生成模型 |
 
 **输出：**

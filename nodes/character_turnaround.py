@@ -88,6 +88,11 @@ class AgnesNovelCharacterTurnaround:
                     "placeholder": "额外的风格/质量补充词...",
                     "tooltip": "追加在提示词末尾的补充要求（可选）",
                 }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
             },
         }
 
@@ -100,6 +105,7 @@ class AgnesNovelCharacterTurnaround:
         aspect_ratio: str = "21:9",
         reference_image=None,
         extra_prompt: str = "",
+        base_url: str = "",
     ):
         character_desc = (character_desc or "").strip()
         if not character_desc:
@@ -129,7 +135,7 @@ class AgnesNovelCharacterTurnaround:
         print(f"  模型: {model}, 档位: {quality}, 比例: {aspect_ratio}, 参考图: {'有' if reference_image is not None else '无'}")
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             ref_imgs = [tensor_to_pil(reference_image)] if reference_image is not None else None
             mode = "img2img" if ref_imgs else "text2img"
 

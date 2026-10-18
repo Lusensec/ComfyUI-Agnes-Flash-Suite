@@ -37,9 +37,16 @@ class AgnesNovelImageReverse:
                     "tooltip": "Vision-capable model for image analysis",
                 }),
             },
+            "optional": {
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
+            },
         }
 
-    def reverse(self, api_key: str, image, model: str = CHAT_MODEL) -> Tuple[str, str]:
+    def reverse(self, api_key: str, image, model: str = CHAT_MODEL, base_url: str = "") -> Tuple[str, str]:
         # Runtime fallback: try config file if widget value is empty
         if not api_key.strip():
             api_key = get_api_key()
@@ -51,7 +58,7 @@ class AgnesNovelImageReverse:
             # Convert ComfyUI tensor to PIL
             pil_img = tensor_to_pil(image)
 
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
 
             # Generate detailed prompt
             detailed = client.reverse_prompt(pil_img, model=model, detail="detailed")

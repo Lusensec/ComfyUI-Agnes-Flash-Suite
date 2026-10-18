@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agnes 资产提取节点
 从小说文本中提取角色、场景、道具等资产信息
 """
@@ -31,8 +31,9 @@ class AgnesAssetExtractor:
             },
             "optional": {
                 "base_url": ("STRING", {
-                    "default": BASE_URL,
-                    "tooltip": "API 地址，默认使用 Agnes AI 官方地址"
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
                 }),
                 "model": ("STRING", {
                     "default": CHAT_MODEL,
@@ -72,7 +73,7 @@ class AgnesAssetExtractor:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def extract(self, chapter_text, api_key, base_url=BASE_URL, model=CHAT_MODEL):
+    def extract(self, chapter_text, api_key, base_url="", model=CHAT_MODEL):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -125,7 +126,7 @@ class AgnesAssetExtractor:
 {chapter_text}"""
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             content = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,

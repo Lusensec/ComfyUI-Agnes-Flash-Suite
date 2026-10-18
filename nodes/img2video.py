@@ -183,6 +183,11 @@ class AgnesNovelImageToVideo:
                     "tooltip": "Optional end frame for keyframe-based animation (image -> image transition). "
                                "新模型 agnes-video-2.5-flash：接尾帧=keyframe 首尾帧模式，不接=reference 参考图模式",
                 }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
             },
         }
 
@@ -199,6 +204,7 @@ class AgnesNovelImageToVideo:
         seed: int = 0,
         max_wait_seconds: int = 600,
         end_frame_image=None,
+        base_url: str = "",
     ) -> Tuple:
         # Runtime fallback: try config file if widget value is empty
         if not api_key.strip():
@@ -218,7 +224,7 @@ class AgnesNovelImageToVideo:
             if has_end_frame:
                 ref_imgs.append(tensor_to_pil(end_frame_image))
 
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_VIDEO_MODELS:
                 # 新接口：有尾帧 → keyframe 首尾帧模式；否则 reference 参考图模式
                 mode_arg = "keyframe" if has_end_frame else "reference"

@@ -73,6 +73,11 @@ class AgnesVideoGen:
                 "image": ("IMAGE", {
                     "tooltip": "参考图片（可选），连接图像生成节点的输出"
                 }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
+                }),
             }
         }
 
@@ -106,7 +111,7 @@ class AgnesVideoGen:
         "3:4": (1024, 1365),
     }
 
-    def generate(self, prompt, api_key, model, num_frames, frame_rate, quality, aspect_ratio, image=None):
+    def generate(self, prompt, api_key, model, num_frames, frame_rate, quality, aspect_ratio, image=None, base_url=""):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -129,7 +134,7 @@ class AgnesVideoGen:
                 height *= 2
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             output_dir = os.path.join(folder_paths.get_output_directory(), "agnes_videos")
 
             # 提交任务（客户端内部完成轮询 + 下载 + 保存）

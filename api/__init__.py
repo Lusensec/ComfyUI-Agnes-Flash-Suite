@@ -237,8 +237,10 @@ class AgnesClient:
     _MAX_RETRIES = 3
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: Optional[str] = None):
         self.api_key = api_key
+        # 请求地址：节点传入 > 全局动态值（API Key 配置节点/环境变量/config 文件/config.yaml）
+        self.base_url = (base_url or get_base_url()).rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"Bearer {api_key}",
@@ -363,7 +365,7 @@ class AgnesClient:
         reasoning_effort: Optional[str] = None,
     ) -> str:
         """Call the chat completions endpoint."""
-        url = f"{BASE_URL}/chat/completions"
+        url = f"{self.base_url}/chat/completions"
         payload = {
             "model": model,
             "messages": messages,
@@ -408,7 +410,7 @@ class AgnesClient:
           return_base64=True 时响应为 b64_json，直接解码为 PIL。
         - 旧接口 agnes-image-2.1/2.0：size 传 "WxH" 像素串。
         """
-        url = f"{BASE_URL}/images/generations"
+        url = f"{self.base_url}/images/generations"
         tier = str(size).strip().upper()
         tier_mode = tier in IMAGE_TIER_SIZES
         payload: Dict[str, Any] = {
@@ -513,7 +515,7 @@ class AgnesClient:
         new_model = model in NEW_VIDEO_MODELS
 
         # --- Build submission payload ---
-        url = f"{BASE_URL}/videos"
+        url = f"{self.base_url}/videos"
         payload: Dict[str, Any] = {"model": model, "prompt": prompt}
 
         if new_model:
@@ -604,7 +606,7 @@ class AgnesClient:
 
         # --- Poll for result ---
         # 新接口需附加 model_name；轮询策略：先等 60s（任务排队期），之后每 5s 一次
-        status_url = f"{BASE_URL}/agnesapi?video_id={video_id}"
+        status_url = f"{self.base_url}/agnesapi?video_id={video_id}"
         if new_model:
             status_url += f"&model_name={model}"
         poll_interval = 60 if (new_model and max_wait > 90) else VIDEO_POLL_INTERVAL
@@ -769,6 +771,7 @@ _API_KEY_CONFIG_FILE = os.path.join(_PLUGIN_DIR, "api_key_config.json")
 
 _GLOBAL_CONFIG: Dict[str, Any] = {
     "api_key": os.environ.get("AGNES_API_KEY", "") or _config.get("api_key", ""),
+    "base_url": os.environ.get("AGNES_API_BASE_URL", ""),
     "chat_model": CHAT_MODEL,
     "image_model": IMAGE_MODEL,
     "video_model": VIDEO_MODEL,
@@ -783,6 +786,18 @@ def _load_key_from_config_file() -> str:
             with open(_API_KEY_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 return data.get("api_key", "")
+    except Exception:
+        pass
+    return ""
+
+
+def _load_base_url_from_config_file() -> str:
+    """Try to load the Base URL from the plugin's api_key_config.json."""
+    try:
+        if os.path.exists(_API_KEY_CONFIG_FILE):
+            with open(_API_KEY_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("base_url", "")
     except Exception:
         pass
     return ""
@@ -830,6 +845,39 @@ def get_api_key() -> str:
 
 def set_api_key(key: str) -> None:
     _GLOBAL_CONFIG["api_key"] = key
+
+
+def get_base_url() -> str:
+    """获取当前生效的 Base URL（动态，优先级从高到低）：
+    1. 内存全局值（set_base_url / API Key 配置节点 写入）
+    2. 环境变量 AGNES_API_BASE_URL
+    3. api_key_config.json 的 base_url 字段
+    4. config.yaml 的 api.base_url（模块导入时读取）
+    5. 默认 DEFAULT_BASE_URL
+    """
+    # 1. 内存全局
+    cached = _GLOBAL_CONFIG.get("base_url", "").strip()
+    if cached:
+        return cached.rstrip("/")
+    # 2. 环境变量
+    env_url = os.environ.get("AGNES_API_BASE_URL", "").strip()
+    if env_url:
+        return env_url.rstrip("/")
+    # 3. api_key_config.json
+    file_url = _load_base_url_from_config_file().strip()
+    if file_url:
+        _GLOBAL_CONFIG["base_url"] = file_url
+        print(f"[AgnesAPI] Base URL source: api_key_config.json = {file_url}")
+        return file_url.rstrip("/")
+    # 4/5. config.yaml / 默认
+    return (BASE_URL or DEFAULT_BASE_URL).rstrip("/")
+
+
+def set_base_url(url: str) -> None:
+    """动态设置全局 Base URL；传空字符串清除（回落到环境变量/配置文件/默认值）。"""
+    url = (url or "").strip().rstrip("/")
+    _GLOBAL_CONFIG["base_url"] = url
+    print(f"[AgnesAPI] Base URL set to: {url or '(cleared, use default)'}")
 
 
 def get_client() -> AgnesClient:

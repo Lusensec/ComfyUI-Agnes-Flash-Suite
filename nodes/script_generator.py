@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agnes 剧本生成节点
 使用 Agnes LLM 生成影视解说文案
 """
@@ -47,8 +47,9 @@ class AgnesScriptGenerator:
             },
             "optional": {
                 "base_url": ("STRING", {
-                    "default": BASE_URL,
-                    "tooltip": "API 地址"
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
                 }),
                 "model": ("STRING", {
                     "default": CHAT_MODEL,
@@ -76,7 +77,7 @@ class AgnesScriptGenerator:
             }
         return extra
 
-    def generate(self, story_outline, api_key, style, target_duration, temperature, base_url=BASE_URL, model=CHAT_MODEL):
+    def generate(self, story_outline, api_key, style, target_duration, temperature, base_url="", model=CHAT_MODEL):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -118,7 +119,7 @@ class AgnesScriptGenerator:
         print(f"[Agnes Script] Generating script (target: {target_chars} chars)...")
 
         try:
-            client = AgnesClient(api_key)
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
             script = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
