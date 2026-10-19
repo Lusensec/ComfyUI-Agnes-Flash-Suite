@@ -125,7 +125,7 @@ class AgnesImageGen:
             api_key = get_api_key()
         if not api_key.strip():
             import torch as _torch
-            err_msg = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            err_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
             black = _torch.zeros(1, height, width, 3)
             return (black, err_msg, "")
         print(f"\n[Agnes Image] 开始生成...")

@@ -1,6 +1,6 @@
 """
-Agnes Text Split Node
-=====================
+Agnes 文本拆分节点
+============
 把一段文本（资产 JSON 列表 / LLM 输出的【名】分块 / 编号列表 / 多段文本）
 拆成最多 20 路独立字符串，方便逐条喂给 三视图生成、文生图、LLM 对话 等节点，
 实现「一个角色/道具/场景 = 一张图」的批量资产出图。
@@ -20,7 +20,7 @@ from ._output_docs import OutputDocsMixin
 
 
 class AgnesTextSplitter(OutputDocsMixin):
-    """Agnes text splitter node for ComfyUI (pure text, no API call)."""
+    """Agnes 文本拆分节点（纯文本处理，不调用 API）。"""
 
     CATEGORY = "Agnes Novel"
 

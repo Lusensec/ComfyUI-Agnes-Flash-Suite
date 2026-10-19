@@ -1,8 +1,8 @@
 """
-Agnes LLM Chat Node
-===================
-Enables text-based conversation with Agnes AI's LLM (agnes-2.0-flash).
-Supports multi-turn dialogue via optional system prompt and conversation history.
+Agnes LLM 对话节点
+=================
+与 Agnes 对话模型进行文本对话（默认 agnes-2.5-flash）。
+支持通过可选的系统提示词与对话消息进行多轮交互。
 """
 
 from typing import Any, Dict, Tuple
@@ -12,7 +12,7 @@ from ._output_docs import OutputDocsMixin
 
 
 class AgnesNovelLLMChat(OutputDocsMixin):
-    """Agnes AI LLM Chat node for ComfyUI."""
+    """Agnes AI LLM 对话节点：与 Agnes 对话模型多轮交互（可带系统提示词）。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING",)
@@ -30,8 +30,8 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "Enter your message...",
-                    "tooltip": "The user message to send to Agnes LLM",
+                    "placeholder": "输入消息...",
+                    "tooltip": "要发送给 Agnes 对话模型的用户消息",
                 }),
                 "base_url": ("STRING", {
                     "multiline": False,
@@ -43,7 +43,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "multiline": False,
                     "default": "",
                     "placeholder": "sk-...",
-                    "tooltip": "Your Agnes AI API key from platform.agnes-ai.com",
+                    "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml；申请地址 platform.agnes-ai.com）",
                 }),
                 "model": (AVAILABLE_CHAT_MODELS, {
                     "default": CHAT_MODEL,
@@ -54,22 +54,22 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "min": 0.0,
                     "max": 2.0,
                     "step": 0.05,
-                    "tooltip": "Sampling temperature (higher = more creative)",
+                    "tooltip": "采样温度（越高越发散/有创意）",
                 }),
                 "max_tokens": ("INT", {
                     "default": 4096,
                     "min": 1,
                     "max": 32768,
                     "step": 1,
-                    "tooltip": "Maximum number of tokens in the response",
+                    "tooltip": "响应最大 token 数",
                 }),
             },
             "optional": {
                 "system_prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "Optional system instructions...",
-                    "tooltip": "System prompt to set behavior/role of the AI",
+                    "placeholder": "系统提示词指令...",
+                    "tooltip": "系统提示词：设定 AI 的行为/角色",
                 }),
                 "enable_thinking": ("BOOLEAN", {
                     "default": False,
@@ -97,13 +97,13 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         reasoning_effort: str = "auto",
     ) -> Tuple[str]:
         if not prompt.strip():
-            return ("[Error: Prompt is empty]",)
+            return ("[错误] 提示词为空：请输入消息",)
 
-        # Runtime fallback: try config file if widget value is empty
+        # 运行时回退：widget 值为空时从全局配置（api_key_config.json 等）取 API Key
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return ("[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]",)
+            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
@@ -125,7 +125,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
             )
             return (response,)
         except Exception as e:
-            return (f"[Error] {str(e)}",)
+            return (f"[错误] {str(e)}",)
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelLLMChat": AgnesNovelLLMChat}
 NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelLLMChat": "💬 Agnes LLM 对话"}

@@ -109,13 +109,13 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
         subject_desc = (subject_desc or "").strip()
         if not subject_desc:
             black = torch.zeros(1, 512, 512, 3)
-            return (black, "", "[Error: 主体描述为空]")
+            return (black, "", "[错误] 主体描述为空")
 
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             black = torch.zeros(1, 512, 512, 3)
-            return (black, "", "[Error: API key is required. Get a free key at https://platform.agnes-ai.cn/]")
+            return (black, "", "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.cn/）")
 
         prompt = subject_desc
         if extra_prompt.strip():

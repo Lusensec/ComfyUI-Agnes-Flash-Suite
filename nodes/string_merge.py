@@ -1,6 +1,6 @@
 """
-Agnes String Merge Node
-======================
+Agnes 字符串合并节点
+=============
 上下合并两个多行字符串：非空输入按顺序拼接（空字符串自动跳过，不产生多余空行），
 适合把多段小说章节文本、多个节点输出文本合并成一个完整字符串。
 """
@@ -11,7 +11,7 @@ from ._output_docs import OutputDocsMixin
 
 
 class AgnesStringMerge(OutputDocsMixin):
-    """Agnes string merge node for ComfyUI (pure text, no API call)."""
+    """Agnes 字符串合并节点（纯文本处理，不调用 API）。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING",)
@@ -53,7 +53,7 @@ class AgnesStringMerge(OutputDocsMixin):
         parts = [s for s in ((string_1 or ""), (string_2 or "")) if s.strip()]
         sep = "\n" if separator is None else separator
         result = sep.join(parts)
-        print(f"[Agnes String Merge] 合并 {len(parts)}/2 段，共 {len(result)} 字符")
+        print(f"[Agnes 字符串合并] 合并 {len(parts)}/2 段，共 {len(result)} 字符")
         return (result,)
 
 

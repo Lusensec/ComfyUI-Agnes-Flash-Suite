@@ -138,15 +138,15 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                  base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto") -> Tuple[str, str]:
         asset_json = (asset_json or "").strip()
         if not asset_json:
-            err = "[Error: asset_json 为空。请连接 Agnes 文本拆分的输出槽，或手动粘贴单条资产 JSON。]"
-            print(f"[Agnes Asset Prompt] {err}")
+            err = "[错误] asset_json 为空：请连接 Agnes 文本拆分的输出槽，或手动粘贴单条资产 JSON"
+            print(f"[Agnes 资产提示词] {err}")
             return (err, "未输入资产 JSON，已跳过。")
 
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            err = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
-            print(f"[Agnes Asset Prompt] {err}")
+            err = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
+            print(f"[Agnes 资产提示词] {err}")
             return (err, "API Key 缺失。")
 
         try:

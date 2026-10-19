@@ -1,8 +1,7 @@
 """
-Agnes Keyframe-to-Video Node（关键帧生视频）
-============================================
-Generate videos from keyframes (first frame required, last frame optional)
-using Agnes AI video generation models.
+Agnes 关键帧生视频（图生视频）节点
+===================================
+使用 Agnes AI 视频生成模型，从关键帧生成视频（首帧必接，尾帧可选）。
 
 - 新接口 agnes-video-2.5-flash：keyframe 模式（first_frame / last_frame，
   固定 720P，4-12 秒）；首帧必接，尾帧可选。
@@ -11,8 +10,8 @@ using Agnes AI video generation models.
 多图参考（最多 5 张）/ 音频参考（最多 3 段）请改用「Agnes 参考视频生成」
 节点（nodes/video_reference.py，reference 模式）。
 
-Uses async API with polling - can take several minutes.
-Output: Saves MP4 to ComfyUI's output/agnes_videos/ directory.
+异步接口 + 轮询，耗时可达数分钟。
+输出：MP4 保存到 ComfyUI 的 output/agnes_videos/ 目录。
 """
 
 import os
@@ -30,13 +29,13 @@ from ..api import (
 )
 from ._output_docs import OutputDocsMixin
 
-# Quality → short-side pixels
+# 画质档位 → 短边像素
 QUALITY_MAP = {
     "1K": 1024,
     "2K": 2048,
 }
 
-# Supported aspect ratios (width:height)
+# 支持的宽高比（宽:高）
 ASPECT_RATIOS = [
     "1:1",
     "2:3",
@@ -51,12 +50,12 @@ ASPECT_RATIOS = [
     "21:9",
 ]
 
-# Try to get ComfyUI's output directory (available inside ComfyUI runtime).
+# 尝试获取 ComfyUI 的输出目录（ComfyUI 运行环境内可用）
 _COMFYUI_OUTPUT_DIR = None
 
 
 def compute_size(quality: str, aspect_ratio: str) -> str:
-    """Compute a WxH pixel size string from quality level and aspect ratio."""
+    """根据画质档位与宽高比计算 WxH 像素尺寸字符串。"""
     base = QUALITY_MAP.get(quality, 1024)
     w_ratio, h_ratio = map(int, aspect_ratio.split(":"))
 
@@ -74,7 +73,7 @@ def compute_size(quality: str, aspect_ratio: str) -> str:
 
 
 def _get_output_dir() -> str:
-    """Get ComfyUI's output directory for saving video files."""
+    """获取 ComfyUI 的视频输出目录（保存视频文件用）。"""
     global _COMFYUI_OUTPUT_DIR
     if _COMFYUI_OUTPUT_DIR is not None:
         return _COMFYUI_OUTPUT_DIR
@@ -89,11 +88,11 @@ def _get_output_dir() -> str:
     return _COMFYUI_OUTPUT_DIR
 
 
-# Detect video output type (priority: comfy_api VIDEO > VHS > STRING).
+# 探测视频输出类型（优先级：comfy_api VIDEO > VHS > STRING）。
 _VIDEO_OUTPUT_TYPE = "STRING"
-_VIDEO_MODE = "string"  # "comfy_api" | "vhs" | "string"
+_VIDEO_MODE = "string"  # 三种输出模式："comfy_api" | "vhs" | "string"
 
-# 1. Try native VIDEO type from comfy_api (ships with ComfyUI v1.7+)
+# 1. 尝试原生 VIDEO 类型（comfy_api，随 ComfyUI v1.7+ 自带）
 try:
     from comfy_api.latest import InputImpl as _ApiInput
     if hasattr(_ApiInput, "VideoFromFile"):
@@ -102,7 +101,7 @@ try:
 except Exception:
     pass
 
-# 2. Fallback to VHS_VIDEOINFO
+# 2. 回退到 VHS 的 VHS_VIDEOINFO（已安装视频Helper时）
 if _VIDEO_MODE == "string":
     try:
         import nodes as _comfy_nodes
@@ -115,7 +114,7 @@ if _VIDEO_MODE == "string":
 
 
 class AgnesNovelImageToVideo(OutputDocsMixin):
-    """Agnes AI Image-to-Video node for ComfyUI."""
+    """Agnes AI 关键帧生视频（图生视频）节点：首帧必接，尾帧可选。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = (_VIDEO_OUTPUT_TYPE, "STRING",)
@@ -137,8 +136,8 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "Smooth camera pan with gentle motion...",
-                    "tooltip": "Description of the desired animation/motion",
+                    "placeholder": "输入运动描述（建议英文），例如：Smooth camera pan with gentle motion...",
+                    "tooltip": "描述想要的动画/运动效果（建议英文提示词）",
                 }),
                 "base_url": ("STRING", {
                     "multiline": False,
@@ -150,11 +149,11 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                     "multiline": False,
                     "default": "",
                     "placeholder": "sk-...",
-                    "tooltip": "Your Agnes AI API key",
+                    "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）",
                 }),
                 "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
-                    "tooltip": "Video generation model",
+                    "tooltip": "视频生成模型：agnes-video-2.5-flash（keyframe 模式，固定 720P）/ agnes-video-v2.0（帧数模式）",
                 }),
                 "quality": (["1K", "2K"], {
                     "default": "1K",
@@ -162,7 +161,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "16:9",
-                    "tooltip": "Output aspect ratio (width:height). E.g. 16:9 for widescreen, 9:16 for portrait",
+                    "tooltip": "输出宽高比（宽:高）：如 16:9 宽屏、9:16 竖屏；新接口 2.5-flash 不支持的比例自动就近映射",
                 }),
                 "num_frames": ("INT", {
                     "default": DEFAULT_VIDEO_FRAMES,
@@ -190,7 +189,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                     "min": 60,
                     "max": 3600,
                     "step": 30,
-                    "tooltip": "Maximum time to wait for video generation (in seconds)",
+                    "tooltip": "视频生成轮询最长等待时间（秒）",
                 }),
             },
             "optional": {
@@ -216,13 +215,13 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         max_wait_seconds: int = 600,
         end_frame_image=None,
     ) -> Tuple:
-        # Runtime fallback: try config file if widget value is empty
+        # 运行时回退：widget 值为空时从全局配置（api_key_config.json 等）取 API Key
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return _error("API key is required")
+            return _error("缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置")
         if not prompt.strip():
-            return _error("Prompt is empty")
+            return _error("提示词为空：请描述运动效果")
 
         size = compute_size(quality, aspect_ratio)
         output_dir = _get_output_dir()
@@ -266,16 +265,16 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
 
             if video_path:
                 return _make_result(video_path, size)
-            return _error("No video returned", size)
+            return _error("未返回视频", size)
 
         except Exception as e:
             return _error(str(e), size)
 
 
-# ---- Result builders (shared) ----
+# ---- 结果构建函数（视频节点共享） ----
 
 def _make_result(video_path: str, size: str) -> Tuple:
-    """Build a (video_output, resolution) tuple based on available output type."""
+    """按可用输出类型构建 (video_output, resolution) 结果元组。"""
     filename = os.path.basename(video_path)
 
     if _VIDEO_MODE == "comfy_api":
@@ -289,8 +288,8 @@ def _make_result(video_path: str, size: str) -> Tuple:
 
 
 def _error(msg: str, size: str = "") -> Tuple:
-    """Build an error. Raises in comfy_api VIDEO mode (string would crash SaveVideo)."""
-    text = f"[Error] {msg}"
+    """构建错误结果。comfy_api VIDEO 模式下直接抛错（返回字符串会令 SaveVideo 崩溃）。"""
+    text = f"[错误] {msg}"
     if _VIDEO_MODE == "comfy_api":
         raise RuntimeError(text)
     if _VIDEO_MODE == "vhs":

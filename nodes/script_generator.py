@@ -85,7 +85,7 @@ class AgnesScriptGenerator:
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return ("[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]",)
+            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
 
         target_chars = target_duration * 5
 
@@ -120,7 +120,7 @@ class AgnesScriptGenerator:
 
 请直接输出解说文案，不要有任何额外说明："""
 
-        print(f"[Agnes Script] Generating script (target: {target_chars} chars), thinking={normalize_reasoning_effort(reasoning_effort) or 'default'}...")
+        print(f"[Agnes 剧本] 生成解说文案（目标 {target_chars} 字），思考等级={normalize_reasoning_effort(reasoning_effort) or '默认'}...")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)

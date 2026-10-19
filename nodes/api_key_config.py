@@ -1,12 +1,10 @@
 """
-Agnes API Key Config Node
-==========================
-A special node that persists the user's API key and Base URL to a local
-config file. Run this node once to save your API key and request address;
-all other Agnes nodes will automatically pick them up when the fields are
-left empty.
+Agnes API Key 配置节点
+======================
+特殊节点：把用户的 API Key 和 Base URL 持久化到本地配置文件。
+运行一次保存后，其他所有 Agnes 节点在留空时会自动读取。
 
-Config file location: <plugin_dir>/api_key_config.json
+配置文件位置：<plugin_dir>/api_key_config.json
 """
 
 import json
@@ -20,7 +18,7 @@ CONFIG_FILE = os.path.join(PLUGIN_DIR, "api_key_config.json")
 
 
 class AgnesNovelAPIKeyConfig(OutputDocsMixin):
-    """Persist Agnes API key and Base URL to a local config file for all nodes to share."""
+    """把 Agnes API Key 和 Base URL 持久化到本地配置文件，供所有节点共享。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
@@ -37,7 +35,7 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Try to load existing key / base url for display
+        # 尝试读取已有 key / base url 用于默认显示
         existing_key = ""
         existing_base_url = ""
         try:
@@ -61,15 +59,15 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
                     "multiline": False,
                     "default": existing_key,
                     "placeholder": "sk-xxxxxxxx...",
-                    "tooltip": "Your Agnes AI API key. Will be saved to plugin config and reused by all other nodes.",
+                    "tooltip": "Agnes AI API Key。保存后写入插件配置，其他节点留空时自动复用。",
                 }),
             },
             "optional": {
                 "clear_key": ("BOOLEAN", {
                     "default": False,
-                    "label_on": "YES - Clear saved key",
-                    "label_off": "NO - Save / Update key",
-                    "tooltip": "Set to YES to delete the saved API key from config.",
+                    "label_on": "是 - 清除已保存的 Key",
+                    "label_off": "否 - 保存 / 更新 Key",
+                    "tooltip": "选「是」时删除配置文件中已保存的 API Key。",
                 }),
             },
             "hidden": {},
@@ -77,30 +75,30 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
 
     def save_key(self, base_url: str = "", api_key: str = "", clear_key: bool = False) -> Tuple[str, str, str, str]:
         """
-        Save or clear the API key and Base URL in the plugin config file.
+        在插件配置文件中保存或清除 API Key 与 Base URL。
         """
         if clear_key:
-            # Remove config file
+            # 删除配置文件
             if os.path.exists(CONFIG_FILE):
                 os.remove(CONFIG_FILE)
-            return ("", "", "", "[OK] API key and Base URL have been cleared from config.")
+            return ("", "", "", "[OK] 已从配置中清除 API Key 与 Base URL。")
 
         key = api_key.strip()
         if not key:
-            return ("", "", "", "[Error] API key is empty. Please enter a valid key.")
+            return ("", "", "", "[错误] API Key 为空：请输入有效的 Key")
 
         url = (base_url or "").strip().rstrip("/")
 
-        # Save to JSON config file
+        # 保存到 JSON 配置文件
         config_data = {"api_key": key, "base_url": url}
         try:
             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            return ("", "", "", f"[Error] Failed to save config: {str(e)}")
+            return ("", "", "", f"[错误] 保存配置失败：{str(e)}")
 
-        # Mask the key for display (show first 8 + last 4 chars)
+        # 掩码显示 Key（前 8 位 + **** + 后 4 位）
         if len(key) > 12:
             masked = key[:8] + "****" + key[-4:]
         elif len(key) > 6:
@@ -120,9 +118,9 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
             url or "https://api.agnes-ai.cn/v1 (default)",
             key,
             masked,
-            f"[OK] API key saved to {os.path.basename(CONFIG_FILE)}"
-            + (f", Base URL = {url}" if url else "")
-            + ". All other Agnes nodes will now auto-load these settings.",
+            f"[OK] API Key 已保存到 {os.path.basename(CONFIG_FILE)}"
+            + (f"，Base URL = {url}" if url else "")
+            + "。其他 Agnes 节点现在会自动加载此配置。",
         )
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelAPIKeyConfig": AgnesNovelAPIKeyConfig}

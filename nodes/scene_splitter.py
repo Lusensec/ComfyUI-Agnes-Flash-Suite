@@ -116,11 +116,11 @@ class AgnesSceneSplitter:
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            error_msg = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            error_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
             result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
             return tuple(result)
         print(f"\n{'='*60}")
-        print(f"[Agnes Scene Splitter - {model}]")
+        print(f"[Agnes 场景拆分 - {model}]")
         print(f"{'='*60}")
 
         prompt = f"""你是一位专业的影视剪辑师。请将以下小说章节切分成段落，每个段落对应5秒视频能容纳的内容。

@@ -9,7 +9,7 @@ Agnes 参考视频生成节点（图片参考 / 音频参考）
 首尾帧关键帧模式请改用「Agnes 关键帧生视频」节点（AgnesNovelImageToVideo）。
 文生视频请改用「Agnes 文生视频」节点（AgnesNovelTextToVideo）；单图首帧动画请改用「Agnes 关键帧生视频」节点。
 
-Output: Saves MP4 to ComfyUI's output/agnes_videos/ directory.
+输出：MP4 保存到 ComfyUI 的 output/agnes_videos/ 目录。
 """
 
 from typing import Tuple
@@ -36,7 +36,7 @@ from .img2video import (
 
 
 class AgnesVideoReference(OutputDocsMixin):
-    """Agnes AI reference-based video generation (up to 5 image refs + 3 audio refs)."""
+    """Agnes AI 参考素材生视频节点：最多 5 张参考图 + 3 段参考音频（2.5-flash reference 模式）。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = (_VIDEO_OUTPUT_TYPE, "STRING",)
@@ -69,7 +69,7 @@ class AgnesVideoReference(OutputDocsMixin):
                     "multiline": False,
                     "default": "",
                     "placeholder": "sk-...",
-                    "tooltip": "Your Agnes AI API key",
+                    "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）",
                 }),
                 "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
@@ -95,7 +95,7 @@ class AgnesVideoReference(OutputDocsMixin):
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "16:9",
-                    "tooltip": "Output aspect ratio (width:height). E.g. 16:9 for widescreen, 9:16 for portrait",
+                    "tooltip": "输出宽高比（宽:高）：如 16:9 宽屏、9:16 竖屏；新接口 2.5-flash 不支持的比例自动就近映射",
                 }),
                 "seed": ("INT", {
                     "default": 0,
@@ -109,7 +109,7 @@ class AgnesVideoReference(OutputDocsMixin):
                     "min": 60,
                     "max": 3600,
                     "step": 30,
-                    "tooltip": "Maximum time to wait for video generation (in seconds)",
+                    "tooltip": "视频生成轮询最长等待时间（秒）",
                 }),
             },
             "optional": {
@@ -167,13 +167,13 @@ class AgnesVideoReference(OutputDocsMixin):
         audio_2: str = "",
         audio_3: str = "",
     ) -> Tuple:
-        # Runtime fallback: try config file if widget value is empty
+        # 运行时回退：widget 值为空时从全局配置（api_key_config.json 等）取 API Key
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return _error("API key is required")
+            return _error("缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置")
         if not prompt.strip():
-            return _error("Prompt is empty")
+            return _error("提示词为空：请描述视频内容")
 
         # 收集媒体参考：图片 5 张上限、音频 3 段上限（客户端会再截断一次）
         refs = [tensor_to_pil(x) for x in
@@ -223,7 +223,7 @@ class AgnesVideoReference(OutputDocsMixin):
 
             if video_path:
                 return _make_result(video_path, size)
-            return _error("No video returned", size)
+            return _error("未返回视频", size)
 
         except Exception as e:
             return _error(str(e), size)

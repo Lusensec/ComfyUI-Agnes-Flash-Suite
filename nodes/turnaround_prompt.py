@@ -1,6 +1,6 @@
 """
-Agnes Turnaround Prompt Generator Node
-======================================
+Agnes 三视图提示词生成节点
+================
 把「原始主体描述/提示词」（资产提示词生成节点输出，或手动粘贴的中文/英文描述）
 转成一条**完整的三视图英文生成提示词**：保留全部主体细节 + 三视图构图指令
 （正/侧/背并排或场景三图纸）+ 纯主体规格（纯白背景、平光无阴影）+ 质量尾词。
@@ -143,7 +143,7 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            err = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            err = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
             print(f"[Agnes 三视图提示词] {err}")
             return (err, "API Key 缺失。")
 

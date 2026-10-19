@@ -85,7 +85,7 @@ class AgnesScenePromptGenerator:
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return ("[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]",)
+            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
         print(f"\n{'='*50}")
         print(f"🖼️  Agnes 分镜提示词生成")
         print(f"{'='*50}")
