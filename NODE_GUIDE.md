@@ -428,7 +428,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 ## 推荐配置
 
 ### 快速测试
-- 使用精简工作流 `agnes-novel-minimal.json`
+- 按下方「完整流程」自行搭建最小链路
 - 只配置 API Key
 - 输入一段小说文本
 
