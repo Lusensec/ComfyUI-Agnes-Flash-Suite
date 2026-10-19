@@ -2,7 +2,7 @@
 Agnes Text Split Node
 =====================
 把一段文本（资产 JSON 列表 / LLM 输出的【名】分块 / 编号列表 / 多段文本）
-拆成最多 12 路独立字符串，方便逐条喂给 三视图生成、文生图、LLM 对话 等节点，
+拆成最多 20 路独立字符串，方便逐条喂给 三视图生成、文生图、LLM 对话 等节点，
 实现「一个角色/道具/场景 = 一张图」的批量资产出图。
 
 典型链路（资产线）：
@@ -25,7 +25,7 @@ class AgnesTextSplitter(OutputDocsMixin):
     CATEGORY = "Agnes Novel"
 
     SPLIT_MODES = ("JSON 数组", "【】括号块", "编号列表", "空行段落")
-    MAX_SLOTS = 12
+    MAX_SLOTS = 20
 
     RETURN_NAMES = tuple(f"item_{i}" for i in range(1, MAX_SLOTS + 1)) + ("count", "text_out",)
     RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 2)
@@ -35,9 +35,9 @@ class AgnesTextSplitter(OutputDocsMixin):
     )
 
     OUTPUT_DOCS = {
-        **{f"item_{i}": f"拆分后的第 {i} 条独立文本（供 三视图/文生图/LLM 对话 逐条使用；超出 12 条不显示）"
+        **{f"item_{i}": f"拆分后的第 {i} 条独立文本（供 三视图/文生图/LLM 对话 逐条使用；超出 20 条不显示）"
            for i in range(1, MAX_SLOTS + 1)},
-        "count": "实际拆分出的条目总数（超过 12 条时显示为「N（仅显示前 12 条）」）",
+        "count": "实际拆分出的条目总数（超过 20 条时显示为「N（仅显示前 20 条）」）",
         "text_out": "原始输入文本透传（方便并联其他节点或存档）",
     }
 
