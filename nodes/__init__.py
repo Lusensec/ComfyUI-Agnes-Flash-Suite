@@ -15,7 +15,6 @@ from .api_key_config import AgnesNovelAPIKeyConfig
 from .llm_chat import AgnesNovelLLMChat
 from .image_reverse import AgnesNovelImageReverse
 from .img2img import AgnesNovelImageToImage
-from .text2img import AgnesNovelTextToImage
 from .img2video import AgnesNovelImageToVideo
 from .text2video import AgnesNovelTextToVideo
 from .video_reference import AgnesVideoReference
@@ -33,7 +32,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 from . import script_generator, director_master, image_gen, asset_extractor
 from . import scene_splitter, prompt_generator, video_gen
 from . import api_key_config, llm_chat, image_reverse
-from . import img2img, text2img, img2video, text2video
+from . import img2img, img2video, text2video
 from . import video_reference
 from . import character_turnaround
 from . import string_merge
@@ -44,7 +43,7 @@ from . import turnaround_prompt
 for _mod in [script_generator, director_master, image_gen, asset_extractor,
              scene_splitter, prompt_generator, video_gen,
              api_key_config, llm_chat, image_reverse,
-             img2img, text2img, img2video, text2video,
+             img2img, img2video, text2video,
              video_reference,
              character_turnaround,
              string_merge,

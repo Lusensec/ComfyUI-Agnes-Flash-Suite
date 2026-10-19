@@ -1,6 +1,8 @@
 """
 Agnes 图像生成节点
 使用 Agnes Image API（默认 agnes-image-2.5-flash，可选旧 2.1/2.0）
+支持 n=1-4 批量出图（旧接口生效；新 2.5-flash 固定 1 张），
+已合并原 Agnes 文生图（AgnesNovelTextToImage）的多张生成功能，该节点已删除。
 """
 import requests
 import torch
@@ -81,15 +83,23 @@ class AgnesImageGen:
                     "default": "16:9",
                     "tooltip": "宽高比（与视频节点一致）：新接口 agnes-image-2.5-flash 与 quality 档位组合出图，如 16:9 + 2K = 2624×1472；旧接口 2.1/2.0 按 width/height 像素出图，此项不生效"
                 }),
+                "n": ("INT", {
+                    "default": 1,
+                    "min": 1,
+                    "max": 4,
+                    "step": 1,
+                    "tooltip": "单次请求生成张数（1-4）：当前 Agnes 服务端对所有图像模型限单张（n>1 返回 400，节点自动降级为 1 张并打印提示）；API 解锁多张后 n 直接生效。n>1 成功时输出批量张量（同主体多张变体；多资产请多节点实例各出 1 张）",
+                }),
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING",)
-    RETURN_NAMES = ("image", "url",)
-    RETURN_LABELS = ("图像张量", "图片 URL")
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
+    RETURN_NAMES = ("image", "url", "resolution",)
+    RETURN_LABELS = ("图像张量", "图片 URL", "分辨率")
     OUTPUT_TOOLTIPS = (
-        "生成的图像张量（连接 SaveImage 存档，或图生视频/三视图节点作为参考图）",
+        "生成的图像张量（n=1 单张；n>1 时批量 (N,H,W,3)；连接 SaveImage 存档，或图生视频/三视图节点作为参考图）",
         "图片 URL / 本地保存路径（可下载或记录引用）",
+        "本次输出的实际分辨率（WxH）",
     )
     FUNCTION = "generate"
     CATEGORY = "Agnes Novel"
@@ -102,50 +112,66 @@ class AgnesImageGen:
     def get_extra_pnginfo(self, **kwargs):
         extra = {}
         if "image" in kwargs:
-            extra["image"] = {"description": "生成的图像张量，可连接视频生成节点"}
+            extra["image"] = {"description": "生成的图像张量（n>1 时批量），可连接 SaveImage 存档或视频生成节点"}
         if "url" in kwargs:
             extra["url"] = {"description": "图片的 URL 地址"}
+        if "resolution" in kwargs:
+            extra["resolution"] = {"description": "本次输出的实际分辨率（WxH）"}
         return extra
 
-    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL, aspect_ratio="16:9"):
+    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL, aspect_ratio="16:9", n=1):
+        n = max(1, min(4, int(n or 1)))
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             import torch as _torch
             err_msg = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
             black = _torch.zeros(1, height, width, 3)
-            return (black, err_msg)
+            return (black, err_msg, "")
         print(f"\n[Agnes Image] 开始生成...")
         print(f"Prompt: {prompt[:80]}...")
-        print(f"Model: {model}, Quality: {quality}, 尺寸: {width}x{height}, 比例: {aspect_ratio}")
+        print(f"Model: {model}, Quality: {quality}, 尺寸: {width}x{height}, 比例: {aspect_ratio}, 张数: {n}")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_IMAGE_MODELS:
                 # 新接口：档位（1K/2K/3K/4K）+ 显式宽高比 ratio；客户端已下载并转 PIL
+                # 注意：新接口 API 不支持 n 参数，实际固定出 1 张
                 size_arg, ratio_arg = quality.upper(), (aspect_ratio or _nearest_ratio(width, height))
             else:
                 # 旧接口：WxH 像素（ratio 不参与）
                 size_arg, ratio_arg = f"{width}x{height}", None
-            pil_images = client.generate_image(
-                prompt=prompt,
-                model=model,
-                size=size_arg,
-                ratio=ratio_arg,
-                n=1,
-            )
+            def _call(nn):
+                return client.generate_image(
+                    prompt=prompt,
+                    model=model,
+                    size=size_arg,
+                    ratio=ratio_arg,
+                    n=nn,
+                )
+
+            try:
+                pil_images = _call(n)
+            except Exception as e:
+                # 服务端限制单张出图（n 必须为 1）时自动降级
+                if n > 1 and ("n 必须为 1" in str(e) or "n must be 1" in str(e)):
+                    print(f"[Agnes Image] {model} 暂不支持 n={n} 多张（服务端限单张，400），自动降级 n=1")
+                    n = 1
+                    pil_images = _call(1)
+                else:
+                    raise
 
             if pil_images:
-                pil_img = pil_images[0]
-                if pil_img.mode != "RGB":
-                    pil_img = pil_img.convert("RGB")
-
-                # 转换为 ComfyUI 格式
-                img_np = np.array(pil_img).astype(np.float32) / 255.0
-                img_tensor = torch.from_numpy(img_np).unsqueeze(0)
-
-                print(f"[Agnes Image] 生成成功: {pil_img.size}")
-                return (img_tensor, "")
+                tensors = []
+                for pil_img in pil_images:
+                    if pil_img.mode != "RGB":
+                        pil_img = pil_img.convert("RGB")
+                    img_np = np.array(pil_img).astype(np.float32) / 255.0
+                    tensors.append(torch.from_numpy(img_np).unsqueeze(0))
+                batch = tensors[0] if len(tensors) == 1 else torch.cat(tensors, dim=0)
+                res = f"{pil_images[0].size[0]}x{pil_images[0].size[1]}"
+                print(f"[Agnes Image] 生成成功: {res} x {len(tensors)} 张")
+                return (batch, "", res)
             else:
                 raise Exception("未获取到图片")
 
@@ -153,7 +179,7 @@ class AgnesImageGen:
             print(f"[Agnes Image] 失败: {e}")
             # 返回黑色图片作为占位
             black = torch.zeros(1, height, width, 3)
-            return (black, "")
+            return (black, "", "")
 
 
 NODE_CLASS_MAPPINGS = {"AgnesImageGen": AgnesImageGen}
