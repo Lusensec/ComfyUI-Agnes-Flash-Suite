@@ -292,7 +292,11 @@ class AgnesClient:
 
     # HTTP statuses that trigger an automatic retry.
     _RETRY_STATUSES = {429, 500, 502, 503, 504, 524}
+    # 队列满/限流类状态：等待时间需要分钟级（生图队列排空约 1-5 分钟）
+    _QUEUE_STATUSES = {429, 503}
+    _QUEUE_BASE_DELAY = 15  # 秒（指数退避: 15, 30, 60, 120）
     _MAX_RETRIES = 3
+    _MAX_RETRIES_QUEUE = 5  # 队列满/限流专用：最多等 ~3.75 分钟
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
@@ -362,10 +366,16 @@ class AgnesClient:
         return f"[{api_name} 错误] HTTP {status_code}: {text}" if text else f"[{api_name} 错误] HTTP {status_code}"
 
     def _request_with_retry(self, method: str, url: str, api_name: str,
-                            json_payload: dict = None, timeout: int = 300) -> requests.Response:
-        """Make an HTTP request with automatic retry on transient server errors."""
+                            json_payload: dict = None, timeout: int = 300,
+                            max_retries: Optional[int] = None) -> requests.Response:
+        """Make an HTTP request with automatic retry on transient server errors.
+
+        队列满/限流（429/503）采用分钟级退避（15/30/60/120 秒，最多
+        _MAX_RETRIES_QUEUE 次）；其他可重试状态维持 3/6/12 秒短退避。
+        """
+        max_retries = max_retries or self._MAX_RETRIES
         last_error = None
-        for attempt in range(1, self._MAX_RETRIES + 1):
+        for attempt in range(1, max_retries + 1):
             try:
                 if method == "POST":
                     resp = self.session.post(url, json=json_payload, timeout=timeout)
@@ -375,17 +385,26 @@ class AgnesClient:
                 if resp.status_code == 200:
                     return resp
 
-                if resp.status_code in self._RETRY_STATUSES and attempt < self._MAX_RETRIES:
-                    delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                if resp.status_code in self._RETRY_STATUSES and attempt < max_retries:
+                    if resp.status_code in self._QUEUE_STATUSES:
+                        delay = self._QUEUE_BASE_DELAY * (2 ** (attempt - 1))
+                    else:
+                        delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
                     last_error = (resp.status_code, resp.text)
                     time.sleep(delay)
                     continue
 
                 # Not retryable or last attempt → raise
+                if resp.status_code in self._QUEUE_STATUSES:
+                    raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name) +
+                                       f"\n（已自动重试 {attempt} 次、累计等待约 "
+                                       f"{sum(self._QUEUE_BASE_DELAY * (2 ** i) for i in range(attempt - 1))} 秒）"
+                                       f"\n建议：生图队列繁忙（文生图与图生图队列相互独立），"
+                                       f"请等 5-10 分钟后再运行本节点。")
                 raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name))
 
             except requests.exceptions.Timeout:
-                if attempt < self._MAX_RETRIES:
+                if attempt < max_retries:
                     delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
                     time.sleep(delay)
                     continue
@@ -394,7 +413,7 @@ class AgnesClient:
                     f"建议：Agnes 服务器可能繁忙，请稍后重试。"
                 )
             except requests.exceptions.ConnectionError:
-                if attempt < self._MAX_RETRIES:
+                if attempt < max_retries:
                     delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
                     time.sleep(delay)
                     continue
@@ -406,7 +425,7 @@ class AgnesClient:
         # Should not reach here, but handle gracefully
         if last_error:
             raise RuntimeError(self._clean_error(last_error[0], last_error[1], api_name))
-        raise RuntimeError(f"[{api_name} 错误] 请求失败（已重试 {self._MAX_RETRIES} 次）")
+        raise RuntimeError(f"[{api_name} 错误] 请求失败（已重试 {max_retries} 次）")
 
     # ------------------------------------------------------------------
     # Chat / LLM
@@ -501,7 +520,10 @@ class AgnesClient:
                     "response_format": "url",
                 }
 
-        resp = self._request_with_retry("POST", url, "Image", json_payload=payload)
+        # 生图队列满（503）/限流（429）：分钟级退避重试（15/30/60/120 秒）
+        resp = self._request_with_retry(
+            "POST", url, "Image", json_payload=payload,
+            max_retries=self._MAX_RETRIES_QUEUE)
 
         data = resp.json()
         images = []
