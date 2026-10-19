@@ -437,7 +437,7 @@
     },
     {
       "id": 6,
-      "type": "AgnesVideoGen",
+      "type": "AgnesNovelTextToVideo",
       "pos": [
         600,
         800
@@ -469,22 +469,6 @@
           "links": null
         },
         {
-          "name": "num_frames",
-          "type": "INT",
-          "widget": {
-            "name": "num_frames"
-          },
-          "links": null
-        },
-        {
-          "name": "frame_rate",
-          "type": "INT",
-          "widget": {
-            "name": "frame_rate"
-          },
-          "links": null
-        },
-        {
           "name": "quality",
           "type": "COMBO",
           "widget": {
@@ -501,9 +485,36 @@
           "links": null
         },
         {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 6
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "links": null
+        },
+        {
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "links": null
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "links": null
+        },
+        {
+          "name": "max_wait_seconds",
+          "type": "INT",
+          "widget": {
+            "name": "max_wait_seconds"
+          },
+          "links": null
         }
       ],
       "outputs": [
@@ -515,26 +526,24 @@
           ]
         },
         {
-          "name": "video_id",
-          "type": "STRING"
-        },
-        {
-          "name": "task_id",
+          "name": "resolution",
           "type": "STRING"
         }
       ],
       "properties": {
-        "Node name for S&R": "AgnesVideoGen"
+        "Node name for S&R": "AgnesNovelTextToVideo"
       },
       "widgets_values": [
         "",
         "",
         "sk-你的Key",
         "agnes-video-v2.0",
+        "1K",
+        "16:9",
         121,
         24,
-        "1K",
-        "16:9"
+        0,
+        600
       ]
     },
     {
@@ -730,14 +739,6 @@
       5,
       0,
       "STRING"
-    ],
-    [
-      6,
-      5,
-      0,
-      6,
-      7,
-      "IMAGE"
     ],
     [
       7,

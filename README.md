@@ -1,4 +1,4 @@
-﻿# ComfyUI Agnes Novel Plugin
+# ComfyUI Agnes Novel Plugin
 ============================
 
 Agnes AI 小说推文插件 - 集成 comfyui-agnes-ai 核心 API
@@ -10,7 +10,7 @@ Agnes AI 小说推文插件 - 集成 comfyui-agnes-ai 核心 API
 - 资产提取 (AgnesAssetExtractor)
 - 提示词生成 (AgnesScenePromptGenerator)
 - 图像生成 (AgnesImageGen)
-- 视频生成 (AgnesVideoGen)
+- 文生视频 (AgnesNovelTextToVideo)
 - 剧本生成 (AgnesScriptGenerator)
 
 ## 依赖

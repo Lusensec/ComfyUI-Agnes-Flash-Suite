@@ -11,7 +11,7 @@ ComfyUI Agnes Novel Plugin
   * AgnesAssetExtractor: 资产提取
   * AgnesScenePromptGenerator: 分镜提示词生成
   * AgnesImageGen: 图像生成
-  * AgnesVideoGen: 视频生成
+  * AgnesNovelTextToVideo: 文生视频（原 AgnesVideoGen 已删除）
   * AgnesScriptGenerator: 剧本生成
 - 通用节点（从 comfyui-agnes-ai 集成）:
   * AgnesAPIKeyConfig: API Key 配置

@@ -539,7 +539,7 @@
     },
     {
       "id": 5,
-      "type": "AgnesVideoGen",
+      "type": "AgnesNovelTextToVideo",
       "pos": [
         1750,
         100
@@ -553,45 +553,81 @@
       "mode": 0,
       "inputs": [
         {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 5,
-          "widget": {
-            "name": "image"
-          }
-        },
-        {
           "name": "prompt",
           "type": "STRING",
-          "link": null,
-          "widget": {
-            "name": "prompt"
-          }
+          "link": null
         },
         {
           "name": "api_key",
           "type": "STRING",
-          "link": null,
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "STRING",
           "widget": {
-            "name": "api_key"
-          }
+            "name": "model"
+          },
+          "links": null
+        },
+        {
+          "name": "quality",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality"
+          },
+          "links": null
+        },
+        {
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "links": null
+        },
+        {
+          "name": "num_frames",
+          "type": "INT",
+          "widget": {
+            "name": "num_frames"
+          },
+          "links": null
+        },
+        {
+          "name": "frame_rate",
+          "type": "INT",
+          "widget": {
+            "name": "frame_rate"
+          },
+          "links": null
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "links": null
+        },
+        {
+          "name": "max_wait_seconds",
+          "type": "INT",
+          "widget": {
+            "name": "max_wait_seconds"
+          },
+          "links": null
         }
       ],
       "outputs": [
         {
           "name": "video",
-          "type": "STRING",
-          "links": null
+          "type": "VIDEO",
+          "links": []
         },
         {
-          "name": "video_id",
-          "type": "STRING",
-          "links": null
-        },
-        {
-          "name": "status",
-          "type": "STRING",
-          "links": null
+          "name": "resolution",
+          "type": "STRING"
         }
       ],
       "properties": {
@@ -602,10 +638,12 @@
         "",
         "",
         "agnes-video-v2.0",
+        "1K",
+        "16:9",
         121,
         24,
-        "1K",
-        "16:9"
+        0,
+        600
       ]
     },
     {
@@ -963,14 +1001,6 @@
       4,
       0,
       "STRING"
-    ],
-    [
-      5,
-      4,
-      0,
-      5,
-      0,
-      "IMAGE"
     ],
     [
       6,

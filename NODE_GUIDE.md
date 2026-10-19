@@ -183,28 +183,31 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### 🎬 Agnes 视频生成 (AgnesVideoGen)
+### 🎞️ Agnes 文生视频 (AgnesNovelTextToVideo)
 
-**功能：** 文生视频 / 单图参考生视频（接一张 image 走 2.5-flash reference 模式）
+**功能：** 文生视频：按提示词直接生成视频（替代原「Agnes 视频生成」AgnesVideoGen，该节点已删除；
+图参考/首尾帧请改用「Agnes 关键帧生视频」或「Agnes 参考视频生成」节点）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| prompt | STRING | "" | 视频描述（建议英文提示词） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
-| prompt | STRING | "" | 视频描述（可选） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-video-2.5-flash | 视频生成模型，可选 2.5-flash（4-12s/720P）/ agnes-video-v2.0（帧数模式） |
-| num_frames | INT | 121 | 旧接口帧数（121≈5秒 @ 24fps）；新接口自动换算为秒数（4-12s） |
-| frame_rate | INT | 24 | 帧率（旧接口生效；新接口仅用于换算时长，API 无此参数） |
-| quality | COMBO | 1K | 画质（旧接口 1K/2K；新接口固定 720P，API 无此参数） |
-| aspect_ratio | COMBO | 16:9 | 宽高比：16:9/9:16/1:1/4:3/3:4 |
-| image | IMAGE | - | 参考图片（可选；连接后走图生视频） |
+| quality | COMBO | 1K | 画质档位：仅旧接口 1K/2K 生效（映射 WxH 像素）；新接口 2.5-flash 固定 720P |
+| aspect_ratio | COMBO | 16:9 | 宽高比（支持 12 种；新接口不支持的比例自动就近映射） |
+| num_frames | INT | 121 | 帧数（旧接口必须 8n+1，121≈5s@24fps）；新接口按 帧数/帧率 换算 4-12 秒时长 |
+| frame_rate | INT | 24 | 帧率：旧接口传给 API；新接口仅用于换算时长 |
+| seed | INT | 0 | 随机种子（0=每次随机，固定值可复现结果） |
+| max_wait_seconds | INT | 600 | 轮询超时 |
 
 **输出（含输出描述）：**
-- video: 视频文件路径（MP4 保存到 ComfyUI output/agnes_videos/）
-- video_id: 视频任务唯一标识（可用于查询重试）
-- task_id: API 返回的任务 ID
+- video: 视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览
+- resolution: 视频目标尺寸（WxH）；新接口 2.5-flash 固定 720P，实际像素随 aspect_ratio 变化
 
-> 多张图片/音频参考请用「🎞️ Agnes 参考视频生成」节点；首尾帧请用「🎬 Agnes 关键帧生视频」节点。
+> 原「Agnes 视频生成」节点（AgnesVideoGen，含 image 参考输入）已删除：
+> 文生视频用本节点；单图首帧/首尾帧请用「🎬 Agnes 关键帧生视频」节点；
+> 多张图片/音频参考请用「🎞️ Agnes 参考视频生成」节点。
 
 ---
 
@@ -434,7 +437,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 2. **资产提取** → 获取 characters_json, locations_json
 3. **提示词生成** → 连接 scene_1 + characters_json + locations_json
 4. **图像生成** → 生成场景图像
-5. **视频生成** → 连接图像，生成视频
+5. **文生视频** → 按提示词生成视频（图参考请用「Agnes 关键帧生视频」/「Agnes 参考视频生成」节点）
 6. **剧本生成** → 独立流程，生成解说文案
 
 ---
@@ -445,7 +448,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 |------|----------|-------------------|
 | LLM 调用 | ~0.001 USD | ~0.10 USD |
 | 图像生成 | ~0.01 USD | ~0.20 USD |
-| 视频生成 | ~0.10 USD | ~2.00 USD |
+| 文生视频 | ~0.10 USD | ~2.00 USD |
 | **总计** | | **~2.30 USD** |
 
 Starter 档位 ($4/月) 可支持约 1-2 集/天
