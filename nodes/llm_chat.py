@@ -128,4 +128,4 @@ class AgnesNovelLLMChat(OutputDocsMixin):
             return (f"[Error] {str(e)}",)
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelLLMChat": AgnesNovelLLMChat}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelLLMChat": "💬 Agnes Novel LLM 对话"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelLLMChat": "Agnes LLM 对话"}

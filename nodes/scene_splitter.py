@@ -253,4 +253,4 @@ class AgnesSceneSplitter:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesSceneSplitter": AgnesSceneSplitter}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesSceneSplitter": "🎬 Agnes 场景切分"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesSceneSplitter": "Agnes 场景切分"}

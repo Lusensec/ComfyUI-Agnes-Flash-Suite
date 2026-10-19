@@ -157,4 +157,4 @@ class AgnesImageGen:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesImageGen": AgnesImageGen}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesImageGen": "🎨 Agnes 图像生成"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesImageGen": "Agnes 图像生成"}

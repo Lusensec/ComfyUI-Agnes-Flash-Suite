@@ -298,4 +298,4 @@ def _error(msg: str, size: str = "") -> Tuple:
     return (text, text) if not size else (text, size)
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelImageToVideo": AgnesNovelImageToVideo}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageToVideo": "🎬 Agnes 关键帧生视频"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageToVideo": "Agnes 关键帧生视频"}

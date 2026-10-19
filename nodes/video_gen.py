@@ -183,4 +183,4 @@ class AgnesVideoGen:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesVideoGen": AgnesVideoGen}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesVideoGen": "🎬 Agnes 视频生成"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesVideoGen": "Agnes 视频生成"}

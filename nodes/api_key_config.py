@@ -126,4 +126,4 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
         )
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelAPIKeyConfig": AgnesNovelAPIKeyConfig}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelAPIKeyConfig": "🔑 Agnes Novel API Key 配置"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelAPIKeyConfig": "Agnes API Key 配置"}
