@@ -351,10 +351,11 @@
         "",
         "",
         "sk-你的Key",
-        "cinematic",
         "",
+        "cinematic",
         "https://api.agnes-ai.cn/v1",
-        "agnes-2.5-flash"
+        "agnes-2.5-flash",
+        "auto"
       ]
     },
     {
@@ -427,10 +428,11 @@
         "",
         "",
         "sk-你的Key",
+        "agnes-image-2.5-flash",
         1920,
         1080,
         "1K",
-        "agnes-image-2.5-flash"
+        "16:9"
       ]
     },
     {
@@ -680,10 +682,11 @@
         "",
         "https://api.agnes-ai.cn/v1",
         "sk-你的Key",
+        "agnes-2.5-flash",
         "casual",
         180,
         0.8,
-        "agnes-2.5-flash"
+        "auto"
       ]
     }
   ],

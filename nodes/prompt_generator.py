@@ -32,13 +32,13 @@ class AgnesScenePromptGenerator:
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key"
                 }),
-                "style": (["cinematic", "anime", "realistic", "watercolor", "oil_painting"], {
-                    "default": "cinematic",
-                    "tooltip": "图像风格：cinematic=电影感，anime=动漫，realistic=写实，watercolor=水彩，oil_painting=油画"
-                }),
                 "model": (AVAILABLE_CHAT_MODELS, {
                     "default": CHAT_MODEL,
                     "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
+                }),
+                "style": (["cinematic", "anime", "realistic", "watercolor", "oil_painting"], {
+                    "default": "cinematic",
+                    "tooltip": "图像风格：cinematic=电影感，anime=动漫，realistic=写实，watercolor=水彩，oil_painting=油画"
                 }),
             },
             "optional": {

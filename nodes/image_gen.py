@@ -55,6 +55,10 @@ class AgnesImageGen:
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key"
                 }),
+                "model": (AVAILABLE_IMAGE_MODELS, {
+                    "default": IMAGE_MODEL,
+                    "tooltip": "图像生成模型（当前默认 agnes-image-2.5-flash；选旧模型时 width/height 按像素生效）"
+                }),
                 "width": ("INT", {
                     "default": 1920,
                     "min": 512,
@@ -72,10 +76,6 @@ class AgnesImageGen:
                 "quality": (["1K", "2K", "3K", "4K"], {
                     "default": "1K",
                     "tooltip": "画质档位：新接口 agnes-image-2.5-flash 按 1K/2K/3K/4K 档位出图；旧接口 1K/2K"
-                }),
-                "model": (AVAILABLE_IMAGE_MODELS, {
-                    "default": IMAGE_MODEL,
-                    "tooltip": "图像生成模型（当前默认 agnes-image-2.5-flash；选旧模型时 width/height 按像素生效）"
                 }),
                 "aspect_ratio": (["1:1", "3:4", "4:3", "16:9", "9:16", "2:3", "3:2", "21:9"], {
                     "default": "16:9",

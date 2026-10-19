@@ -31,10 +31,6 @@ class AgnesNovelImageReverse(OutputDocsMixin):
                 "image": ("IMAGE", {
                     "tooltip": "Input image to analyze for prompt generation",
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "Vision-capable model for image analysis",
-                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -46,6 +42,10 @@ class AgnesNovelImageReverse(OutputDocsMixin):
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key",
+                }),
+                "model": (AVAILABLE_CHAT_MODELS, {
+                    "default": CHAT_MODEL,
+                    "tooltip": "Vision-capable model for image analysis",
                 }),
             },
         }

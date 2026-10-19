@@ -32,6 +32,10 @@ class AgnesScriptGenerator:
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key"
                 }),
+                "model": (AVAILABLE_CHAT_MODELS, {
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
+                }),
                 "style": (["casual", "professional", "humorous", "dramatic"], {
                     "default": "casual",
                     "tooltip": "解说风格：casual=风趣幽默，professional=深度解读，humorous=轻松搞笑，dramatic=情感饱满"
@@ -48,10 +52,6 @@ class AgnesScriptGenerator:
                     "max": 1.0,
                     "step": 0.05,
                     "tooltip": "生成温度，越高越有创意，越低越稳定"
-                }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
