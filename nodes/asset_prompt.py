@@ -30,26 +30,26 @@ from ._output_docs import OutputDocsMixin
 SUBJECT_TYPES = ("角色", "物品/道具", "服装", "场景", "载具", "通用")
 STYLE_OPTIONS = ("cinematic", "anime", "realistic", "watercolor", "oil_painting")
 
-# 主体类型 → 构图指令（英文，拼进提示词）
+# 主体类型 → 构图指令（英文，拼进提示词；纯主体：无背景/无打光）
 _SUBJECT_DIRECTIVES = {
-    "角色": "full-body character reference sheet, front-facing neutral standing pose, entire body visible",
-    "物品/道具": "detailed close-up still life of the prop, studio lighting, sharp focus on material and texture",
-    "服装": "costume design sheet, flat lay or displayed on invisible mannequin, showing the full outfit",
-    "场景": "wide establishing shot of the location, showing architecture, environment, weather and time of day",
-    "载具": "three-quarter view of the vehicle, full silhouette visible, studio or environment background",
-    "通用": "high-quality subject-focused image",
+    "角色": "full-body character reference sheet, front-facing neutral standing pose, entire body visible, isolated on a plain white background",
+    "物品/道具": "detailed still life of the prop, material and texture clearly visible, isolated on a plain white background",
+    "服装": "costume design sheet, flat lay or displayed on invisible mannequin, showing the full outfit, isolated on a plain white background",
+    "场景": "wide establishing view of the location as a self-contained asset, showing architecture and environment clearly",
+    "载具": "three-quarter view of the vehicle, full silhouette visible, isolated on a plain white background",
+    "通用": "single subject isolated on a plain white background",
 }
 
-# style → 风格尾词
+# style → 风格尾词（只描述画面风格，不含背景/打光/镜头）
 _STYLE_TAGS = {
-    "cinematic": "cinematic still, dramatic lighting, film photography, shallow depth of field",
+    "cinematic": "cinematic look",
     "anime": "anime style, clean lineart, cel shading, vibrant colors",
-    "realistic": "photorealistic, studio photography, softbox lighting, 8k uhd",
+    "realistic": "photorealistic",
     "watercolor": "watercolor illustration, soft washes, paper texture, delicate",
-    "oil_painting": "oil painting, impasto brushstrokes, classical composition, rich texture",
+    "oil_painting": "oil painting, impasto brushstrokes, rich texture",
 }
 
-_QUALITY_TAGS = "masterpiece, best quality, highly detailed, sharp focus"
+_QUALITY_TAGS = "masterpiece, best quality, highly detailed"
 
 
 class AgnesAssetPromptGenerator(OutputDocsMixin):
@@ -118,9 +118,11 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
             f"【要求】\n"
             "1. JSON 中的姓名/性别/年龄/外貌/服装/性格/描述等字段全部保留并翻译成英文（专名可用拼音）\n"
             f"2. 构图指令：{directive}\n"
-            f"3. 风格尾词：{style_tags}\n"
-            f"4. 质量尾词：{_QUALITY_TAGS}\n"
-            "5. 只输出最终的一段英文提示词，不要解释、不要引号、不要代码块"
+            "3. 这是资产设定图：**画面中只出现该主体本身，不要添加任何场景背景、打光氛围、镜头参数或环境元素描述**"
+            "（主体自身的固有属性，如角色穿着、道具材质，正常保留）\n"
+            f"4. 风格尾词：{style_tags}\n"
+            f"5. 质量尾词：{_QUALITY_TAGS}\n"
+            "6. 只输出最终的一段英文提示词，不要解释、不要引号、不要代码块"
         )
 
     @staticmethod
