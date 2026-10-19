@@ -1,0 +1,169 @@
+"""
+Agnes Asset Prompt Generator Node
+==================================
+把单条资产 JSON（角色/道具/服装/场景/载具）转成可直接生图的英文提示词。
+内置 art-director 模板（按 subject_type 换构图指令 + style 风格尾词 + quality 词），
+免去手写 LLM 指令。
+
+典型接法（资产线）：
+  Agnes 资产提取.角色JSON → Agnes 文本拆分(JSON 数组模式)
+  → 第 N 条 → Agnes 资产提示词生成(subject_type=角色, style=cinematic)
+  → english_prompt → Agnes 文生图 / 三视图生成(subject_desc)
+每条资产一个节点实例（各占 1 次 LLM 调用）；想省调用可改用
+LLM 对话批量路线（整份 JSON 一次出全部【名】英文提示词，再接文本拆分）。
+"""
+
+import re
+from typing import Tuple
+
+from ..api import (
+    AgnesClient,
+    get_api_key,
+    CHAT_MODEL,
+    AVAILABLE_CHAT_MODELS,
+    REASONING_EFFORTS,
+    normalize_reasoning_effort,
+)
+from ._output_docs import OutputDocsMixin
+
+
+SUBJECT_TYPES = ("角色", "物品/道具", "服装", "场景", "载具", "通用")
+STYLE_OPTIONS = ("cinematic", "anime", "realistic", "watercolor", "oil_painting")
+
+# 主体类型 → 构图指令（英文，拼进提示词）
+_SUBJECT_DIRECTIVES = {
+    "角色": "full-body character reference sheet, front-facing neutral standing pose, entire body visible",
+    "物品/道具": "detailed close-up still life of the prop, studio lighting, sharp focus on material and texture",
+    "服装": "costume design sheet, flat lay or displayed on invisible mannequin, showing the full outfit",
+    "场景": "wide establishing shot of the location, showing architecture, environment, weather and time of day",
+    "载具": "three-quarter view of the vehicle, full silhouette visible, studio or environment background",
+    "通用": "high-quality subject-focused image",
+}
+
+# style → 风格尾词
+_STYLE_TAGS = {
+    "cinematic": "cinematic still, dramatic lighting, film photography, shallow depth of field",
+    "anime": "anime style, clean lineart, cel shading, vibrant colors",
+    "realistic": "photorealistic, studio photography, softbox lighting, 8k uhd",
+    "watercolor": "watercolor illustration, soft washes, paper texture, delicate",
+    "oil_painting": "oil painting, impasto brushstrokes, classical composition, rich texture",
+}
+
+_QUALITY_TAGS = "masterpiece, best quality, highly detailed, sharp focus"
+
+
+class AgnesAssetPromptGenerator(OutputDocsMixin):
+    """Agnes asset prompt generator node (JSON 资产 → 英文生图提示词)."""
+
+    CATEGORY = "Agnes Novel"
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("english_prompt", "log_text")
+    RETURN_LABELS = ("英文资产生成提示词", "处理日志")
+    OUTPUT_DOCS = {
+        "english_prompt": "可直接用于 文生图/三视图(subject_desc) 的英文提示词：保留 JSON 全部描述字段 + 主体构图指令 + 风格尾词 + quality 词；失败时返回 [Error] 前缀",
+        "log_text": "处理日志（成功=摘要预览；失败=错误原因）",
+    }
+    FUNCTION = "generate"
+    OUTPUT_NODE = True
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "asset_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": '{"name":"苏尘","sex":"男","appearance":"黑发，青色衣袍"}\n（单条资产 JSON）',
+                    "tooltip": "单条资产 JSON：连 Agnes 文本拆分的任一输出槽，或手动粘贴一个资产 JSON 对象（角色/道具/服装/场景/载具字段均可）",
+                }),
+                "subject_type": (list(SUBJECT_TYPES), {
+                    "default": "角色",
+                    "tooltip": "主体类型（决定构图指令）：角色=全身设定图 / 物品道具=特写静物 / 服装=定妆服装图 / 场景=全景建立镜头 / 载具=四分之三视角 / 通用",
+                }),
+                "style": (list(STYLE_OPTIONS), {
+                    "default": "cinematic",
+                    "tooltip": "生图风格尾词：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画",
+                }),
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
+                }),
+                "api_key": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "sk-xxxxxxxx",
+                    "tooltip": "Agnes AI API Key，留空=自动加载全局配置",
+                }),
+                "model": (AVAILABLE_CHAT_MODELS, {
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）",
+                }),
+                "reasoning_effort": (list(REASONING_EFFORTS), {
+                    "default": "auto",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
+                }),
+            },
+            "optional": {},
+        }
+
+    @classmethod
+    def _build_user_prompt(cls, asset_json: str, subject_type: str, style: str) -> str:
+        directive = _SUBJECT_DIRECTIVES.get(subject_type, _SUBJECT_DIRECTIVES["通用"])
+        style_tags = _STYLE_TAGS.get(style, "")
+        return (
+            f"你是一位电影美术指导。请把以下{subject_type}资产 JSON 转成一条高质量的英文图像生成提示词。\n\n"
+            f"【资产 JSON】\n{asset_json}\n\n"
+            f"【要求】\n"
+            "1. JSON 中的姓名/性别/年龄/外貌/服装/性格/描述等字段全部保留并翻译成英文（专名可用拼音）\n"
+            f"2. 构图指令：{directive}\n"
+            f"3. 风格尾词：{style_tags}\n"
+            f"4. 质量尾词：{_QUALITY_TAGS}\n"
+            "5. 只输出最终的一段英文提示词，不要解释、不要引号、不要代码块"
+        )
+
+    @staticmethod
+    def _clean_prompt(raw: str) -> str:
+        t = (raw or "").strip()
+        t = re.sub(r"^```[a-zA-Z]*\s*\n?", "", t)
+        t = re.sub(r"\n?```\s*$", "", t)
+        t = re.sub(r"^(?:English\s*prompt|Prompt|提示词)\s*[:：]\s*", "", t, flags=re.I)
+        return t.strip().strip('"')
+
+    def generate(self, asset_json="", subject_type="角色", style="cinematic",
+                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto") -> Tuple[str, str]:
+        asset_json = (asset_json or "").strip()
+        if not asset_json:
+            err = "[Error: asset_json 为空。请连接 Agnes 文本拆分的输出槽，或手动粘贴单条资产 JSON。]"
+            print(f"[Agnes Asset Prompt] {err}")
+            return (err, "未输入资产 JSON，已跳过。")
+
+        if not api_key.strip():
+            api_key = get_api_key()
+        if not api_key.strip():
+            err = "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]"
+            print(f"[Agnes Asset Prompt] {err}")
+            return (err, "API Key 缺失。")
+
+        try:
+            client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            raw = client.chat(
+                messages=[{"role": "user", "content": self._build_user_prompt(asset_json, subject_type, style)}],
+                model=model,
+                temperature=0.4,
+                max_tokens=800,
+                reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+            )
+            prompt = self._clean_prompt(raw)
+            log = f"✅ 资产提示词已生成（{subject_type}/{style}）：{prompt[:60].strip()}..."
+            print(log)
+            return (prompt, log)
+        except Exception as e:
+            log = f"❌ 资产提示词生成失败: {e}"
+            print(log)
+            return (f"[Error] {e}", log)
+
+
+NODE_CLASS_MAPPINGS = {"AgnesAssetPromptGenerator": AgnesAssetPromptGenerator}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesAssetPromptGenerator": "🖌️ Agnes 资产提示词生成"}

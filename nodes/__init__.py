@@ -22,6 +22,7 @@ from .video_reference import AgnesVideoReference
 from .character_turnaround import AgnesSubjectTurnaround
 from .string_merge import AgnesStringMerge
 from .text_split import AgnesTextSplitter
+from .asset_prompt import AgnesAssetPromptGenerator
 
 # 合并所有节点映射
 NODE_CLASS_MAPPINGS = {}
@@ -36,6 +37,7 @@ from . import video_reference
 from . import character_turnaround
 from . import string_merge
 from . import text_split
+from . import asset_prompt
 
 for _mod in [script_generator, director_master, image_gen, asset_extractor,
              scene_splitter, prompt_generator, video_gen,
@@ -44,7 +46,8 @@ for _mod in [script_generator, director_master, image_gen, asset_extractor,
              video_reference,
              character_turnaround,
              string_merge,
-             text_split]:
+             text_split,
+             asset_prompt]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)
     if hasattr(_mod, 'NODE_DISPLAY_NAME_MAPPINGS'):

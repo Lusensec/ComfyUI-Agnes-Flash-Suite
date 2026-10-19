@@ -357,6 +357,37 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
+### 🖌️ Agnes 资产提示词生成 (AgnesAssetPromptGenerator)
+
+**功能：** 把单条资产 JSON 转成**可直接生图的英文提示词**（内置 art-director 模板，
+按主体类型换构图指令 + 风格尾词 + quality 词，免去手写 LLM 指令）。
+输出接 文生图 / 三视图生成(subject_desc)，完成资产线的最后一步。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| asset_json | STRING(多行) | "" | 单条资产 JSON：连 Agnes 文本拆分任一输出槽，或粘贴单个资产 JSON 对象 |
+| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（决定构图指令，与三视图一致 + 服装） |
+| style | COMBO | cinematic | 生图风格尾词：cinematic/anime/realistic/watercolor/oil_painting |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
+| api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
+
+**输出：**
+- 英文资产生成提示词: 保留 JSON 全部描述字段（专名拼音化）+ 构图指令 + 风格/质量尾词，直接喂生图
+- 处理日志: 成功=提示词摘要预览；失败=错误原因
+
+> **资产线完整接法（角色/道具/场景/服装 → 设定图）：**
+> ① `Agnes 资产提取.角色JSON` → `Agnes 文本拆分`（JSON 数组模式）
+> ② 拆分 `第 N 条` → `Agnes 资产提示词生成`（subject_type=角色，style 自选）
+> ③ `英文资产生成提示词` → `Agnes 文生图`（或 三视图生成 subject_desc，
+>    想系列一致再 reference_image 接一张已出图）
+> 场景/道具/服装走同一条链，换 subject_type 即可
+> 批量省调用：也可用 LLM 对话一次把整份 JSON 转成【名】英文提示词，
+> 再接 文本拆分(【】括号块模式) 扇出（少 19 次 LLM 调用）
+
+---
+
 ## 推荐配置
 
 ### 快速测试
@@ -423,5 +454,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.10.1  
+**版本**: 1.11.0  
 **更新日期**: 2026-10-19
