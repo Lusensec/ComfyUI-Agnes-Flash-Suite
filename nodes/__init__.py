@@ -2,12 +2,13 @@
 # 静态导入所有节点，自动合并映射
 #
 # 注册顺序 = 前端节点库（Agnes Novel 菜单）默认显示顺序（前端"原始顺序"排序模式）：
-#   ① 文本类节点（配置 + 小说→提示词管线：拆分/导演/提取/提示词/拆分/对话/剧本）
+#   ① 文本类节点（配置 → 剧本生成置顶 → 小说→提示词管线：拆分/导演/提取/提示词/拆分/对话）
 #   ② 图片类节点（文生图 → 图生图 → 三视图 → 反推提示词）
 #   ③ 视频类节点（文生视频 → 关键帧生视频 → 参考视频生成）
 
 # ── 文本类节点 ─────────────────────────────────────────────
 from .api_key_config import AgnesNovelAPIKeyConfig
+from .script_generator import AgnesScriptGenerator
 from .scene_splitter import AgnesSceneSplitter
 from .director_master import AgnesDirectorMaster
 from .asset_extractor import AgnesAssetExtractor
@@ -17,7 +18,6 @@ from .asset_prompt import AgnesAssetPromptGenerator
 from .turnaround_prompt import AgnesTurnaroundPromptGenerator
 from .string_merge import AgnesStringMerge
 from .llm_chat import AgnesNovelLLMChat
-from .script_generator import AgnesScriptGenerator
 
 # ── 图片类节点 ─────────────────────────────────────────────
 from .image_gen import AgnesImageGen
@@ -35,21 +35,21 @@ NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
 # 从各节点文件收集映射（顺序即菜单显示顺序）
-from . import api_key_config, scene_splitter, director_master, asset_extractor
-from . import prompt_generator, text_split, asset_prompt, turnaround_prompt
-from . import string_merge, llm_chat, script_generator
+from . import api_key_config, script_generator, scene_splitter, director_master
+from . import asset_extractor, prompt_generator, text_split, asset_prompt
+from . import turnaround_prompt, string_merge, llm_chat
 from . import image_gen, img2img, character_turnaround, image_reverse
 from . import text2video, img2video, video_reference
 
-# 文本类：API Key 配置 → 场景切分 → 总导演 → 资产提取 → 分镜提示词 → 文本拆分
-#        → 资产提示词生成 → 三视图提示词生成 → 字符串合并 → LLM 对话 → 剧本生成
+# 文本类：API Key 配置 → 剧本生成（置顶：常用入口）→ 场景切分 → 总导演 → 资产提取
+#        → 分镜提示词生成 → 文本拆分 → 资产提示词生成 → 三视图提示词生成 → 字符串合并 → LLM 对话
 # 图片类：图像生成 → 图生图 → 三视图生成 → 图像反推提示词
 # 视频类：文生视频 → 关键帧生视频 → 参考视频生成
 for _mod in [
     # 文本类
-    api_key_config, scene_splitter, director_master, asset_extractor,
-    prompt_generator, text_split, asset_prompt, turnaround_prompt,
-    string_merge, llm_chat, script_generator,
+    api_key_config, script_generator, scene_splitter, director_master,
+    asset_extractor, prompt_generator, text_split, asset_prompt,
+    turnaround_prompt, string_merge, llm_chat,
     # 图片类
     image_gen, img2img, character_turnaround, image_reverse,
     # 视频类
