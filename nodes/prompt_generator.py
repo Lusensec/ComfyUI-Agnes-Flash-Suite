@@ -4,7 +4,7 @@ Agnes 分镜提示词生成节点
 """
 import requests
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
 
 
 class AgnesScenePromptGenerator:
@@ -54,6 +54,10 @@ class AgnesScenePromptGenerator:
                     "placeholder": "{\"locations\":[...]}",
                     "tooltip": "场景信息 JSON（从资产提取节点获取，可选）"
                 }),
+                "reasoning_effort": (list(REASONING_EFFORTS), {
+                    "default": "auto",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
+                }),
             }
         }
 
@@ -77,7 +81,7 @@ class AgnesScenePromptGenerator:
             }
         return extra
 
-    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json=""):
+    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", reasoning_effort="auto"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -150,6 +154,7 @@ class AgnesScenePromptGenerator:
                 model=model,
                 temperature=0.4,
                 max_tokens=2000,
+                reasoning_effort=normalize_reasoning_effort(reasoning_effort),
             )
 
             # 清理 markdown 标记

@@ -5,7 +5,7 @@ Agnes 资产提取节点
 import requests
 import json
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
 
 
 class AgnesAssetExtractor:
@@ -36,6 +36,10 @@ class AgnesAssetExtractor:
                 "model": (AVAILABLE_CHAT_MODELS, {
                     "default": CHAT_MODEL,
                     "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
+                }),
+                "reasoning_effort": (list(REASONING_EFFORTS), {
+                    "default": "auto",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
             },
             "optional": {}
@@ -79,7 +83,7 @@ class AgnesAssetExtractor:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL):
+    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -138,6 +142,7 @@ class AgnesAssetExtractor:
                 model=model,
                 temperature=0.3,
                 max_tokens=3000,
+                reasoning_effort=normalize_reasoning_effort(reasoning_effort),
             )
 
             # 清理 markdown 代码块

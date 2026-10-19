@@ -123,6 +123,24 @@ AVAILABLE_IMAGE_MODELS = list(dict.fromkeys(
 AVAILABLE_VIDEO_MODELS = list(dict.fromkeys(
     [VIDEO_MODEL, "agnes-video-2.5-flash", "agnes-video-v2.0"]))
 
+# 思考等级（reasoning_effort，Agnes 2.5/3.0 文本模型 Thinking 模式）：
+# 2.5-flash 5 档 none~max；3.0-flash 7 档（本套件暴露其中 5 档）
+# "auto" = 不传该参数，跟随模型默认思考等级
+REASONING_EFFORTS = ("auto", "none", "low", "medium", "high", "max")
+_REASONING_EFFORT_VALID = frozenset(("none", "low", "medium", "high", "max"))
+
+
+def normalize_reasoning_effort(v):
+    """节点思考等级 widget 值 → API 参数值。
+
+    auto / 空 / 非法值（含旧 JSON 遗留脏值）→ None（不传 reasoning_effort，
+    保持模型默认行为）；合法档位原样返回。
+    """
+    if v is None:
+        return None
+    s = str(v).strip().lower()
+    return s if s in _REASONING_EFFORT_VALID else None
+
 MIME_MAP = {
     "png": "image/png",
     "jpg": "image/jpeg",

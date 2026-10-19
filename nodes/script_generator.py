@@ -4,7 +4,7 @@ Agnes 剧本生成节点
 """
 import requests
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
 
 
 class AgnesScriptGenerator:
@@ -53,6 +53,10 @@ class AgnesScriptGenerator:
                     "default": CHAT_MODEL,
                     "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
                 }),
+                "reasoning_effort": (list(REASONING_EFFORTS), {
+                    "default": "auto",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
+                }),
             },
             "optional": {}
         }
@@ -77,7 +81,7 @@ class AgnesScriptGenerator:
             }
         return extra
 
-    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL):
+    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -116,7 +120,7 @@ class AgnesScriptGenerator:
 
 请直接输出解说文案，不要有任何额外说明："""
 
-        print(f"[Agnes Script] Generating script (target: {target_chars} chars)...")
+        print(f"[Agnes Script] Generating script (target: {target_chars} chars), thinking={normalize_reasoning_effort(reasoning_effort) or 'default'}...")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
@@ -125,6 +129,7 @@ class AgnesScriptGenerator:
                 model=model,
                 temperature=temperature,
                 max_tokens=target_chars * 2,
+                reasoning_effort=normalize_reasoning_effort(reasoning_effort),
             )
 
             # 清理

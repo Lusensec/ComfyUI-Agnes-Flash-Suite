@@ -58,6 +58,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 图片参考 | - | - | ✅ reference 模式 images[] 最多 5 张（参考视频生成节点 image_1~5；<Picture N> 指代） | ⚠️ extra_body.image 多图（参考视频生成节点兼容，无 <Picture N>） |
 | 音频参考 | - | - | ✅ reference 模式 audios[] 最多 3 段（本地路径/URL/Data URI，<Audio N> 指代） | ❌ 不支持 |
 | 关键帧（首尾帧） | - | - | ✅ keyframe 模式 first_frame/last_frame（关键帧生视频节点） | ⚠️ 多图 img2video（无独立尾帧参数） |
+| reasoning_effort（思考等级） | 仅文本模型 | - | - | - |
+
+> 思考等级：文本节点（场景切分/总导演/资产提取/分镜提示词/剧本生成/LLM 对话）
+> 均带 reasoning_effort 下拉（auto/none/low/medium/high/max；auto=不传参数跟随模型
+> 默认）；2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
 | quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
 | max_wait | 客户端轮询超时，非 API 参数 | 同左 | 同左 | 同左 |
 
@@ -81,6 +86,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
 
 **输出：**
 - log_text: 处理日志
@@ -100,6 +106,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
 
 **输出：**
 - log_text: 处理日志
@@ -118,6 +125,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
 
 **输出：**
 - characters_json: 角色信息 JSON
@@ -139,6 +147,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | style | COMBO | cinematic | 图像风格：cinematic/anime/realistic/watercolor/oil_painting |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
 | characters_json | STRING | "" | 角色信息 JSON（可选） |
 | locations_json | STRING | "" | 场景信息 JSON（可选） |
 
@@ -260,6 +269,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | target_duration | INT | 180 | 目标时长（秒） |
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
 
 **输出：**
 - script: 解说文案
@@ -352,5 +362,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.6.0  
+**版本**: 1.7.0  
 **更新日期**: 2026-10-19

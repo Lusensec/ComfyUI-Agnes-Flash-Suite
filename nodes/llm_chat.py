@@ -7,7 +7,7 @@ Supports multi-turn dialogue via optional system prompt and conversation history
 
 from typing import Any, Dict, Tuple
 
-from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS
+from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
 from ._output_docs import OutputDocsMixin
 
 
@@ -77,9 +77,9 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "label_off": "关闭",
                     "tooltip": "Thinking 模式：模型先思考再回答（chat_template_kwargs.enable_thinking），消耗更多 token",
                 }),
-                "reasoning_effort": (["auto", "none", "low", "medium", "high", "max"], {
+                "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考强度：2.5-flash 支持 none/low/medium/high/max；3.0-flash 支持 7 档；auto=不传该参数",
+                    "tooltip": "思考强度：2.5-flash 支持 none/low/medium/high/max；3.0-flash 支持 7 档；auto=不传该参数（跟随模型默认）",
                 }),
             },
         }
@@ -113,7 +113,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
             messages.append({"role": "user", "content": prompt})
 
             ctk = {"enable_thinking": True} if enable_thinking else None
-            effort = None if reasoning_effort == "auto" else reasoning_effort
+            effort = normalize_reasoning_effort(reasoning_effort)
 
             response = client.chat(
                 messages=messages,
