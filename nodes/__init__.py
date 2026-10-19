@@ -10,8 +10,7 @@ from .scene_splitter import AgnesSceneSplitter
 from .prompt_generator import AgnesScenePromptGenerator
 from .video_gen import AgnesVideoGen
 
-# 两段式管线: 工作流B导出节点 + 资产拆分器 + 定妆图生成器
-from .workflow_exporter import AgnesWorkflowExporter
+# 两段式管线: 资产拆分器 + 定妆图生成器
 from .asset_json_splitter import AgnesAssetJsonSplitter
 from .asset_maker import AgnesAssetMaker
 from .jimeng_asset_maker import JimengAssetMaker
@@ -38,7 +37,7 @@ from . import api_key_config, llm_chat, image_reverse
 from . import img2img, text2img, img2video, text2video
 from . import video_reference
 from . import character_turnaround
-from . import workflow_exporter, asset_json_splitter, asset_maker, jimeng_asset_maker
+from . import asset_json_splitter, asset_maker, jimeng_asset_maker
 
 for _mod in [script_generator, director_master, image_gen, asset_extractor,
              scene_splitter, prompt_generator, video_gen,
@@ -46,7 +45,7 @@ for _mod in [script_generator, director_master, image_gen, asset_extractor,
              img2img, text2img, img2video, text2video,
              video_reference,
              character_turnaround,
-             workflow_exporter, asset_json_splitter, asset_maker, jimeng_asset_maker]:
+             asset_json_splitter, asset_maker, jimeng_asset_maker]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)
     if hasattr(_mod, 'NODE_DISPLAY_NAME_MAPPINGS'):
