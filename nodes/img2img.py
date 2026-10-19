@@ -1,10 +1,9 @@
 """
-Agnes Image-to-Image Node
-=========================
-Edit or transform images using Agnes AI image generation models.
-Supports multi-image input - multiple reference images can be provided
-to guide the generation process.
-Supports quality (1K/2K/4K) and aspect ratio selection.
+Agnes 图生图（Image-to-Image）节点
+===================================
+使用 Agnes AI 图像生成模型编辑或变换图像。
+支持多图输入 - 可传入多张参考图共同指导生成过程（最多 6 张）。
+支持画质档位（1K/2K/3K/4K）与宽高比选择。
 """
 
 import torch
@@ -20,7 +19,7 @@ from ..api import (
 )
 from ._output_docs import OutputDocsMixin
 
-# Quality → short-side pixels
+# 画质档位 → 短边像素
 QUALITY_MAP = {
     "1K": 1024,
     "2K": 2048,
@@ -28,7 +27,7 @@ QUALITY_MAP = {
     "4K": 4096,
 }
 
-# Supported aspect ratios (width:height)
+# 支持的宽高比（宽:高）
 ASPECT_RATIOS = [
     "1:1",
     "2:3",
@@ -46,12 +45,12 @@ ASPECT_RATIOS = [
 
 def compute_size(quality: str, aspect_ratio: str) -> str:
     """
-    Compute a WxH pixel size string from quality level and aspect ratio.
+    根据画质档位与宽高比计算 WxH 像素尺寸字符串。
 
-    quality: "1K" / "2K" / "4K" — determines the short-side pixel count.
-    aspect_ratio: "W:H" — e.g. "16:9", "2:3".
+    quality: "1K" / "2K" / "4K" — 决定短边像素数。
+    aspect_ratio: "W:H" — 例如 "16:9"、"2:3"。
 
-    Returns: e.g. "1792x1024"
+    返回：例如 "1792x1024"
     """
     base = QUALITY_MAP.get(quality, 1024)
     w_ratio, h_ratio = map(int, aspect_ratio.split(":"))
@@ -70,7 +69,7 @@ def compute_size(quality: str, aspect_ratio: str) -> str:
 
 
 class AgnesNovelImageToImage(OutputDocsMixin):
-    """Agnes AI Image-to-Image (Image Editing) node for ComfyUI."""
+    """Agnes AI 图生图（图像编辑）节点：以参考图为底，按提示词编辑/变换，支持多图输入。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("IMAGE", "STRING",)
@@ -87,13 +86,13 @@ class AgnesNovelImageToImage(OutputDocsMixin):
         return {
             "required": {
                 "image": ("IMAGE", {
-                    "tooltip": "Primary reference image for editing",
+                    "tooltip": "主参考图（必接）：图生图以此图为底做编辑/变换；可再接最多 5 张额外参考图（合计最多 6 张）",
                 }),
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "Make it look like a watercolor painting...",
-                    "tooltip": "Description of the desired transformation",
+                    "placeholder": "输入变换描述（建议英文），例如：Make it look like a watercolor painting...",
+                    "tooltip": "描述想要的变换效果（建议英文提示词）",
                 }),
                 "base_url": ("STRING", {
                     "multiline": False,
@@ -105,19 +104,19 @@ class AgnesNovelImageToImage(OutputDocsMixin):
                     "multiline": False,
                     "default": "",
                     "placeholder": "sk-...",
-                    "tooltip": "Your Agnes AI API key",
+                    "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）",
                 }),
                 "model": (AVAILABLE_IMAGE_MODELS, {
                     "default": IMAGE_MODEL,
-                    "tooltip": "Image generation model",
+                    "tooltip": "图像生成模型（默认 agnes-image-2.5-flash；旧接口 2.1/2.0 按 WxH 像素出图）",
                 }),
                 "quality": (["1K", "2K", "3K", "4K"], {
                     "default": "1K",
-                    "tooltip": "Image quality / short-side resolution. 3K/4K for new image-2.5 model",
+                    "tooltip": "画质档位（短边分辨率）：新接口 2.5-flash 按 1K/2K/3K/4K 档位出图（3K/4K 面向新 2.5 模型）；旧接口 2.1/2.0 换算为 WxH 像素",
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "1:1",
-                    "tooltip": "Output aspect ratio (width:height). E.g. 16:9 for widescreen, 2:3 for portrait",
+                    "tooltip": "输出宽高比（宽:高）：与画质档位组合出图，如 16:9 宽屏、2:3 竖版；新接口不支持的比例自动就近映射",
                 }),
                 "strength": ("FLOAT", {
                     "default": 0.75,
@@ -136,19 +135,19 @@ class AgnesNovelImageToImage(OutputDocsMixin):
             },
             "optional": {
                 "reference_image_2": ("IMAGE", {
-                    "tooltip": "Additional reference image 2 (multi-image input, up to 6 total)",
+                    "tooltip": "额外参考图 2（多图输入，合计最多 6 张）",
                 }),
                 "reference_image_3": ("IMAGE", {
-                    "tooltip": "Additional reference image 3 (multi-image input, up to 6 total)",
+                    "tooltip": "额外参考图 3（多图输入，合计最多 6 张）",
                 }),
                 "reference_image_4": ("IMAGE", {
-                    "tooltip": "Additional reference image 4 (multi-image input, up to 6 total)",
+                    "tooltip": "额外参考图 4（多图输入，合计最多 6 张）",
                 }),
                 "reference_image_5": ("IMAGE", {
-                    "tooltip": "Additional reference image 5 (multi-image input, up to 6 total)",
+                    "tooltip": "额外参考图 5（多图输入，合计最多 6 张）",
                 }),
                 "reference_image_6": ("IMAGE", {
-                    "tooltip": "Additional reference image 6 (multi-image input, up to 6 total)",
+                    "tooltip": "额外参考图 6（多图输入，合计最多 6 张）",
                 }),
             },
         }
@@ -173,17 +172,17 @@ class AgnesNovelImageToImage(OutputDocsMixin):
         size = compute_size(quality, aspect_ratio)
         w, h = map(int, size.split("x"))
 
-        # Runtime fallback: try config file if widget value is empty
+        # 运行时回退：widget 值为空时从全局配置（api_key_config.json 等）取 API Key
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             black = torch.zeros(1, h, w, 3)
-            return (black, "[Error: API key is required. Get a free key at https://platform.agnes-ai.com/]")
+            return (black, "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）")
         if not prompt.strip():
             black = torch.zeros(1, h, w, 3)
-            return (black, "[Error: Prompt is empty.]")
+            return (black, "[错误] 提示词为空：请描述想要的变换效果")
 
-        # Collect all reference images
+        # 收集全部参考图（主图 + 额外参考图）
         ref_imgs = [tensor_to_pil(image)]
 
         for ref in [reference_image_2, reference_image_3, reference_image_4,
@@ -191,7 +190,7 @@ class AgnesNovelImageToImage(OutputDocsMixin):
             if ref is not None:
                 ref_imgs.append(tensor_to_pil(ref))
 
-        # Inject strength into prompt if needed
+        # strength < 1.0 时转成提示词指令附在提示词尾部（保持英文，与模型提示词语言一致）
         full_prompt = prompt.strip()
         if strength < 1.0:
             full_prompt = (
@@ -226,9 +225,9 @@ class AgnesNovelImageToImage(OutputDocsMixin):
 
             if not pil_images:
                 black = torch.zeros(1, h, w, 3)
-                return (black, "[Error: No images were generated. Check your inputs and try again.]")
+                return (black, "[错误] 未生成任何图片：请检查输入后重试")
 
-            # Convert to ComfyUI tensor batch
+            # 转换为 ComfyUI 图像张量（n>1 时批量）
             tensors = [pil_to_tensor(img) for img in pil_images]
             batch = tensors[0] if len(tensors) == 1 else torch.cat(tensors, dim=0)
 
