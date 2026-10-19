@@ -2,16 +2,12 @@
 """
 Agnes 三视图生成节点
 ====================
-生成任意主体的三视图设定表（turnaround sheet）：同一主体的
-正面 / 侧面 / 背面（场景为 正面 / 侧面 / 俯视）三个视图从左到右并排排列，
-正交视图、比例与细节保持一致。
+纯出图节点：**不使用任何内置提示词模板**——直接用 subject_desc 输入的
+完整三视图提示词生成三视图设定图（turnaround sheet）。
 
-主体类型（subject_type）：
-- 角色：全身正交视图、A-pose、服装发型细节一致
-- 物品/道具：产品设定表，结构材质细节一致
-- 场景：场景概念表（正立面/侧立面/俯视图）
-- 载具：整车设定表，钣金细节一致
-- 通用：任意主体的通用三视图模板
+完整三视图提示词推荐由 Agnes 三视图提示词生成 节点输出（原始描述 →
+LLM 合并三视图构图指令 + 纯白背景平光无阴影规格 + 质量尾词，
+输出对用户可见、可手工修改优化后再填入本节点）。
 
 可选连接参考图（定妆图/已有设定图）走图生图模式，保证与已有资产一致。
 """
@@ -29,63 +25,6 @@ from ..api import (
 )
 from ._output_docs import OutputDocsMixin
 
-# 各主体类型的三视图固定模板（与用户规格一致：三视图并排、正交、细节一致；
-# 纯主体规格：纯白背景、平光无阴影、不含场景背景/打光氛围）
-_TURNAROUND_TEMPLATES = {
-    "角色": (
-        "{subject_desc}\n\n"
-        "Character turnaround sheet, character reference sheet: the same single character "
-        "shown in three orthographic views arranged side by side from left to right: "
-        "front view, side view (profile), back view.\n"
-        "Full body complete display, orthographic views, no perspective distortion, "
-        "consistent character proportions, consistent costume and hairstyle details, "
-        "natural standing pose, A-pose, isolated on a pure white background, "
-        "even flat lighting, no shadows, clean line art, flat clean colors, "
-        "high resolution, sharp details."
-    ),
-    "物品/道具": (
-        "{subject_desc}\n\n"
-        "Item design sheet, product reference sheet: the same single item "
-        "shown in three orthographic views arranged side by side from left to right: "
-        "front view, side view, back view.\n"
-        "Complete display of the whole item, orthographic views, no perspective distortion, "
-        "consistent proportions, consistent structure and material details, "
-        "isolated on a pure white background, even flat lighting, no shadows, "
-        "clean line art, high resolution, sharp details."
-    ),
-    "场景": (
-        "{subject_desc}\n\n"
-        "Scene concept sheet, environment reference sheet: the same scene "
-        "shown in three views arranged side by side from left to right: "
-        "front elevation, side elevation, top-down plan view.\n"
-        "Drawn as clean architectural sheets on a pure white background, "
-        "no environmental lighting or weather atmosphere, even flat lighting, no shadows, "
-        "orthographic views, no perspective distortion, consistent layout, "
-        "consistent architecture/structure and material details, "
-        "clean line art, flat clean colors, high resolution, sharp details."
-    ),
-    "载具": (
-        "{subject_desc}\n\n"
-        "Vehicle turnaround sheet, vehicle reference sheet: the same single vehicle "
-        "shown in three orthographic views arranged side by side from left to right: "
-        "front view, side view, back view.\n"
-        "Full vehicle complete display, orthographic views, no perspective distortion, "
-        "consistent proportions, consistent body panels, trim and detail design, "
-        "isolated on a pure white background, even flat lighting, no shadows, "
-        "clean line art, high resolution, sharp details."
-    ),
-    "通用": (
-        "{subject_desc}\n\n"
-        "Turnaround sheet, reference sheet: the same single subject "
-        "shown in three orthographic views arranged side by side from left to right: "
-        "front view, side view, back view.\n"
-        "Complete display, orthographic views, no perspective distortion, "
-        "consistent proportions and details, isolated on a pure white background, "
-        "even flat lighting, no shadows, clean line art, high resolution, sharp details."
-    ),
-}
-
-SUBJECT_TYPES = list(_TURNAROUND_TEMPLATES.keys())
 
 # 三视图推荐横向画幅
 ASPECT_RATIOS = ["1:1", "4:3", "3:2", "16:9", "21:9"]
@@ -95,7 +34,7 @@ QUALITIES = ["1K", "2K", "3K", "4K"]
 class AgnesSubjectTurnaround(OutputDocsMixin):
     """生成主体三视图设定图（角色/物品/场景/载具/通用，正视图并排）"""
 
-    DESCRIPTION = "三视图生成：任意主体（角色/物品/场景/载具）正面/侧面/背面并排设定表，正交视图、细节一致（可选参考图保持一致性）"
+    DESCRIPTION = "三视图生成：直接用输入的完整三视图提示词出图（无内置模板，提示词推荐由 Agnes 三视图提示词生成 节点输出），可选参考图保持一致"
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
@@ -104,7 +43,7 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
     OUTPUT_DOCS = {
         "image": "三视图设定图张量（三个视图并排），可连接 SaveImage 存档或作为后续生成的参考图",
         "resolution": "三视图实际输出分辨率（WxH）",
-        "final_prompt": "最终拼接的完整提示词（主体描述 + 该类型三视图模板 + 补充词），可复制复用或微调",
+        "final_prompt": "实际使用的完整提示词（subject_desc + extra_prompt 补充词），可复制复用或微调",
     }
     FUNCTION = "generate"
     OUTPUT_NODE = True
@@ -113,15 +52,11 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "subject_type": (SUBJECT_TYPES, {
-                    "default": "角色",
-                    "tooltip": "主体类型：决定三视图提示词模板（角色=全身A-pose / 物品=产品设定 / 场景=立面+俯视 / 载具=整车设定 / 通用=任意主体）",
-                }),
                 "subject_desc": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "主体名称 + 外观描述，例如：\n白奕，20岁青年剑修，黑色长发束高马尾，白衣黑边长剑袍，左手持剑",
-                    "tooltip": "主体名称与外观、材质/结构等描述（越具体，三视图细节越一致）",
+                    "placeholder": "完整三视图提示词（推荐连 Agnes 三视图提示词生成 的输出）：\nSu Chen, 20-year-old sword cultivator, three orthographic views side by side: front, side, back, full body, pure white background, even flat lighting...",
+                    "tooltip": "完整三视图提示词（无内置模板，出什么图由这段提示词决定）：推荐连 Agnes 三视图提示词生成 节点输出，或手动粘贴/手工修改后的提示词",
                 }),
                 "base_url": ("STRING", {
                     "multiline": False,
@@ -162,7 +97,6 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
 
     def generate(
         self,
-        subject_type: str = "角色",
         subject_desc: str = "",
         base_url: str = "",
         api_key: str = "",
@@ -183,9 +117,7 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
             black = torch.zeros(1, 512, 512, 3)
             return (black, "", "[Error: API key is required. Get a free key at https://platform.agnes-ai.cn/]")
 
-        if subject_type not in _TURNAROUND_TEMPLATES:
-            subject_type = "通用"
-        prompt = _TURNAROUND_TEMPLATES[subject_type].format(subject_desc=subject_desc)
+        prompt = subject_desc
         if extra_prompt.strip():
             prompt += "\n" + extra_prompt.strip()
 
@@ -198,7 +130,7 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
             ratio_arg = None
             w, h = (2048, 768) if aspect_ratio in ("21:9", "16:9") else (1024, 1024)
 
-        print(f"\n[Agnes 三视图] {subject_type}三视图生成: {subject_desc[:40]}...")
+        print(f"\n[Agnes 三视图] 三视图生成: {subject_desc[:40]}...")
         print(f"  模型: {model}, 档位: {quality}, 比例: {aspect_ratio}, 参考图: {'有' if reference_image is not None else '无'}")
 
         try:

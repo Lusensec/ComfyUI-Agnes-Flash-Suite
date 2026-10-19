@@ -278,15 +278,13 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 📐 Agnes 三视图生成 (AgnesSubjectTurnaround)
 
-**功能：** 生成任意主体的三视图设定表（turnaround sheet）：同一主体三个视图
-从左到右并排（角色=正/侧/背全身 A-pose；物品=产品设定；场景=正立面/侧立面/
-俯视图；载具=整车设定；通用=任意主体），正交视图、比例与细节一致。
-**纯主体规格**：纯白背景 + 平光无阴影，不含场景背景与打光氛围（与资产提示词生成节点一致）
+**功能：** 纯出图节点，**不再内置任何提示词模板**——直接用 subject_desc 输入的
+**完整三视图提示词**出图。提示词推荐由 `Agnes 三视图提示词生成` 节点输出
+（或手工编写/修改后填入），出什么图完全由这段提示词决定
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| subject_type | COMBO | 角色 | 主体类型：角色/物品道具/场景/载具/通用，决定三视图提示词模板 |
-| subject_desc | STRING | "" | 主体名 + 外观/材质/结构描述（越具体越一致） |
+| subject_desc | STRING(多行) | "" | 完整三视图提示词：推荐连 Agnes 三视图提示词生成 的「三视图提示词」输出，或手动粘贴/手工修改后的提示词 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | 留空自动加载 | Agnes AI API Key |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
@@ -298,10 +296,36 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 **输出：**
 - image: 三视图张量（可存图或作为后续视频节点参考）
 - resolution: 实际分辨率
-- final_prompt: 最终拼接的完整提示词
+- final_prompt: 实际使用的完整提示词（subject_desc + extra_prompt），可复制复用或微调
 
-> 原「Agnes 角色三视图设定图」节点（AgnesNovelCharacterTurnaround）已升级为本
-> 通用节点；角色三视图选 subject_type=角色（默认）即可，原用法不变。
+> 接法：`Agnes 三视图提示词生成.三视图提示词` → `三视图生成.subject_desc`
+> （21:9 宽幅避免三视图被裁切；想与已有资产一致就 reference_image 接定妆图）
+
+---
+
+### ✍️ Agnes 三视图提示词生成 (AgnesTurnaroundPromptGenerator)
+
+**功能：** 把原始主体描述/提示词（资产提示词生成节点输出，或手写的中英文描述）
+转成一条**完整可见的三视图英文提示词**（内置三视图构图指令 + 纯主体规格
+「纯白背景、平光无阴影」+ 质量尾词），并**自动去掉原文中与三视图矛盾的单视图
+字样（single front view / facing the camera 等）**。输出可复制到
+三视图生成节点的 subject_desc 手工修改优化后再出图
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| subject_prompt | STRING(多行) | "" | 原始主体描述/提示词：连 Agnes 资产提示词生成 的「英文资产生成提示词」输出，或手动粘贴任意中英文描述 |
+| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（决定三视图构图指令：角色=全身正侧背 / 场景=正立面+侧立面+俯视 / 载具=整车三视图…） |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
+| api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
+| model | COMBO | agnes-2.5-flash | 文本生成模型 |
+| reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
+
+**输出：**
+- 三视图提示词: 完整三视图英文提示词（主体全部细节保留 + 三视图构图 + 纯白底平光 + 质量尾词），可连 三视图生成 或复制后手工修改
+- 处理日志: 成功=提示词摘要预览；失败=错误原因
+
+> 完整资产三视图链路：
+> `资产提取 → 文本拆分(第N条) → 资产提示词生成 → 三视图提示词生成 → [查看/手工改三视图提示词] → 三视图生成`
 
 ### 🔗 Agnes 字符串合并 (AgnesStringMerge)
 
@@ -351,9 +375,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > **资产线完整接法（角色/场景/道具/服装 三视图）：**
 > ① `Agnes 资产提取.角色JSON` →（可选）`LLM 对话`（提示词写死：把 JSON 逐条扩写成
 > 「【名】+定妆描述」格式，一次全出）→ `Agnes 文本拆分`（mode=【】括号块 或 JSON 数组）
-> ② 拆分 `第 N 条` → `Agnes 三视图生成`（subject_type 选 角色/道具/场景，
-> subject_desc 接第 N 条；要系列一致就 reference_image 接一张已出的定妆图）
-> ③ 场景/道具/服装 JSON 走同一条链，只换 subject_type
+> ② 拆分 `第 N 条` → `Agnes 资产提示词生成`（subject_type 选 角色/道具/场景/服装，
+> 输出英文资产提示词）→ `Agnes 三视图提示词生成`（同 subject_type，输出完整三视图提示词）
+> ③ `三视图提示词`（可查看/手工修改）→ `Agnes 三视图生成.subject_desc`（21:9 宽幅；
+> 要系列一致就 reference_image 接一张已出的定妆图）
+> 场景/道具/服装 JSON 走同一条链，只换两节点的 subject_type
 > 资产超过 20 个时看「条数」输出提示，手动分批或让 LLM 合并小项
 
 ---
@@ -456,5 +482,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.11.3  
+**版本**: 1.11.4  
 **更新日期**: 2026-10-19
