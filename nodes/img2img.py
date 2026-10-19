@@ -136,13 +136,19 @@ class AgnesNovelImageToImage(OutputDocsMixin):
             },
             "optional": {
                 "reference_image_2": ("IMAGE", {
-                    "tooltip": "Additional reference image (multi-image input)",
+                    "tooltip": "Additional reference image 2 (multi-image input, up to 6 total)",
                 }),
                 "reference_image_3": ("IMAGE", {
-                    "tooltip": "Additional reference image (multi-image input)",
+                    "tooltip": "Additional reference image 3 (multi-image input, up to 6 total)",
                 }),
                 "reference_image_4": ("IMAGE", {
-                    "tooltip": "Additional reference image (multi-image input)",
+                    "tooltip": "Additional reference image 4 (multi-image input, up to 6 total)",
+                }),
+                "reference_image_5": ("IMAGE", {
+                    "tooltip": "Additional reference image 5 (multi-image input, up to 6 total)",
+                }),
+                "reference_image_6": ("IMAGE", {
+                    "tooltip": "Additional reference image 6 (multi-image input, up to 6 total)",
                 }),
             },
         }
@@ -161,6 +167,8 @@ class AgnesNovelImageToImage(OutputDocsMixin):
         reference_image_2=None,
         reference_image_3=None,
         reference_image_4=None,
+        reference_image_5=None,
+        reference_image_6=None,
     ):
         size = compute_size(quality, aspect_ratio)
         w, h = map(int, size.split("x"))
@@ -178,7 +186,8 @@ class AgnesNovelImageToImage(OutputDocsMixin):
         # Collect all reference images
         ref_imgs = [tensor_to_pil(image)]
 
-        for ref in [reference_image_2, reference_image_3, reference_image_4]:
+        for ref in [reference_image_2, reference_image_3, reference_image_4,
+                    reference_image_5, reference_image_6]:
             if ref is not None:
                 ref_imgs.append(tensor_to_pil(ref))
 
