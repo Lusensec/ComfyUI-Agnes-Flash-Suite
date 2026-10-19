@@ -30,14 +30,14 @@ from ._output_docs import OutputDocsMixin
 SUBJECT_TYPES = ("角色", "物品/道具", "服装", "场景", "载具", "通用")
 STYLE_OPTIONS = ("cinematic", "anime", "realistic", "watercolor", "oil_painting")
 
-# 主体类型 → 构图指令（英文，拼进提示词；纯主体：无背景/无打光）
+# 主体类型 → 构图指令（英文，拼进提示词；纯主体 + 单一正面视图，从头到尾完整可见）
 _SUBJECT_DIRECTIVES = {
-    "角色": "full-body character reference sheet, front-facing neutral standing pose, entire body visible, isolated on a plain white background",
-    "物品/道具": "detailed still life of the prop, material and texture clearly visible, isolated on a plain white background",
-    "服装": "costume design sheet, flat lay or displayed on invisible mannequin, showing the full outfit, isolated on a plain white background",
-    "场景": "wide establishing view of the location as a self-contained asset, showing architecture and environment clearly",
-    "载具": "three-quarter view of the vehicle, full silhouette visible, isolated on a plain white background",
-    "通用": "single subject isolated on a plain white background",
+    "角色": "single front view of the character, facing the camera, full body from head to toe completely visible, standing pose, isolated on a plain white background",
+    "物品/道具": "single front view of the prop, showing its front side and full extent, isolated on a plain white background",
+    "服装": "costume shown in a single front view, full outfit from head to toe, flat lay or on invisible mannequin, isolated on a plain white background",
+    "场景": "single straight-on wide view of the location as a self-contained asset, showing architecture and environment clearly",
+    "载具": "single front view of the vehicle, full extent visible, isolated on a plain white background",
+    "通用": "single front view of the subject, full extent visible, isolated on a plain white background",
 }
 
 # style → 风格尾词（只描述画面风格，不含背景/打光/镜头）
@@ -120,9 +120,10 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
             f"2. 构图指令：{directive}\n"
             "3. 这是资产设定图：**画面中只出现该主体本身，不要添加任何场景背景、打光氛围、镜头参数或环境元素描述**"
             "（主体自身的固有属性，如角色穿着、道具材质，正常保留）\n"
-            f"4. 风格尾词：{style_tags}\n"
-            f"5. 质量尾词：{_QUALITY_TAGS}\n"
-            "6. 只输出最终的一段英文提示词，不要解释、不要引号、不要代码块"
+            "4. **视角：只保留主体的正面单一视图（从头到尾完整可见），不要侧面/背面/俯视/三视图/多角度并排**\n"
+            f"5. 风格尾词：{style_tags}\n"
+            f"6. 质量尾词：{_QUALITY_TAGS}\n"
+            "7. 只输出最终的一段英文提示词，不要解释、不要引号、不要代码块"
         )
 
     @staticmethod
