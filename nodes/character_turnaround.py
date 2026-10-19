@@ -29,7 +29,8 @@ from ..api import (
 )
 from ._output_docs import OutputDocsMixin
 
-# 各主体类型的三视图固定模板（与用户规格一致：三视图并排、正交、细节一致、纯白背景）
+# 各主体类型的三视图固定模板（与用户规格一致：三视图并排、正交、细节一致；
+# 纯主体规格：纯白背景、平光无阴影、不含场景背景/打光氛围）
 _TURNAROUND_TEMPLATES = {
     "角色": (
         "{subject_desc}\n\n"
@@ -38,8 +39,9 @@ _TURNAROUND_TEMPLATES = {
         "front view, side view (profile), back view.\n"
         "Full body complete display, orthographic views, no perspective distortion, "
         "consistent character proportions, consistent costume and hairstyle details, "
-        "natural standing pose, A-pose, pure white background, clean line art, "
-        "flat clean colors, high resolution, sharp details."
+        "natural standing pose, A-pose, isolated on a pure white background, "
+        "even flat lighting, no shadows, clean line art, flat clean colors, "
+        "high resolution, sharp details."
     ),
     "物品/道具": (
         "{subject_desc}\n\n"
@@ -48,14 +50,17 @@ _TURNAROUND_TEMPLATES = {
         "front view, side view, back view.\n"
         "Complete display of the whole item, orthographic views, no perspective distortion, "
         "consistent proportions, consistent structure and material details, "
-        "plain neutral white background, clean line art, high resolution, sharp details."
+        "isolated on a pure white background, even flat lighting, no shadows, "
+        "clean line art, high resolution, sharp details."
     ),
     "场景": (
         "{subject_desc}\n\n"
         "Scene concept sheet, environment reference sheet: the same scene "
         "shown in three views arranged side by side from left to right: "
         "front elevation, side elevation, top-down plan view.\n"
-        "Orthographic views, no perspective distortion, consistent layout, "
+        "Drawn as clean architectural sheets on a pure white background, "
+        "no environmental lighting or weather atmosphere, even flat lighting, no shadows, "
+        "orthographic views, no perspective distortion, consistent layout, "
         "consistent architecture/structure and material details, "
         "clean line art, flat clean colors, high resolution, sharp details."
     ),
@@ -66,7 +71,8 @@ _TURNAROUND_TEMPLATES = {
         "front view, side view, back view.\n"
         "Full vehicle complete display, orthographic views, no perspective distortion, "
         "consistent proportions, consistent body panels, trim and detail design, "
-        "pure white background, clean line art, high resolution, sharp details."
+        "isolated on a pure white background, even flat lighting, no shadows, "
+        "clean line art, high resolution, sharp details."
     ),
     "通用": (
         "{subject_desc}\n\n"
@@ -74,8 +80,8 @@ _TURNAROUND_TEMPLATES = {
         "shown in three orthographic views arranged side by side from left to right: "
         "front view, side view, back view.\n"
         "Complete display, orthographic views, no perspective distortion, "
-        "consistent proportions and details, pure white background, clean line art, "
-        "high resolution, sharp details."
+        "consistent proportions and details, isolated on a pure white background, "
+        "even flat lighting, no shadows, clean line art, high resolution, sharp details."
     ),
 }
 
