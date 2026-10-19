@@ -24,6 +24,7 @@ from .img2img import AgnesNovelImageToImage
 from .text2img import AgnesNovelTextToImage
 from .img2video import AgnesNovelImageToVideo
 from .text2video import AgnesNovelTextToVideo
+from .video_reference import AgnesVideoReference
 from .character_turnaround import AgnesNovelCharacterTurnaround
 
 # 合并所有节点映射
@@ -35,6 +36,7 @@ from . import script_generator, director_master, image_gen, asset_extractor
 from . import scene_splitter, prompt_generator, video_gen
 from . import api_key_config, llm_chat, image_reverse
 from . import img2img, text2img, img2video, text2video
+from . import video_reference
 from . import character_turnaround
 from . import workflow_exporter, asset_json_splitter, asset_maker, jimeng_asset_maker
 
@@ -42,6 +44,7 @@ for _mod in [script_generator, director_master, image_gen, asset_extractor,
              scene_splitter, prompt_generator, video_gen,
              api_key_config, llm_chat, image_reverse,
              img2img, text2img, img2video, text2video,
+             video_reference,
              character_turnaround,
              workflow_exporter, asset_json_splitter, asset_maker, jimeng_asset_maker]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):

@@ -1,14 +1,18 @@
 """
-Agnes Image-to-Video Node
-=========================
-Generate videos from still images using Agnes AI video generation models.
-Supports multi-image input for keyframe-based animation.
+Agnes Keyframe-to-Video Node（关键帧生视频）
+============================================
+Generate videos from keyframes (first frame required, last frame optional)
+using Agnes AI video generation models.
+
+- 新接口 agnes-video-2.5-flash：keyframe 模式（first_frame / last_frame，
+  固定 720P，4-12 秒）；首帧必接，尾帧可选。
+- 旧接口 agnes-video-v2.0：按帧数/帧率 + WxH 像素。
+
+多图参考（最多 5 张）/ 音频参考（最多 3 段）请改用「Agnes 参考视频生成」
+节点（nodes/video_reference.py，reference 模式）。
+
 Uses async API with polling - can take several minutes.
-
-Supports quality (1K/2K) and aspect ratio selection.
-
-Output: Saves MP4 to ComfyUI's output/agnes_videos/ directory so users can
-preview and download from the web UI.
+Output: Saves MP4 to ComfyUI's output/agnes_videos/ directory.
 """
 
 import os
@@ -128,7 +132,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         return {
             "required": {
                 "image": ("IMAGE", {
-                    "tooltip": "Primary input image to animate",
+                    "tooltip": "关键帧·首帧（必接）：可再接尾帧做首尾帧过渡；多图/音频参考请用「Agnes 参考视频生成」节点"
                 }),
                 "prompt": ("STRING", {
                     "multiline": True,
@@ -191,8 +195,8 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
             },
             "optional": {
                 "end_frame_image": ("IMAGE", {
-                    "tooltip": "Optional end frame for keyframe-based animation (image -> image transition). "
-                               "新模型 agnes-video-2.5-flash：接尾帧=keyframe 首尾帧模式，不接=reference 参考图模式",
+                    "tooltip": "关键帧·尾帧（可选）：接了=首尾帧过渡（image→image 运动）；不接=仅按首帧生成。"
+                               "2.5-flash 走 keyframe 首尾帧模式；多图/音频参考请用「Agnes 参考视频生成」节点"
                 }),
             },
         }
@@ -224,21 +228,17 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         output_dir = _get_output_dir()
 
         try:
-            # Collect reference images
-            ref_imgs = [tensor_to_pil(image)]
             has_end_frame = end_frame_image is not None
-            if has_end_frame:
-                ref_imgs.append(tensor_to_pil(end_frame_image))
 
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_VIDEO_MODELS:
-                # 新接口：有尾帧 → keyframe 首尾帧模式；否则 reference 参考图模式
-                mode_arg = "keyframe" if has_end_frame else "reference"
+                # 新接口：keyframe 关键帧模式（首帧必填；接尾帧=首尾帧过渡，不接=仅首帧）
                 seconds = int(round(num_frames / frame_rate)) if frame_rate else 5
                 video_path = client.generate_video(
                     prompt=prompt.strip(),
-                    mode=mode_arg,
-                    reference_images=ref_imgs,
+                    mode="keyframe",
+                    first_frame=tensor_to_pil(image),
+                    last_frame=tensor_to_pil(end_frame_image) if has_end_frame else None,
                     model=model,
                     seconds=seconds,
                     aspect_ratio=aspect_ratio,
@@ -248,6 +248,9 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                 )
             else:
                 # 旧接口：num_frames/frame_rate/size(WxH)
+                ref_imgs = [tensor_to_pil(image)]
+                if has_end_frame:
+                    ref_imgs.append(tensor_to_pil(end_frame_image))
                 video_path = client.generate_video(
                     prompt=prompt.strip(),
                     mode="img2video",
@@ -295,4 +298,4 @@ def _error(msg: str, size: str = "") -> Tuple:
     return (text, text) if not size else (text, size)
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelImageToVideo": AgnesNovelImageToVideo}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageToVideo": "🎬 Agnes Novel 图生视频"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageToVideo": "🎬 Agnes 关键帧生视频"}

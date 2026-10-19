@@ -55,6 +55,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | strength（强度） | ❌ 无此参数，节点将其转成提示词指令 | 同左 | - | - |
 | 时长 | - | - | seconds "4"~"12"（节点用 帧数/帧率 换算） | num_frames（8n+1） |
 | frame_rate | - | - | ❌ API 无此参数 | ✅ 传给 API |
+| 图片参考 | - | - | ✅ reference 模式 images[] 最多 5 张（参考视频生成节点 image_1~5；<Picture N> 指代） | ⚠️ extra_body.image 多图（参考视频生成节点兼容，无 <Picture N>） |
+| 音频参考 | - | - | ✅ reference 模式 audios[] 最多 3 段（本地路径/URL/Data URI，<Audio N> 指代） | ❌ 不支持 |
+| 关键帧（首尾帧） | - | - | ✅ keyframe 模式 first_frame/last_frame（关键帧生视频节点） | ⚠️ 多图 img2video（无独立尾帧参数） |
 | quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
 | max_wait | 客户端轮询超时，非 API 参数 | 同左 | 同左 | 同左 |
 
@@ -167,7 +170,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 🎬 Agnes 视频生成 (AgnesVideoGen)
 
-**功能：** 图生视频 / 文生视频
+**功能：** 文生视频 / 单图参考生视频（接一张 image 走 2.5-flash reference 模式）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -185,6 +188,62 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - video: 视频文件路径（MP4 保存到 ComfyUI output/agnes_videos/）
 - video_id: 视频任务唯一标识（可用于查询重试）
 - task_id: API 返回的任务 ID
+
+> 多张图片/音频参考请用「🎞️ Agnes 参考视频生成」节点；首尾帧请用「🎬 Agnes 关键帧生视频」节点。
+
+---
+
+### 🎬 Agnes 关键帧生视频 (AgnesNovelImageToVideo)
+
+**功能：** 关键帧生视频（原「Agnes Novel 图生视频」）：首帧必接、尾帧可选；
+2.5-flash 走 keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| image | IMAGE | 必接 | 关键帧·首帧（first_frame） |
+| prompt | STRING | "" | 视频描述（可选） |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-video-2.5-flash | 视频生成模型（2.5-flash keyframe 模式 / 旧 v2.0 帧数模式） |
+| quality | COMBO | 1K | 仅旧接口生效；2.5-flash 固定 720P |
+| aspect_ratio | COMBO | 16:9 | 宽高比 |
+| num_frames / frame_rate | INT | 121 / 24 | 旧接口帧数/帧率；新接口按 帧数/帧率 换算 4-12 秒 |
+| seed | INT | 0 | 随机种子（0=每次随机） |
+| max_wait_seconds | INT | 600 | 轮询超时 |
+| end_frame_image | IMAGE | - | 关键帧·尾帧（可选，last_frame；不接=仅按首帧生成） |
+
+**输出（含输出描述）：**
+- video: 视频（MP4 保存到 output/agnes_videos/，输出类型随环境为 VIDEO/VHS/路径）
+- resolution: 视频目标尺寸（WxH）
+
+> 多张参考图/音频参考请用「🎞️ Agnes 参考视频生成」节点。
+
+---
+
+### 🎞️ Agnes 参考视频生成 (AgnesVideoReference)
+
+**功能：** 参考素材生视频（2.5-flash reference 模式）：最多 5 张参考图
+（image_1~5，提示词用 `<Picture N>` 指代）+ 最多 3 段参考音频
+（audio_1~3，提示词用 `<Audio N>` 指代；音频为本地文件路径或公开 URL，
+本地文件自动转 Base64 Data URI，单段 <15MB）。至少提供一种媒体参考。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| prompt | STRING | "" | 视频描述；`<Picture 1>~5` / `<Audio 1>~3` 指代参考素材 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-video-2.5-flash | 2.5-flash（支持图片+音频参考）/ 旧 v2.0（仅多图，音频忽略） |
+| num_frames / frame_rate | INT | 121 / 24 | 新接口换算 4-12 秒；旧接口直接传 API |
+| quality | COMBO | 1K | 仅旧接口生效；2.5-flash 固定 720P |
+| aspect_ratio | COMBO | 16:9 | 宽高比 |
+| seed | INT | 0 | 随机种子（0=每次随机） |
+| max_wait_seconds | INT | 600 | 轮询超时 |
+| image_1 ~ image_5 | IMAGE | - | 参考图片（1 必接或可只接音频；2.5-flash 上限 5 张） |
+| audio_1 ~ audio_3 | STRING | "" | 参考音频（本地路径或公开 URL；仅 2.5-flash，上限 3 段） |
+
+**输出（含输出描述）：**
+- video: 视频（MP4 保存到 output/agnes_videos/）
+- resolution: 视频目标尺寸（WxH）
 
 ---
 
@@ -287,5 +346,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.4.0  
+**版本**: 1.5.0  
 **更新日期**: 2026-10-19

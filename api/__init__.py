@@ -153,6 +153,46 @@ VIDEO_25_RATIOS = ("21:9", "16:9", "4:3", "1:1", "3:4", "9:16")
 # 节点上常见但新视频接口不支持的比例 → 就近映射
 _VIDEO_RATIO_FALLBACK = {"4:5": "3:4", "5:4": "4:3", "9:21": "21:9"}
 
+# 音频参考（2.5-flash reference 模式 audios[]）：公开 URL 或 Base64 Data URI
+# 本地文件按扩展名推断 MIME（免公开托管，服务端实测接受 Data URI）
+_AUDIO_MIME_MAP = {
+    ".mp3": "audio/mpeg", ".wav": "audio/wav", ".m4a": "audio/mp4",
+    ".aac": "audio/aac", ".ogg": "audio/ogg", ".oga": "audio/ogg",
+    ".flac": "audio/flac", ".wma": "audio/x-ms-wma", ".opus": "audio/opus",
+}
+_AUDIO_MAX_MB = 15  # Flash 单段 < 15MB
+
+
+def normalize_audio_ref(a):
+    """把音频参考归一化为 API 可接受的形式。
+
+    支持输入：
+    - str 公开 URL（http/https）或 Data URI（data:）→ 原样返回
+    - str 本地文件路径 → 读文件转 Base64 Data URI（MIME 按扩展名推断），
+      单段超过 15MB 时抛错
+    - bytes → 默认按 audio/mpeg 编码 Data URI（兼容旧调用）
+    - None / 空串 → None
+    """
+    if a is None:
+        return None
+    if isinstance(a, (bytes, bytearray)):
+        return "data:audio/mpeg;base64," + base64.b64encode(bytes(a)).decode("ascii")
+    if isinstance(a, str):
+        s = a.strip()
+        if not s:
+            return None
+        if s.startswith(("http://", "https://", "data:")):
+            return s
+        if not os.path.exists(s):
+            raise RuntimeError(f"[Video 错误] 音频参考文件不存在: {s}")
+        with open(s, "rb") as f:
+            data = f.read()
+        if len(data) > _AUDIO_MAX_MB * 1024 * 1024:
+            raise RuntimeError(f"[Video 错误] 音频参考超过 {_AUDIO_MAX_MB}MB 上限: {s}")
+        mime = _AUDIO_MIME_MAP.get(os.path.splitext(s)[1].lower(), "audio/mpeg")
+        return f"data:{mime};base64," + base64.b64encode(data).decode("ascii")
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Helper utilities
@@ -511,7 +551,8 @@ class AgnesClient:
             seconds: 新接口视频时长（秒，4-12，默认 5）。
             aspect_ratio: 新接口宽高比（21:9/16:9/4:3/1:1/3:4/9:16；其他值就近映射）。
             first_frame / last_frame: 新接口 keyframe 模式首尾帧（PIL/URL/bytes）。
-            audio_refs: 新接口音频参考（URL 字符串或 bytes，最多 3 个）。
+            audio_refs: 新接口音频参考（公开 URL / 本地文件路径 / bytes，最多 3 个；
+                    本地文件自动转 Base64 Data URI，单段 <15MB）。
             return_ids: True 时返回 (save_path, task_id, video_id) 三元组。
         """
         new_model = model in NEW_VIDEO_MODELS
@@ -555,14 +596,9 @@ class AgnesClient:
                 if reference_images:
                     payload["images"] = [_enc_ref(i) for i in reference_images[:5]]
                 if audio_refs:
-                    audios = []
-                    for a in audio_refs[:3]:
-                        if isinstance(a, str):
-                            audios.append(a)
-                        else:
-                            audios.append("data:audio/mpeg;base64," +
-                                          base64.b64encode(bytes(a)).decode("ascii"))
-                    payload["audios"] = audios
+                    audios = [x for x in (normalize_audio_ref(a) for a in audio_refs[:3]) if x]
+                    if audios:
+                        payload["audios"] = audios
         else:
             # 旧接口 agnes-video-v2.0
             # Validate num_frames
