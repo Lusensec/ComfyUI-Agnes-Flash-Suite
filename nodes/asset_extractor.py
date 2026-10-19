@@ -182,4 +182,4 @@ class AgnesAssetExtractor:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesAssetExtractor": AgnesAssetExtractor}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesAssetExtractor": "Agnes 资产提取"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesAssetExtractor": "📋 Agnes 资产提取"}

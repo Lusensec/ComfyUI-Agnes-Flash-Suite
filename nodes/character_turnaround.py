@@ -239,4 +239,4 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
 
 
 NODE_CLASS_MAPPINGS = {"AgnesSubjectTurnaround": AgnesSubjectTurnaround}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesSubjectTurnaround": "Agnes 三视图生成"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesSubjectTurnaround": "📐 Agnes 三视图生成"}

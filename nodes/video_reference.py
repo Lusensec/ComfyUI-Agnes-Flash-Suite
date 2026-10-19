@@ -230,4 +230,4 @@ class AgnesVideoReference(OutputDocsMixin):
 
 
 NODE_CLASS_MAPPINGS = {"AgnesVideoReference": AgnesVideoReference}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesVideoReference": "Agnes 参考视频生成"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesVideoReference": "🎞️ Agnes 参考视频生成"}

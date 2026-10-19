@@ -76,7 +76,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ## 节点配置说明
 
-### Agnes 场景切分 (AgnesSceneSplitter)
+### 🎬 Agnes 场景切分 (AgnesSceneSplitter)
 
 **功能：** 将小说章节拆分为 5 秒/片的场景段落
 
@@ -96,7 +96,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 总导演 (AgnesDirectorMaster)
+### 🎬 Agnes 总导演 (AgnesDirectorMaster)
 
 **功能：** 生成完整编号分镜脚本
 
@@ -115,7 +115,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 资产提取 (AgnesAssetExtractor)
+### 📋 Agnes 资产提取 (AgnesAssetExtractor)
 
 **功能：** 提取角色、场景、道具等资产信息
 
@@ -136,7 +136,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 分镜提示词生成 (AgnesScenePromptGenerator)
+### 🎨 Agnes 分镜提示词生成 (AgnesScenePromptGenerator)
 
 **功能：** 将分镜脚本转换为英文生图提示词
 
@@ -156,7 +156,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 图像生成 (AgnesImageGen)
+### 🎨 Agnes 图像生成 (AgnesImageGen)
 
 **功能：** 根据提示词生成场景图像
 
@@ -177,7 +177,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 视频生成 (AgnesVideoGen)
+### 🎬 Agnes 视频生成 (AgnesVideoGen)
 
 **功能：** 文生视频 / 单图参考生视频（接一张 image 走 2.5-flash reference 模式）
 
@@ -202,7 +202,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 关键帧生视频 (AgnesNovelImageToVideo)
+### 🎬 Agnes 关键帧生视频 (AgnesNovelImageToVideo)
 
 **功能：** 关键帧生视频（原「Agnes 图生视频」）：首帧必接、尾帧可选；
 2.5-flash 走 keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）
@@ -229,7 +229,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 参考视频生成 (AgnesVideoReference)
+### 🎞️ Agnes 参考视频生成 (AgnesVideoReference)
 
 **功能：** 参考素材生视频（2.5-flash reference 模式）：最多 5 张参考图
 （image_1~5，提示词用 `<Picture N>` 指代）+ 最多 3 段参考音频
@@ -256,7 +256,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 剧本生成 (AgnesScriptGenerator)
+### 📝 Agnes 剧本生成 (AgnesScriptGenerator)
 
 **功能：** 生成影视解说文案
 
@@ -276,7 +276,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### Agnes 三视图生成 (AgnesSubjectTurnaround)
+### 📐 Agnes 三视图生成 (AgnesSubjectTurnaround)
 
 **功能：** 生成任意主体的三视图设定表（turnaround sheet）：同一主体三个视图
 从左到右并排（角色=正/侧/背全身 A-pose；物品=产品设定；场景=正立面/侧立面/
@@ -302,7 +302,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 原「Agnes 角色三视图设定图」节点（AgnesNovelCharacterTurnaround）已升级为本
 > 通用节点；角色三视图选 subject_type=角色（默认）即可，原用法不变。
 
-### Agnes 字符串合并 (AgnesStringMerge)
+### 🔗 Agnes 字符串合并 (AgnesStringMerge)
 
 **功能：** 上下合并两个多行字符串（纯文本节点，不调用 API、无需 API Key）：
 非空输入按顺序拼接，空输入自动跳过（不产生多余空行/尾随分隔符），
@@ -388,5 +388,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.9.1  
+**版本**: 1.9.2  
 **更新日期**: 2026-10-19

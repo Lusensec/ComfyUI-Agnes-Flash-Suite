@@ -76,4 +76,4 @@ class AgnesNovelImageReverse(OutputDocsMixin):
             return (err, err)
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelImageReverse": AgnesNovelImageReverse}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageReverse": "Agnes 图像反推提示词"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageReverse": "🔍 Agnes 图像反推提示词"}

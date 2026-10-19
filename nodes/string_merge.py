@@ -58,4 +58,4 @@ class AgnesStringMerge(OutputDocsMixin):
 
 
 NODE_CLASS_MAPPINGS = {"AgnesStringMerge": AgnesStringMerge}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesStringMerge": "Agnes 字符串合并"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesStringMerge": "🔗 Agnes 字符串合并"}

@@ -238,4 +238,4 @@ class AgnesNovelImageToImage(OutputDocsMixin):
             return (black, f"[Error] {str(e)}")
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelImageToImage": AgnesNovelImageToImage}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageToImage": "Agnes 图生图"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelImageToImage": "🖼️ Agnes 图生图"}

@@ -173,4 +173,4 @@ class AgnesScenePromptGenerator:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScenePromptGenerator": AgnesScenePromptGenerator}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesScenePromptGenerator": "Agnes 分镜提示词生成"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesScenePromptGenerator": "🎨 Agnes 分镜提示词生成"}

@@ -241,4 +241,4 @@ class AgnesDirectorMaster:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesDirectorMaster": AgnesDirectorMaster}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesDirectorMaster": "Agnes 总导演"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesDirectorMaster": "🎬 Agnes 总导演"}
