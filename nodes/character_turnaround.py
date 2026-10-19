@@ -60,17 +60,17 @@ class AgnesNovelCharacterTurnaround(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "base_url": ("STRING", {
-                    "multiline": False,
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
-                }),
                 "character_desc": ("STRING", {
                     "multiline": True,
                     "default": "",
                     "placeholder": "角色名 + 外貌/服装描述，例如：\n白奕，20岁青年剑修，黑色长发束高马尾，白衣黑边长剑袍，左手持剑",
                     "tooltip": "角色名称与外貌、服装、道具描述（越具体，三视图细节越一致）",
+                }),
+                "base_url": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
                 }),
                 "api_key": ("STRING", {
                     "default": "",
@@ -105,8 +105,8 @@ class AgnesNovelCharacterTurnaround(OutputDocsMixin):
 
     def generate(
         self,
-        base_url: str = "",
         character_desc: str = "",
+        base_url: str = "",
         api_key: str = "",
         model: str = IMAGE_MODEL,
         quality: str = "2K",

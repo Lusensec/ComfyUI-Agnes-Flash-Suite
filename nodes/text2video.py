@@ -127,6 +127,12 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "A cinematic drone shot flying over a misty forest at sunrise...",
+                    "tooltip": "Text description of the video to generate",
+                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -138,12 +144,6 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key",
-                }),
-                "prompt": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "A cinematic drone shot flying over a misty forest at sunrise...",
-                    "tooltip": "Text description of the video to generate",
                 }),
                 "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
@@ -190,9 +190,9 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
 
     def generate(
         self,
+        prompt: str = "",
         base_url: str = "",
         api_key: str = "",
-        prompt: str = "",
         model: str = VIDEO_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "16:9",

@@ -86,6 +86,15 @@ class AgnesNovelImageToImage(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "image": ("IMAGE", {
+                    "tooltip": "Primary reference image for editing",
+                }),
+                "prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "Make it look like a watercolor painting...",
+                    "tooltip": "Description of the desired transformation",
+                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -97,15 +106,6 @@ class AgnesNovelImageToImage(OutputDocsMixin):
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key",
-                }),
-                "image": ("IMAGE", {
-                    "tooltip": "Primary reference image for editing",
-                }),
-                "prompt": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "Make it look like a watercolor painting...",
-                    "tooltip": "Description of the desired transformation",
                 }),
                 "model": (AVAILABLE_IMAGE_MODELS, {
                     "default": IMAGE_MODEL,
@@ -149,10 +149,10 @@ class AgnesNovelImageToImage(OutputDocsMixin):
 
     def edit(
         self,
-        base_url: str = "",
-        api_key: str = "",
         image=None,
         prompt: str = "",
+        base_url: str = "",
+        api_key: str = "",
         model: str = IMAGE_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "1:1",

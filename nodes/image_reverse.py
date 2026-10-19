@@ -28,6 +28,13 @@ class AgnesNovelImageReverse(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "image": ("IMAGE", {
+                    "tooltip": "Input image to analyze for prompt generation",
+                }),
+                "model": (AVAILABLE_CHAT_MODELS, {
+                    "default": CHAT_MODEL,
+                    "tooltip": "Vision-capable model for image analysis",
+                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -40,17 +47,10 @@ class AgnesNovelImageReverse(OutputDocsMixin):
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key",
                 }),
-                "image": ("IMAGE", {
-                    "tooltip": "Input image to analyze for prompt generation",
-                }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "Vision-capable model for image analysis",
-                }),
             },
         }
 
-    def reverse(self, base_url: str = "", api_key: str = "", image=None, model: str = CHAT_MODEL) -> Tuple[str, str]:
+    def reverse(self, image=None, model: str = CHAT_MODEL, base_url: str = "", api_key: str = "") -> Tuple[str, str]:
         # Runtime fallback: try config file if widget value is empty
         if not api_key.strip():
             api_key = get_api_key()

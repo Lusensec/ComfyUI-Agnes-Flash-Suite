@@ -127,6 +127,15 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "image": ("IMAGE", {
+                    "tooltip": "Primary input image to animate",
+                }),
+                "prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "Smooth camera pan with gentle motion...",
+                    "tooltip": "Description of the desired animation/motion",
+                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -138,15 +147,6 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key",
-                }),
-                "image": ("IMAGE", {
-                    "tooltip": "Primary input image to animate",
-                }),
-                "prompt": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "Smooth camera pan with gentle motion...",
-                    "tooltip": "Description of the desired animation/motion",
                 }),
                 "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
@@ -199,10 +199,10 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
 
     def generate(
         self,
-        base_url: str = "",
-        api_key: str = "",
         image=None,
         prompt: str = "",
+        base_url: str = "",
+        api_key: str = "",
         model: str = VIDEO_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "16:9",

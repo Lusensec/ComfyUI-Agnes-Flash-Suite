@@ -77,6 +77,9 @@ class AgnesSceneSplitter:
         "场景 46", "场景 47", "场景 48", "场景 49", "场景 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
     )
+    OUTPUT_TOOLTIPS = ("处理日志（场景统计/错误信息）",) + (
+        ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * 50
+    ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True

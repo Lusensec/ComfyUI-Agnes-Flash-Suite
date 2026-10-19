@@ -76,6 +76,9 @@ class AgnesDirectorMaster:
         "分镜 46", "分镜 47", "分镜 48", "分镜 49", "分镜 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
     )
+    OUTPUT_TOOLTIPS = ("处理日志（分镜统计/错误信息）",) + (
+        ("编号分镜脚本（5秒/段，含画面/对白/运镜，连接提示词生成节点）",) * 50
+    ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True

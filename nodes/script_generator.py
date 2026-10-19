@@ -61,6 +61,7 @@ class AgnesScriptGenerator:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("script",)
     RETURN_LABELS = ("解说文案")
+    OUTPUT_TOOLTIPS = ("影视解说文案（含开场/讲解/结尾完整结构，连接 SaveText 或作为配音稿）",)
     FUNCTION = "generate"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True

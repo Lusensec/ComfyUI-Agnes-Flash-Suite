@@ -33,16 +33,16 @@ class AgnesVideoGen:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
-                }),
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
                     "placeholder": "输入视频描述（可选）...",
                     "tooltip": "视频描述文本，如果提供图片则优先使用图片生成视频"
+                }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
                 }),
                 "api_key": ("STRING", {
                     "default": "",
@@ -85,6 +85,11 @@ class AgnesVideoGen:
     RETURN_TYPES = ("VIDEO", "STRING", "STRING",)
     RETURN_NAMES = ("video", "video_id", "task_id",)
     RETURN_LABELS = ("视频文件路径", "视频 ID", "任务 ID")
+    OUTPUT_TOOLTIPS = (
+        "生成的视频（MP4 保存到 ComfyUI output/agnes_videos/，连接 SaveVideo 预览）",
+        "视频任务唯一标识（生成失败时可凭此查询/重试）",
+        "API 返回的任务 ID（排错用）",
+    )
     FUNCTION = "generate"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -112,7 +117,7 @@ class AgnesVideoGen:
         "3:4": (1024, 1365),
     }
 
-    def generate(self, base_url="", prompt="", api_key="", model=VIDEO_MODEL, num_frames=121, frame_rate=24, quality="1K", aspect_ratio="16:9", image=None):
+    def generate(self, prompt="", base_url="", api_key="", model=VIDEO_MODEL, num_frames=121, frame_rate=24, quality="1K", aspect_ratio="16:9", image=None):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

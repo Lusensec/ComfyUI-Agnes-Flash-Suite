@@ -39,16 +39,16 @@ class AgnesImageGen:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
-                }),
                 "prompt": ("STRING", {
                     "multiline": True,
                     "default": "",
                     "placeholder": "输入英文图像描述...",
                     "tooltip": "从分镜提示词生成节点输出的英文提示词"
+                }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
                 }),
                 "api_key": ("STRING", {
                     "default": "",
@@ -83,6 +83,10 @@ class AgnesImageGen:
     RETURN_TYPES = ("IMAGE", "STRING",)
     RETURN_NAMES = ("image", "url",)
     RETURN_LABELS = ("图像张量", "图片 URL")
+    OUTPUT_TOOLTIPS = (
+        "生成的图像张量（连接 SaveImage 存档，或图生视频/三视图节点作为参考图）",
+        "图片 URL / 本地保存路径（可下载或记录引用）",
+    )
     FUNCTION = "generate"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -99,7 +103,7 @@ class AgnesImageGen:
             extra["url"] = {"description": "图片的 URL 地址"}
         return extra
 
-    def generate(self, base_url="", prompt="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL):
+    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

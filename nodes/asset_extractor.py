@@ -51,6 +51,13 @@ class AgnesAssetExtractor:
         "服装信息 JSON",
         "天气信息 JSON"
     )
+    OUTPUT_TOOLTIPS = (
+        "角色列表 JSON（姓名/性别/年龄/外貌/性格，连接资产拆分器或提示词节点）",
+        "场景列表 JSON（地点名称/环境描述/时代背景，连接资产拆分器或提示词节点）",
+        "道具列表 JSON（重要物品名称+描述，连接资产拆分器）",
+        "服装列表 JSON（角色名+对应服装描述，连接资产拆分器）",
+        "天气/氛围 JSON（场景氛围补充，连接提示词节点增强一致性）",
+    )
     FUNCTION = "extract"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True

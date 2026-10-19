@@ -22,18 +22,25 @@ Expand-Archive -Path "comfyui-agnes-novel.zip" -DestinationPath "你的ComfyUI�
 4. `config.yaml` 的 `api.base_url`
 5. 内置默认 `https://api.agnes-ai.cn/v1`
 
+> **布局约定**：为贴近"请求地址 + 密钥"这一组配置，`base_url` 统一放在
+> **`api_key` 紧挨着的上方**（二者相邻），且位于提示词/内容输入之后，
+> 不再顶在最上面与内容区混在一起。
+
 ### 5. 输出描述机制
 
 ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 描述机制**，
-而**输出（RETURN_*）只有短标签（RETURN_NAMES/RETURN_LABELS），没有长描述字段**——
-这就是"每个输入都有说明、输出却没有"的原因。本插件通过官方扩展点补齐：
+而**输出只有短标签（RETURN_NAMES/RETURN_LABELS）**。本插件通过两条官方扩展点补齐
+输出的"描述"，使其在节点文档面板的"输出 → 描述"列可见：
 
-- 每个节点类实现 `get_extra_output_methods() → ["get_extra_pnginfo"]` 和 `get_extra_pnginfo()`，
-  保存图像/视频时把每个输出的**含义与去向**写入文件元数据（PNG info / 文件说明）；
-- 共享实现见 `nodes/_output_docs.py`（OutputDocsMixin），各节点在类属性
-  `OUTPUT_DOCS = {输出名: 描述}` 中声明；
-- 查看方式：ComfyUI 画廊的图片元数据、或用任意 PNG-info 查看工具打开
-  `output/` 下的保存文件。
+- **`OUTPUT_TOOLTIPS`**（类属性，与 `RETURN_NAMES` 一一对应）：ComfyUI 内核
+  `server.py` 读取该属性并以 `output_tooltips` 字段随节点定义下发前端，
+  节点文档面板"输出"表格的"描述"列、以及输出接口的悬停提示都读它。
+  各节点已逐一填写；mixin 节点由 `nodes/_output_docs.py` 的元类从
+  `OUTPUT_DOCS` 自动生成，避免重复维护。
+- **`get_extra_output_methods()` / `get_extra_pnginfo()`**：保存图像/视频时
+  把每个输出的含义写入文件元数据（PNG info / 文件说明），可在 ComfyUI
+  画廊或任意 PNG-info 工具中查看。
+- 共享实现见 `nodes/_output_docs.py`（OutputDocsMixin + OutputDocsMeta）。
 
 ### 6. Agnes API 参数可用性对照（生图/生视频参数与真实 API 参数的对应关系）
 

@@ -27,6 +27,12 @@ class AgnesNovelLLMChat(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "Enter your message...",
+                    "tooltip": "The user message to send to Agnes LLM",
+                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -38,12 +44,6 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key from platform.agnes-ai.com",
-                }),
-                "prompt": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "Enter your message...",
-                    "tooltip": "The user message to send to Agnes LLM",
                 }),
                 "model": (AVAILABLE_CHAT_MODELS, {
                     "default": CHAT_MODEL,
@@ -86,9 +86,9 @@ class AgnesNovelLLMChat(OutputDocsMixin):
 
     def chat(
         self,
+        prompt: str = "",
         base_url: str = "",
         api_key: str = "",
-        prompt: str = "",
         model: str = CHAT_MODEL,
         temperature: float = 0.7,
         max_tokens: int = 4096,

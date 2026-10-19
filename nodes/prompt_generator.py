@@ -60,6 +60,7 @@ class AgnesScenePromptGenerator:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("detailed_prompt",)
     RETURN_LABELS = ("英文提示词",)
+    OUTPUT_TOOLTIPS = ("英文生图提示词（风格化+角色/场景一致性描述，连接文生图/定妆图节点）",)
     FUNCTION = "generate_prompt"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True

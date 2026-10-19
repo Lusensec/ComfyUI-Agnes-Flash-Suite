@@ -86,6 +86,12 @@ class AgnesNovelTextToImage(OutputDocsMixin):
     def INPUT_TYPES(cls):
         return {
             "required": {
+                "prompt": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "A beautiful sunset over mountains...",
+                    "tooltip": "Text description of the image to generate",
+                }),
                 "base_url": ("STRING", {
                     "multiline": False,
                     "default": "",
@@ -97,12 +103,6 @@ class AgnesNovelTextToImage(OutputDocsMixin):
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Your Agnes AI API key",
-                }),
-                "prompt": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "A beautiful sunset over mountains...",
-                    "tooltip": "Text description of the image to generate",
                 }),
                 "model": (AVAILABLE_IMAGE_MODELS, {
                     "default": IMAGE_MODEL,
@@ -128,9 +128,9 @@ class AgnesNovelTextToImage(OutputDocsMixin):
 
     def generate(
         self,
+        prompt: str = "",
         base_url: str = "",
         api_key: str = "",
-        prompt: str = "",
         model: str = IMAGE_MODEL,
         quality: str = "1K",
         aspect_ratio: str = "1:1",
