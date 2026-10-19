@@ -19,12 +19,7 @@
       "inputs": [],
       "outputs": [
         {
-          "name": "status",
-          "type": "STRING",
-          "links": null
-        },
-        {
-          "name": "masked_key",
+          "name": "base_url",
           "type": "STRING",
           "links": null
         },
@@ -34,6 +29,16 @@
           "links": [
             2
           ]
+        },
+        {
+          "name": "masked_key",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": null
         }
       ],
       "properties": {
@@ -938,7 +943,7 @@
       2,
       1,
       2,
-      2,
+      1,
       0,
       "STRING"
     ],

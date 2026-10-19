@@ -24,13 +24,13 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("status", "masked_key", "full_key", "base_url")
-    RETURN_LABELS = ('状态信息', '已掩码的Key', '完整Key', '请求地址')
+    RETURN_NAMES = ("base_url", "full_key", "masked_key", "status")
+    RETURN_LABELS = ('请求地址', '完整Key', '已掩码的Key', '状态信息')
     OUTPUT_DOCS = {
-        "status": "保存/清除结果信息（成功或失败原因）",
-        "masked_key": "掩码后的 API Key（前8+****+后4），用于确认保存成功，可安全显示",
-        "full_key": "完整 API Key（本节点内部使用；如需在其他节点手动粘贴请用此项输出）",
         "base_url": "本次保存的模型请求地址（留空时回显内置默认值）",
+        "full_key": "完整 API Key（本节点内部使用；如需在其他节点手动粘贴请用此项输出）",
+        "masked_key": "掩码后的 API Key（前8+****+后4），用于确认保存成功，可安全显示",
+        "status": "保存/清除结果信息（成功或失败原因）",
     }
     FUNCTION = "save_key"
     OUTPUT_NODE = True
@@ -83,11 +83,11 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
             # Remove config file
             if os.path.exists(CONFIG_FILE):
                 os.remove(CONFIG_FILE)
-            return ("[OK] API key and Base URL have been cleared from config.", "", "", "")
+            return ("", "", "", "[OK] API key and Base URL have been cleared from config.")
 
         key = api_key.strip()
         if not key:
-            return ("[Error] API key is empty. Please enter a valid key.", "", "", "")
+            return ("", "", "", "[Error] API key is empty. Please enter a valid key.")
 
         url = (base_url or "").strip().rstrip("/")
 
@@ -98,7 +98,7 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            return (f"[Error] Failed to save config: {str(e)}", "", "", "")
+            return ("", "", "", f"[Error] Failed to save config: {str(e)}")
 
         # Mask the key for display (show first 8 + last 4 chars)
         if len(key) > 12:
@@ -117,12 +117,12 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
             pass
 
         return (
+            url or "https://api.agnes-ai.cn/v1 (default)",
+            key,
+            masked,
             f"[OK] API key saved to {os.path.basename(CONFIG_FILE)}"
             + (f", Base URL = {url}" if url else "")
             + ". All other Agnes nodes will now auto-load these settings.",
-            masked,
-            key,
-            url or "https://api.agnes-ai.cn/v1 (default)",
         )
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelAPIKeyConfig": AgnesNovelAPIKeyConfig}
