@@ -7,7 +7,7 @@ Agnes 参考视频生成节点（图片参考 / 音频参考）
   （本地文件路径或公开 URL；本地文件自动转 Base64 Data URI，单段 <15MB）
 
 首尾帧关键帧模式请改用「Agnes 关键帧生视频」节点（AgnesNovelImageToVideo）。
-文生视频请改用「Agnes 视频生成」节点（AgnesVideoGen）。
+文生视频请改用「Agnes 文生视频」节点（AgnesNovelTextToVideo）；单图首帧动画请改用「Agnes 关键帧生视频」节点。
 
 Output: Saves MP4 to ComfyUI's output/agnes_videos/ directory.
 """

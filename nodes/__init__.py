@@ -8,7 +8,6 @@ from .image_gen import AgnesImageGen
 from .asset_extractor import AgnesAssetExtractor
 from .scene_splitter import AgnesSceneSplitter
 from .prompt_generator import AgnesScenePromptGenerator
-from .video_gen import AgnesVideoGen
 
 # 通用节点（Agnes Novel 版本，节点名带 Novel 前缀）
 from .api_key_config import AgnesNovelAPIKeyConfig
@@ -30,7 +29,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 
 # 从各节点文件收集映射
 from . import script_generator, director_master, image_gen, asset_extractor
-from . import scene_splitter, prompt_generator, video_gen
+from . import scene_splitter, prompt_generator
 from . import api_key_config, llm_chat, image_reverse
 from . import img2img, img2video, text2video
 from . import video_reference
@@ -41,7 +40,7 @@ from . import asset_prompt
 from . import turnaround_prompt
 
 for _mod in [script_generator, director_master, image_gen, asset_extractor,
-             scene_splitter, prompt_generator, video_gen,
+             scene_splitter, prompt_generator,
              api_key_config, llm_chat, image_reverse,
              img2img, img2video, text2video,
              video_reference,
