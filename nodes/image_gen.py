@@ -60,14 +60,14 @@ class AgnesImageGen:
                     "min": 512,
                     "max": 2048,
                     "step": 64,
-                    "tooltip": "图像宽度：旧接口按 WxH 像素；新接口 agnes-image-2.5-flash 自动就近映射到支持的比例（W/H 像素本身不被 2.5 使用）"
+                    "tooltip": "图像宽度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效；新接口 agnes-image-2.5-flash 用 quality 档位 + aspect_ratio 出图"
                 }),
                 "height": ("INT", {
                     "default": 1080,
                     "min": 512,
                     "max": 2048,
                     "step": 64,
-                    "tooltip": "图像高度：旧接口按 WxH 像素；新接口 agnes-image-2.5-flash 自动就近映射到支持的比例"
+                    "tooltip": "图像高度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效；新接口 agnes-image-2.5-flash 用 quality 档位 + aspect_ratio 出图"
                 }),
                 "quality": (["1K", "2K", "3K", "4K"], {
                     "default": "1K",
@@ -76,6 +76,10 @@ class AgnesImageGen:
                 "model": (AVAILABLE_IMAGE_MODELS, {
                     "default": IMAGE_MODEL,
                     "tooltip": "图像生成模型（当前默认 agnes-image-2.5-flash；选旧模型时 width/height 按像素生效）"
+                }),
+                "aspect_ratio": (["1:1", "3:4", "4:3", "16:9", "9:16", "2:3", "3:2", "21:9"], {
+                    "default": "16:9",
+                    "tooltip": "宽高比（与视频节点一致）：新接口 agnes-image-2.5-flash 与 quality 档位组合出图，如 16:9 + 2K = 2624×1472；旧接口 2.1/2.0 按 width/height 像素出图，此项不生效"
                 }),
             },
         }
@@ -103,7 +107,7 @@ class AgnesImageGen:
             extra["url"] = {"description": "图片的 URL 地址"}
         return extra
 
-    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL):
+    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL, aspect_ratio="16:9"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -113,15 +117,15 @@ class AgnesImageGen:
             return (black, err_msg)
         print(f"\n[Agnes Image] 开始生成...")
         print(f"Prompt: {prompt[:80]}...")
-        print(f"Model: {model}, Quality: {quality}, 尺寸: {width}x{height}")
+        print(f"Model: {model}, Quality: {quality}, 尺寸: {width}x{height}, 比例: {aspect_ratio}")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_IMAGE_MODELS:
-                # 新接口：档位（1K/2K/3K/4K）+ 比例，客户端已下载并转 PIL
-                size_arg, ratio_arg = quality.upper(), _nearest_ratio(width, height)
+                # 新接口：档位（1K/2K/3K/4K）+ 显式宽高比 ratio；客户端已下载并转 PIL
+                size_arg, ratio_arg = quality.upper(), (aspect_ratio or _nearest_ratio(width, height))
             else:
-                # 旧接口：WxH 像素
+                # 旧接口：WxH 像素（ratio 不参与）
                 size_arg, ratio_arg = f"{width}x{height}", None
             pil_images = client.generate_image(
                 prompt=prompt,

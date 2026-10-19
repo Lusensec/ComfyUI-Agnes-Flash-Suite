@@ -48,7 +48,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 |---|---|---|---|---|
 | model | ✅ | ✅ | ✅ | ✅ |
 | prompt | ✅ | ✅ | ✅ | ✅ |
-| 尺寸 | size 档位 1K/2K/3K/4K + ratio | width/height(WxH) | aspect_ratio（固定 720P） | width/height(WxH) |
+| 尺寸 | size 档位 1K/2K/3K/4K | width/height(WxH) | 固定 720P | width/height(WxH) |
+| ratio（宽高比） | ✅ 1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9（默认 1:1），与档位组合决定像素，节点已提供 aspect_ratio 下拉 | ❌ 按 WxH 像素表达 | ✅ 16:9/9:16/1:1/4:3/3:4 | ✅ 映射 WxH 像素 |
 | n（张数） | ❌ API 不支持，固定 1 张 | ✅ 1-4 | ❌ 固定 1 | - |
 | seed（种子） | ❌ | ❌ | ✅ 可选（0=随机） | ✅ 可选 |
 | strength（强度） | ❌ 无此参数，节点将其转成提示词指令 | 同左 | - | - |
@@ -57,9 +58,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
 | max_wait | 客户端轮询超时，非 API 参数 | 同左 | 同左 | 同左 |
 
-> 结论：新 2.5 系列模型**不再支持 n/strength/seed（图）/frame_rate（视）等参数**，
-> 节点中保留这些输入框是为了兼容旧模型和习惯；使用新模型时它们不生效（已在各
-> widget 的 tooltip 中注明）。视频 2.5 支持 seed，可直接传入做可复现实验。
+> 结论：新 2.5 系列图像模型**支持 ratio 宽高比**（8 种，配合 1K-4K 档位），
+> 图像/视频节点的 aspect_ratio 下拉均可直接使用；新模型不再支持 n/strength/
+> seed（图）/frame_rate（视）等参数，节点中保留这些输入框是为了兼容旧模型和
+> 习惯；使用新模型时它们不生效（已在各 widget 的 tooltip 中注明）。视频 2.5 支
+> 持 seed，可直接传入做可复现实验。
 
 ---
 
@@ -147,13 +150,14 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | prompt | STRING | "" | 英文图像描述 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| width | INT | 1920 | 图像宽度（旧接口 WxH 像素；新接口 agnes-image-2.5-flash 自动映射到支持的比例） |
-| height | INT | 1080 | 图像高度（同上） |
+| width | INT | 1920 | 图像宽度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效 |
+| height | INT | 1080 | 图像高度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效 |
 | quality | COMBO | 1K | 画质档位：1K/2K/3K/4K（新图像模型 agnes-image-2.5-flash 按档位出图，2K 性价比最高） |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型，可选 2.5-flash / 2.1-flash / 2.0-flash（选旧模型时 width/height 按像素生效） |
+| aspect_ratio | COMBO | 16:9 | 宽高比（与视频节点一致）：新接口与 quality 档位组合出图，如 16:9 + 2K = 2624×1472；支持 1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9；旧接口不生效 |
 
 **输出（含输出描述）：**
 - image: 图像张量（连接视频生成节点或 SaveImage）
@@ -282,5 +286,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.1.0  
+**版本**: 1.2.0  
 **更新日期**: 2026-10-19
