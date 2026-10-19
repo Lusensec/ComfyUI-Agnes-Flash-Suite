@@ -60,9 +60,10 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 关键帧（首尾帧） | - | - | ✅ keyframe 模式 first_frame/last_frame（关键帧生视频节点） | ⚠️ 多图 img2video（无独立尾帧参数） |
 | reasoning_effort（思考等级） | 仅文本模型 | - | - | - |
 
-> 思考等级：文本节点（场景切分/总导演/资产提取/分镜提示词/剧本生成/LLM 对话）
-> 均带 reasoning_effort 下拉（auto/none/low/medium/high/max；auto=不传参数跟随模型
-> 默认）；2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
+> 思考等级：走 LLM 的节点（场景切分/总导演/资产提取/分镜提示词/剧本生成/LLM 对话/
+> 资产提示词生成/三视图提示词生成/图像反推提示词）均带 reasoning_effort 下拉
+> （auto/none/low/medium/high/max；auto=不传参数跟随模型默认）；
+> 2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
 | quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
 | max_wait | 客户端轮询超时，非 API 参数 | 同左 | 同左 | 同左 |
 
@@ -482,5 +483,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.11.4  
+**版本**: 1.11.5  
 **更新日期**: 2026-10-19

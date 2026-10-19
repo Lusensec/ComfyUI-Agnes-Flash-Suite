@@ -7,7 +7,15 @@ that describes the image. Uses Agnes-2.0-Flash vision capability.
 
 from typing import Tuple
 
-from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, tensor_to_pil
+from ..api import (
+    AgnesClient,
+    get_api_key,
+    CHAT_MODEL,
+    AVAILABLE_CHAT_MODELS,
+    REASONING_EFFORTS,
+    normalize_reasoning_effort,
+    tensor_to_pil,
+)
 from ._output_docs import OutputDocsMixin
 
 
@@ -47,10 +55,14 @@ class AgnesNovelImageReverse(OutputDocsMixin):
                     "default": CHAT_MODEL,
                     "tooltip": "Vision-capable model for image analysis",
                 }),
+                "reasoning_effort": (list(REASONING_EFFORTS), {
+                    "default": "auto",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型视觉识别）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
+                }),
             },
         }
 
-    def reverse(self, image=None, model: str = CHAT_MODEL, base_url: str = "", api_key: str = "") -> Tuple[str, str]:
+    def reverse(self, image=None, model: str = CHAT_MODEL, base_url: str = "", api_key: str = "", reasoning_effort: str = "auto") -> Tuple[str, str]:
         # Runtime fallback: try config file if widget value is empty
         if not api_key.strip():
             api_key = get_api_key()
@@ -63,14 +75,15 @@ class AgnesNovelImageReverse(OutputDocsMixin):
             pil_img = tensor_to_pil(image)
 
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            effort = normalize_reasoning_effort(reasoning_effort)
 
             # Generate detailed prompt
-            detailed = client.reverse_prompt(pil_img, model=model, detail="detailed")
+            detailed = client.reverse_prompt(pil_img, model=model, detail="detailed", reasoning_effort=effort)
 
             # Generate brief prompt
-            brief = client.reverse_prompt(pil_img, model=model, detail="brief")
+            brief = client.reverse_prompt(pil_img, model=model, detail="brief", reasoning_effort=effort)
 
-            return (detailed, brief)
+            return (detailed.strip(), brief.strip())
         except Exception as e:
             err = f"[Error] {str(e)}"
             return (err, err)

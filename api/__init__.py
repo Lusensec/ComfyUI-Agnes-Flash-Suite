@@ -793,6 +793,7 @@ class AgnesClient:
         image: Image.Image,
         model: str = CHAT_MODEL,
         detail: str = "detailed",
+        reasoning_effort: Optional[str] = None,
     ) -> str:
         """
         Analyze an image and generate a prompt that could reproduce it.
@@ -801,6 +802,7 @@ class AgnesClient:
             image: Input PIL Image.
             model: Vision-capable model identifier.
             detail: "brief" or "detailed" analysis level.
+            reasoning_effort: Optional thinking level ("none"-"max"; auto/None=模型默认).
 
         Returns:
             Generated prompt / description.
@@ -836,7 +838,13 @@ class AgnesClient:
             },
         ]
 
-        return self.chat(messages, model=model, temperature=0.3, max_tokens=2048)
+        return self.chat(
+            messages,
+            model=model,
+            temperature=0.3,
+            max_tokens=2048,
+            reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+        )
 
 
 # ---------------------------------------------------------------------------
