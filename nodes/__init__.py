@@ -10,9 +10,6 @@ from .scene_splitter import AgnesSceneSplitter
 from .prompt_generator import AgnesScenePromptGenerator
 from .video_gen import AgnesVideoGen
 
-# 定妆图生成器（Jimeng API）
-from .jimeng_asset_maker import JimengAssetMaker
-
 # 通用节点（Agnes Novel 版本，节点名带 Novel 前缀）
 from .api_key_config import AgnesNovelAPIKeyConfig
 from .llm_chat import AgnesNovelLLMChat
@@ -35,15 +32,13 @@ from . import api_key_config, llm_chat, image_reverse
 from . import img2img, text2img, img2video, text2video
 from . import video_reference
 from . import character_turnaround
-from . import jimeng_asset_maker
 
 for _mod in [script_generator, director_master, image_gen, asset_extractor,
              scene_splitter, prompt_generator, video_gen,
              api_key_config, llm_chat, image_reverse,
              img2img, text2img, img2video, text2video,
              video_reference,
-             character_turnaround,
-             jimeng_asset_maker]:
+             character_turnaround]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)
     if hasattr(_mod, 'NODE_DISPLAY_NAME_MAPPINGS'):

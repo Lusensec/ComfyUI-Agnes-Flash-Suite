@@ -1478,7 +1478,7 @@
         "Node name for S&R": "Note"
       },
       "widgets_values": [
-        "工作流B说明：\n1. 上方为定妆图加载区（已扫描 output/agnes_assets/ 目录）\n2. 每个场景使用第一个资产作为主图进行图生图\n3. JimengImageToImage 输出 → AgnesNovelImageToVideo → SaveVideo\n4. 需要配置：Jimeng API Key（工作流A生成定妆图时已用过的sessionid）、Agnes API Key\n5. 运行 Queue，等待各场景视频生成完成"
+        "工作流B说明：\n1. 上方为定妆图/设定图加载区（用 LoadImage 从 ComfyUI input 目录加载图片）\n2. 每个场景使用加载的图作为主图进行图生图\n3. JimengImageToImage 输出 → AgnesNovelImageToVideo → SaveVideo\n4. 需要配置：Jimeng API Key（comfyui-jimeng 插件）、Agnes API Key\n5. 运行 Queue，等待各场景视频生成完成"
       ]
     }
   ],
