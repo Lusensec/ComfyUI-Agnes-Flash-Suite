@@ -24,7 +24,7 @@ from .text2img import AgnesNovelTextToImage
 from .img2video import AgnesNovelImageToVideo
 from .text2video import AgnesNovelTextToVideo
 from .video_reference import AgnesVideoReference
-from .character_turnaround import AgnesNovelCharacterTurnaround
+from .character_turnaround import AgnesSubjectTurnaround
 
 # 合并所有节点映射
 NODE_CLASS_MAPPINGS = {}

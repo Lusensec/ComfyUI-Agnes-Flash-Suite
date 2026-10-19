@@ -266,25 +266,31 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### 📐 Agnes 角色三视图设定图 (AgnesNovelCharacterTurnaround)
+### 📐 Agnes 三视图生成 (AgnesSubjectTurnaround)
 
-**功能：** 生成角色三视图设定表（turnaround sheet）：同一角色正面/侧面/背面从左到右并排，全身正交视图、比例与服装发型细节一致
+**功能：** 生成任意主体的三视图设定表（turnaround sheet）：同一主体三个视图
+从左到右并排（角色=正/侧/背全身 A-pose；物品=产品设定；场景=正立面/侧立面/
+俯视图；载具=整车设定；通用=任意主体），正交视图、比例与细节一致
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| character_desc | STRING | "" | 角色名 + 外貌/服装描述（越具体越一致） |
+| subject_type | COMBO | 角色 | 主体类型：角色/物品道具/场景/载具/通用，决定三视图提示词模板 |
+| subject_desc | STRING | "" | 主体名 + 外观/材质/结构描述（越具体越一致） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | 留空自动加载 | Agnes AI API Key |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
 | quality | COMBO | 2K | 档位：1K/2K/3K/4K |
 | aspect_ratio | COMBO | 21:9 | 三视图推荐宽幅 21:9 / 16:9 |
-| reference_image | IMAGE | - | 可选：角色定妆图，连接后走图生图保持一致 |
+| reference_image | IMAGE | - | 可选：定妆图/已有设定图，连接后走图生图保持一致 |
 | extra_prompt | STRING | "" | 可选：追加风格/质量补充词 |
 
 **输出：**
 - image: 三视图张量（可存图或作为后续视频节点参考）
 - resolution: 实际分辨率
 - final_prompt: 最终拼接的完整提示词
+
+> 原「Agnes 角色三视图设定图」节点（AgnesNovelCharacterTurnaround）已升级为本
+> 通用节点；角色三视图选 subject_type=角色（默认）即可，原用法不变。
 
 ---
 
@@ -346,5 +352,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.5.0  
+**版本**: 1.6.0  
 **更新日期**: 2026-10-19
