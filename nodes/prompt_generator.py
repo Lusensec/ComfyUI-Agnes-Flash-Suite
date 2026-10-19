@@ -4,7 +4,7 @@ Agnes 分镜提示词生成节点
 """
 import requests
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS
 
 
 class AgnesScenePromptGenerator:
@@ -22,6 +22,11 @@ class AgnesScenePromptGenerator:
                     "placeholder": "输入分镜脚本...",
                     "tooltip": "从场景切分或总导演节点输出的分镜文本"
                 }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
+                }),
                 "api_key": ("STRING", {
                     "default": "",
                     "placeholder": "sk-xxxxxxxx",
@@ -31,17 +36,12 @@ class AgnesScenePromptGenerator:
                     "default": "cinematic",
                     "tooltip": "图像风格：cinematic=电影感，anime=动漫，realistic=写实，watercolor=水彩，oil_painting=油画"
                 }),
+                "model": (AVAILABLE_CHAT_MODELS, {
+                    "default": CHAT_MODEL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
+                }),
             },
             "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
-                }),
-                "model": ("STRING", {
-                    "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型"
-                }),
                 "characters_json": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -77,7 +77,7 @@ class AgnesScenePromptGenerator:
             }
         return extra
 
-    def generate_prompt(self, scene_text, api_key, style, base_url="", model=CHAT_MODEL, characters_json="", locations_json=""):
+    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json=""):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

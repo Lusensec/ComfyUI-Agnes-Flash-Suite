@@ -112,8 +112,8 @@
       },
       "widgets_values": [
         "",
-        "sk-你的Key",
         "https://api.agnes-ai.cn/v1",
+        "sk-你的Key",
         "agnes-2.5-flash"
       ]
     },
@@ -190,8 +190,8 @@
       },
       "widgets_values": [
         "",
-        "sk-你的Key",
         "https://api.agnes-ai.cn/v1",
+        "sk-你的Key",
         "agnes-2.5-flash"
       ]
     },
@@ -270,8 +270,8 @@
       },
       "widgets_values": [
         "",
-        "sk-你的Key",
         "https://api.agnes-ai.cn/v1",
+        "sk-你的Key",
         "agnes-2.5-flash"
       ]
     },
@@ -349,9 +349,9 @@
       },
       "widgets_values": [
         "",
+        "",
         "sk-你的Key",
         "cinematic",
-        "",
         "",
         "https://api.agnes-ai.cn/v1",
         "agnes-2.5-flash"
@@ -678,11 +678,11 @@
       },
       "widgets_values": [
         "",
+        "https://api.agnes-ai.cn/v1",
         "sk-你的Key",
         "casual",
         180,
         0.8,
-        "https://api.agnes-ai.cn/v1",
         "agnes-2.5-flash"
       ]
     }

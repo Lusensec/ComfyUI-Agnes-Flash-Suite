@@ -105,8 +105,8 @@
       },
       "widgets_values": [
         "",
-        "",
         "https://api.agnes-ai.cn/v1",
+        "",
         "agnes-2.5-flash"
       ]
     },
@@ -178,8 +178,8 @@
       },
       "widgets_values": [
         "",
-        "",
         "https://api.agnes-ai.cn/v1",
+        "",
         "agnes-2.5-flash"
       ]
     },
@@ -252,8 +252,8 @@
       "widgets_values": [
         "characters_主角",
         "Character concept sheet, full body, three views, anime style, white background, detailed facial features, cultivation novel style",
-        "",
         "http://127.0.0.1:8001",
+        "",
         "jimeng-image-5.0-lite",
         "1:1",
         "2k"
@@ -328,8 +328,8 @@
       "widgets_values": [
         "locations_主要场景",
         "Wide shot of ancient Chinese martial arts arena, stone platform, banners, dramatic lighting, cinematic composition, cultivation novel style",
-        "",
         "http://127.0.0.1:8001",
+        "",
         "jimeng-image-5.0-lite",
         "16:9",
         "2k"
@@ -404,8 +404,8 @@
       "widgets_values": [
         "props_关键道具",
         "Close-up of mystical artifact, glowing, detailed, fantasy style, macro photography",
-        "",
         "http://127.0.0.1:8001",
+        "",
         "jimeng-image-5.0-lite",
         "1:1",
         "2k"

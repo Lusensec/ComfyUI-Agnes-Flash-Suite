@@ -4,7 +4,7 @@ Agnes 剧本生成节点
 """
 import requests
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS
 
 
 class AgnesScriptGenerator:
@@ -21,6 +21,11 @@ class AgnesScriptGenerator:
                     "default": "",
                     "placeholder": "输入故事大纲或章节摘要...",
                     "tooltip": "故事大纲，用于生成解说文案"
+                }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
                 }),
                 "api_key": ("STRING", {
                     "default": "",
@@ -44,18 +49,12 @@ class AgnesScriptGenerator:
                     "step": 0.05,
                     "tooltip": "生成温度，越高越有创意，越低越稳定"
                 }),
-            },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
-                }),
-                "model": ("STRING", {
+                "model": (AVAILABLE_CHAT_MODELS, {
                     "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型"
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
                 }),
-            }
+            },
+            "optional": {}
         }
 
     RETURN_TYPES = ("STRING",)
@@ -78,7 +77,7 @@ class AgnesScriptGenerator:
             }
         return extra
 
-    def generate(self, story_outline, api_key, style, target_duration, temperature, base_url="", model=CHAT_MODEL):
+    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

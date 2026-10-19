@@ -138,14 +138,14 @@ class JimengAssetMaker(OutputDocsMixin):
                     "placeholder": "Character concept sheet, full body, three views...",
                     "tooltip": "定妆图英文提示词"
                 }),
+                "base_url": ("STRING", {
+                    "default": DEFAULT_BASE_URL,
+                    "tooltip": "jimeng-free-api服务地址（默认127.0.0.1:8001）"
+                }),
                 "api_key": ("STRING", {
                     "default": "",
                     "placeholder": "即梦sessionid",
                     "tooltip": "jimeng-free-api的Authorization Bearer值"
-                }),
-                "base_url": ("STRING", {
-                    "default": DEFAULT_BASE_URL,
-                    "tooltip": "jimeng-free-api服务地址（默认127.0.0.1:8001）"
                 }),
                 "model": (IMAGE_MODELS, {
                     "default": DEFAULT_IMAGE_MODEL,
@@ -168,7 +168,7 @@ class JimengAssetMaker(OutputDocsMixin):
     FUNCTION = "make"
     CATEGORY = "Agnes Novel"
 
-    def make(self, prefix, prompt, api_key, base_url, model, ratio, resolution):
+    def make(self, prefix, prompt, base_url, api_key, model, ratio, resolution):
         prefix = (prefix or "").strip()
         prompt = (prompt or "").strip()
         base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")

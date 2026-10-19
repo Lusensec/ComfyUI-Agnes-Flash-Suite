@@ -75,9 +75,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | chapter_text | STRING | "" | 小说章节文本，建议 3000-8000 字 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
-| model | STRING | agnes-2.5-flash | 文本生成模型 |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 
 **输出：**
 - log_text: 处理日志
@@ -94,9 +94,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | chapter_text | STRING | "" | 小说章节文本 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
-| model | STRING | agnes-2.5-flash | 文本生成模型 |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 
 **输出：**
 - log_text: 处理日志
@@ -112,9 +112,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | chapter_text | STRING | "" | 小说章节文本 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
-| model | STRING | agnes-2.5-flash | 文本生成模型 |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 
 **输出：**
 - characters_json: 角色信息 JSON
@@ -132,12 +132,12 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | scene_text | STRING | "" | 分镜文本（从场景切分或总导演获取） |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | style | COMBO | cinematic | 图像风格：cinematic/anime/realistic/watercolor/oil_painting |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | characters_json | STRING | "" | 角色信息 JSON（可选） |
 | locations_json | STRING | "" | 场景信息 JSON（可选） |
-| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
-| model | STRING | agnes-2.5-flash | 文本生成模型 |
 
 **输出：**
 - detailed_prompt: 英文提示词
@@ -195,12 +195,12 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | story_outline | STRING | "" | 故事大纲 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | style | COMBO | casual | 解说风格：casual/professional/humorous/dramatic |
 | target_duration | INT | 180 | 目标时长（秒） |
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
-| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
-| model | STRING | agnes-2.5-flash | 文本生成模型 |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 
 **输出：**
 - script: 解说文案
@@ -214,6 +214,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | character_desc | STRING | "" | 角色名 + 外貌/服装描述（越具体越一致） |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | 留空自动加载 | Agnes AI API Key |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
 | quality | COMBO | 2K | 档位：1K/2K/3K/4K |
@@ -286,5 +287,5 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 
 ---
 
-**版本**: 1.2.0  
+**版本**: 1.3.0  
 **更新日期**: 2026-10-19

@@ -6,7 +6,7 @@ import requests
 import re
 import os
 import time
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS
 
 
 class AgnesDirectorMaster:
@@ -27,21 +27,19 @@ class AgnesDirectorMaster:
                     "placeholder": "输入小说章节全文...\n建议 3000-8000 字",
                     "tooltip": "待处理的小说章节文本，将生成完整分镜脚本"
                 }),
+                "base_url": ("STRING", {
+                    "default": "",
+                    "placeholder": "https://api.agnes-ai.cn/v1",
+                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整"
+                }),
                 "api_key": ("STRING", {
                     "default": "",
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key，从 https://platform.agnes-ai.com 获取"
                 }),
-            },
-            "optional": {
-                "base_url": ("STRING", {
-                    "default": "",
-                    "placeholder": "https://api.agnes-ai.cn/v1",
-                    "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml）"
-                }),
-                "model": ("STRING", {
+                "model": (AVAILABLE_CHAT_MODELS, {
                     "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型，推荐使用 agnes-2.5-flash"
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
                 }),
             }
         }
@@ -109,7 +107,7 @@ class AgnesDirectorMaster:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def split_scenes(self, chapter_text, api_key, base_url="", model=CHAT_MODEL):
+    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
