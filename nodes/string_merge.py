@@ -1,8 +1,9 @@
 """
 Agnes 字符串合并节点
 =============
-上下合并两个多行字符串：非空输入按顺序拼接（空字符串自动跳过，不产生多余空行），
-适合把多段小说章节文本、多个节点输出文本合并成一个完整字符串。
+上/中/下合并三个多行字符串：非空段落按 上→中→下 顺序拼接（空段落自动跳过，不产生多余空行），
+适合把多段小说章节文本、多个节点输出文本合并成一个完整字符串；
+「中段」槽专为**人工衔接语**设计：两段提示词之间手输一句过渡/连接描述（或连其他文本节点输出）。
 """
 
 from typing import Tuple
@@ -18,7 +19,7 @@ class AgnesStringMerge(OutputDocsMixin):
     RETURN_NAMES = ("result",)
     RETURN_LABELS = ("合并结果",)
     OUTPUT_DOCS = {
-        "result": "上下合并后的字符串：非空输入按顺序拼接（空输入自动跳过，不产生多余空行/尾随分隔符）",
+        "result": "上/中/下合并后的字符串：非空段落按 上→中→下 顺序拼接（空段落自动跳过，不产生多余空行/尾随分隔符）",
     }
     FUNCTION = "concat"
 
@@ -30,13 +31,13 @@ class AgnesStringMerge(OutputDocsMixin):
                     "multiline": True,
                     "default": "",
                     "placeholder": "第一段字符串（上）...",
-                    "tooltip": "第一段字符串（上方），支持多行文本；可连任意 STRING 输出",
+                    "tooltip": "第一段字符串（上），支持多行文本；可连任意 STRING 输出",
                 }),
                 "string_2": ("STRING", {
                     "multiline": True,
                     "default": "",
                     "placeholder": "第二段字符串（下）...",
-                    "tooltip": "第二段字符串（下方），支持多行文本；可连任意 STRING 输出",
+                    "tooltip": "第二段字符串（下），支持多行文本；可连任意 STRING 输出",
                 }),
             },
             "optional": {
@@ -44,16 +45,24 @@ class AgnesStringMerge(OutputDocsMixin):
                     "multiline": False,
                     "default": "\n",
                     "placeholder": "分隔符",
-                    "tooltip": "两段之间的分隔符（默认一个换行；留空=直接首尾相接）。空输入被跳过时不产生尾随分隔符",
+                    "tooltip": "段落之间的分隔符（默认一个换行；留空=直接首尾相接）。空段落被跳过时不产生尾随分隔符",
+                }),
+                # 合并顺序固定为 上→中→下（与控件位置无关）；optional 组追加在
+                # separator 之后 = 旧工作流 widgets_values 位置映射不变（3 值节点无错位）
+                "string_3": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "中段：人工衔接语，如「随后镜头缓缓推进至…」，或连 LLM 对话/文本节点输出",
+                    "tooltip": "中段（上、下之间的人工衔接语）：手输一句过渡/连接描述，或连任意 STRING 输出；留空=上、下直接合并（等同旧版两槽行为）",
                 }),
             },
         }
 
-    def concat(self, string_1="", string_2="", separator="\n") -> Tuple[str]:
-        parts = [s for s in ((string_1 or ""), (string_2 or "")) if s.strip()]
+    def concat(self, string_1="", string_2="", separator="\n", string_3="") -> Tuple[str]:
+        parts = [s for s in ((string_1 or ""), (string_3 or ""), (string_2 or "")) if s.strip()]
         sep = "\n" if separator is None else separator
         result = sep.join(parts)
-        print(f"[Agnes 字符串合并] 合并 {len(parts)}/2 段，共 {len(result)} 字符")
+        print(f"[Agnes 字符串合并] 合并 {len(parts)}/3 段，共 {len(result)} 字符")
         return (result,)
 
 
