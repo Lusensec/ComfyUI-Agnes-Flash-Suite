@@ -8,7 +8,7 @@ Agnes LLM 对话节点
 from typing import Any, Dict, Tuple
 import traceback
 
-from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
+from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
 from ._output_docs import OutputDocsMixin
 
 
@@ -59,7 +59,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "tooltip": "采样温度（越高越发散/有创意）",
                 }),
                 "max_tokens": ("INT", {
-                    "default": 4096,
+                    "default": 1024,
                     "min": 1,
                     "max": 32768,
                     "step": 1,
@@ -93,11 +93,12 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         api_key: str = "",
         model: str = CHAT_MODEL,
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 1024,
         system_prompt: str = "",
         enable_thinking: bool = False,
         reasoning_effort: str = "auto",
     ) -> Tuple[str, str]:
+        max_tokens = sanitize_max_tokens(max_tokens, 1024)
         if not prompt.strip():
             return ("[错误] 提示词为空：请输入消息", "提示词为空，已跳过。")
 

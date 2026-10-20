@@ -157,6 +157,20 @@ def format_chat_meta(meta, max_tokens):
     return line
 
 
+def sanitize_max_tokens(value, default):
+    """INT 控件值修复：旧工作流 widgets_values 位置错位 / 前端 NaN 显示时，
+    该槽位可能载到字符串（"auto"、"\\n" 等）甚至 undefined（JSON null → None），
+    数值化后可能是 float NaN。统一回落到 default，避免 int(None) 崩溃或 NaN 进 API 请求。"""
+    if value is None:
+        return default
+    try:
+        if value != value:  # NaN（float('nan')）
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 MIME_MAP = {
     "png": "image/png",
     "jpg": "image/jpeg",

@@ -8,7 +8,7 @@ import re
 import os
 import time
 import traceback
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
 
 
 class AgnesDirectorMaster:
@@ -48,10 +48,10 @@ class AgnesDirectorMaster:
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
                 "max_tokens": ("INT", {
-                    "default": 12000,
-                    "min": 2000,
+                    "default": 1024,
+                    "min": 512,
                     "max": 16000,
-                    "step": 1000,
+                    "step": 128,
                     "tooltip": "输出 token 预算：50 个分镜块需要大预算；思考模型（reasoning_effort≥medium）下建议拉满 16000 防空正文/截断"
                 }),
             }
@@ -120,7 +120,8 @@ class AgnesDirectorMaster:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=12000):
+    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=1024):
+        max_tokens = sanitize_max_tokens(max_tokens, 1024)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

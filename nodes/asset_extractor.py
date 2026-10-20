@@ -6,7 +6,7 @@ import requests
 import json
 import re
 import traceback
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
 
 
 class AgnesAssetExtractor:
@@ -43,10 +43,10 @@ class AgnesAssetExtractor:
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
                 "max_tokens": ("INT", {
-                    "default": 3000,
-                    "min": 500,
+                    "default": 1024,
+                    "min": 512,
                     "max": 8192,
-                    "step": 250,
+                    "step": 128,
                     "tooltip": "输出 token 预算：5 路资产 JSON 约需 1000-2000；思考模型（reasoning_effort≥medium）下建议调大（4000+）防空正文"
                 }),
             },
@@ -94,7 +94,8 @@ class AgnesAssetExtractor:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=3000):
+    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=1024):
+        max_tokens = sanitize_max_tokens(max_tokens, 1024)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

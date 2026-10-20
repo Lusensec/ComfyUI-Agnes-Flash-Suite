@@ -25,6 +25,7 @@ from ..api import (
     REASONING_EFFORTS,
     normalize_reasoning_effort,
     format_chat_meta,
+    sanitize_max_tokens,
 )
 from ._output_docs import OutputDocsMixin
 
@@ -107,7 +108,7 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
                 }),
                 "max_tokens": ("INT", {
-                    "default": 1000,
+                    "default": 1024,
                     "min": 256,
                     "max": 8192,
                     "step": 128,
@@ -143,7 +144,8 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
 
     def generate(self, subject_prompt="", subject_type="角色",
                  base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto",
-                 max_tokens=1000) -> Tuple[str, str]:
+                 max_tokens=1024) -> Tuple[str, str]:
+        max_tokens = sanitize_max_tokens(max_tokens, 1024)
         subject_prompt = (subject_prompt or "").strip()
         if not subject_prompt:
             err = "[Error: subject_prompt 为空。请连接 Agnes 资产提示词生成的输出，或手动粘贴主体描述。]"

@@ -132,7 +132,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
-| max_tokens | INT | 12000 | 输出 token 预算（切分长章节需要大预算）；思考模型 ≥medium 建议拉满 16000 |
+| max_tokens | INT | 1024 | 输出 token 预算（512–16000，步长 128）；切分长章节需大预算，思考模型 ≥medium 建议拉满 16000 |
 
 **输出：**
 - log_text: 处理日志（成功=段落数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
@@ -153,7 +153,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
-| max_tokens | INT | 12000 | 输出 token 预算（50 个分镜块需要大预算）；思考模型 ≥medium 建议拉满 16000 |
+| max_tokens | INT | 1024 | 输出 token 预算（512–16000，步长 128）；50 个分镜块需大预算，思考模型 ≥medium 建议拉满 16000 |
 
 **输出：**
 - log_text: 处理日志（成功=分镜数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
@@ -178,7 +178,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
-| max_tokens | INT | 3000 | 输出 token 预算：5 路资产 JSON 约需 1000–2000；思考模型 ≥medium 建议 4000+ 防空正文 |
+| max_tokens | INT | 1024 | 输出 token 预算（512–8192，步长 128）：5 路资产 JSON 约需 1000–2000；思考模型 ≥medium 建议 4000+ 防空正文 |
 
 **输出：**
 - characters_json: 角色信息 JSON
@@ -208,7 +208,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | style | COMBO | cinematic | 图像风格：cinematic/anime/realistic/watercolor/oil_painting |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
-| max_tokens | INT | 2000 | 输出 token 预算：一条分镜提示词约需 300–500；思考模型 ≥medium 建议 4000+ 防空正文 |
+| max_tokens | INT | 1024 | 输出 token 预算（256–8192，步长 128）：一条分镜提示词约需 300–500；思考模型 ≥medium 建议 4000+ 防空正文 |
 | characters_json | STRING | "" | 角色信息 JSON（可选） |
 | locations_json | STRING | "" | 场景信息 JSON（可选） |
 
@@ -340,7 +340,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | target_duration | INT | 180 | 目标时长（秒） |
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
-| max_tokens | INT | 0 | 输出 token 预算：0=自动（目标字数×2，原行为）；思考模型 ≥medium 建议填 目标字数×4 防空正文 |
+| max_tokens | INT | 1024 | 输出 token 预算（0–16000，步长 128）：0=自动（目标字数×2）；思考模型 ≥medium 建议填 目标字数×4 防空正文 |
 
 **输出：**
 - script: 解说文案
@@ -429,7 +429,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
-| max_tokens | INT | 1000 | 输出 token 预算：三视图提示词约需 150–300；思考模型 ≥medium 建议 4000+ 防空正文 |
+| max_tokens | INT | 1024 | 输出 token 预算（256–8192，步长 128）：三视图提示词约需 150–300；思考模型 ≥medium 建议 4000+ 防空正文 |
 
 **输出：**
 - 三视图提示词: 完整三视图英文提示词（主体全部细节保留 + 三视图构图 + 纯白底平光 + 质量尾词），可连 三视图生成 或复制后手工修改
@@ -520,7 +520,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 对话模型（2.5-flash 默认 / 3.0-flash Agent） |
 | temperature | FLOAT | 0.7 | 采样温度 |
-| max_tokens | INT | 4096 | 输出 token 预算上限（思考模型下思考链与正文共享该预算，思考档拉高时按需调大） |
+| max_tokens | INT | 1024 | 输出 token 预算上限（1–32768；思考模型下思考链与正文共享该预算，思考档拉高时按需调大） |
 | system_prompt（可选） | STRING(多行) | "" | 系统提示词（角色/行为设定） |
 | enable_thinking（可选） | BOOLEAN | 关 | Thinking 模式开关（消耗更多 token） |
 | reasoning_effort（可选） | COMBO | auto | 思考强度：auto/none/low/medium/high/max |
@@ -528,6 +528,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 **输出：**
 - AI回复: 完整回复文本
 - 响应日志: 成功=字数+响应元数据（finish_reason/token 消耗）；空响应=⚠️警示；失败=异常+堆栈
+
+> 控件显示 "NaN" 排查（适用于所有带 max_tokens 的节点）：
+> 旧版工作流里该节点保存的 widgets_values 位置错位，max_tokens 槽载到了相邻槽的值
+> （如 reasoning_effort 的 "auto"），数字控件显示成 NaN。处理：点一下该控件重新输入 1024
+> 再保存工作流即可；后端已做 None/NaN 回落（自动回到 1024），即使带 NaN 直接执行也不会报错。
 
 ---
 
@@ -547,7 +552,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
-| max_tokens | INT | 2000 | 输出 token 预算上限：正文仅需 150–300；思考模型下思考链与正文共享预算，reasoning_effort≥medium 建议 4000+ 防空正文；勿超模型硬上限 |
+| max_tokens | INT | 1024 | 输出 token 预算上限（256–8192，步长 128）：正文仅需 150–300；思考模型下思考链与正文共享预算，reasoning_effort≥medium 建议 4000+ 防空正文；勿超模型硬上限 |
 
 **输出：**
 - 英文资产生成提示词: 保留 JSON 全部描述字段（专名拼音化）+ 构图指令 + 风格/质量尾词，直接喂生图

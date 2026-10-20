@@ -5,7 +5,7 @@ Agnes 分镜提示词生成节点
 import requests
 import re
 import traceback
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
 
 
 class AgnesScenePromptGenerator:
@@ -60,7 +60,7 @@ class AgnesScenePromptGenerator:
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
                 "max_tokens": ("INT", {
-                    "default": 2000,
+                    "default": 1024,
                     "min": 256,
                     "max": 8192,
                     "step": 128,
@@ -94,7 +94,8 @@ class AgnesScenePromptGenerator:
             }
         return extra
 
-    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", reasoning_effort="auto", max_tokens=2000):
+    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", reasoning_effort="auto", max_tokens=1024):
+        max_tokens = sanitize_max_tokens(max_tokens, 1024)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
