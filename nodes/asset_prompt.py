@@ -104,6 +104,13 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
                 }),
+                "max_tokens": ("INT", {
+                    "default": 2000,
+                    "min": 256,
+                    "max": 8192,
+                    "step": 128,
+                    "tooltip": "输出 token 预算上限：资产提示词正文约需 150-300；思考模型下思考链与正文共享该预算，reasoning_effort≥medium 时建议调大（4000+）防空正文；勿超模型硬上限",
+                }),
             },
             "optional": {},
         }
@@ -135,7 +142,8 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
         return t.strip().strip('"')
 
     def generate(self, asset_json="", subject_type="角色", style="cinematic",
-                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto") -> Tuple[str, str]:
+                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto",
+                 max_tokens=2000) -> Tuple[str, str]:
         asset_json = (asset_json or "").strip()
         if not asset_json:
             err = "[错误] asset_json 为空：请连接 Agnes 文本拆分的输出槽，或手动粘贴单条资产 JSON"
@@ -155,11 +163,11 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                 messages=[{"role": "user", "content": self._build_user_prompt(asset_json, subject_type, style)}],
                 model=model,
                 temperature=0.4,
-                max_tokens=800,
+                max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
             )
             prompt = self._clean_prompt(raw)
-            log = f"✅ 资产提示词已生成（{subject_type}/{style}）：{prompt[:60].strip()}..."
+            log = f"✅ 资产提示词已生成（{subject_type}/{style}，预算 {max_tokens} tokens）：{prompt[:60].strip()}..."
             print(log)
             return (prompt, log)
         except Exception as e:

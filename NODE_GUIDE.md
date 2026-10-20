@@ -498,10 +498,14 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
+| max_tokens | INT | 2000 | 输出 token 预算上限：正文仅需 150–300；思考模型下思考链与正文共享预算，reasoning_effort≥medium 建议 4000+ 防空正文；勿超模型硬上限 |
 
 **输出：**
 - 英文资产生成提示词: 保留 JSON 全部描述字段（专名拼音化）+ 构图指令 + 风格/质量尾词，直接喂生图
-- 处理日志: 成功=提示词摘要预览；失败=错误原因
+- 处理日志: 成功=提示词摘要预览（含所用预算）；失败=错误原因
+
+> 空正文排查：日志显示"已生成"但输出仍为空（API 200 但正文 0 字，多为思考模型预算耗尽）：
+> ① reasoning_effort → none/low ② max_tokens 调大（4000+）③ 原样重跑一次（排除服务器偶发）。
 
 > **资产线完整接法（角色/道具/场景/服装 → 设定图）：**
 > ① `Agnes 资产提取.角色JSON` → `Agnes 文本拆分`（JSON 数组模式）
