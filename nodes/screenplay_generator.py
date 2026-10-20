@@ -7,7 +7,8 @@ Agnes 剧本生成节点（漫剧短视频）
 也可人工修改后作为漫剧/短剧的分镜脚本。
 
 剧本类型按三维分类（三个独立参数，自由组合）：
-  - tag（题材标签，讲什么）：逆袭爽文/甜宠CP/悬疑解谜/搞笑沙雕/热血动作/治愈日常/虐心催泪
+  - tag（题材标签，讲什么）：逆袭爽文/甜宠CP/悬疑解谜/搞笑沙雕/热血动作/治愈日常/虐心催泪，
+    另对齐「Agnes 风格选择」导演风格的 青春成长/家庭温馨/历史史诗/恐怖异灵/喜剧搞笑/科幻未来/都市末世/都市异能
   - emotion（情绪基调，观众什么感受）：爽/暖/爆笑/热血/紧张/泪
   - rhythm（节奏，多快）：快节奏/中速/慢热（同时决定每场秒数与钩子密度）
 
@@ -33,6 +34,15 @@ class AgnesScreenplayGenerator:
         "热血动作": "热血动作：打斗/闯关、成长线、高燃爆发",
         "治愈日常": "治愈日常：市井烟火、小确幸、萌宠/陪伴线、温情细节",
         "虐心催泪": "虐心催泪：亲情/命运拉扯、虐点精准、共情爆发",
+        # 与「Agnes 风格选择」导演风格对齐（外部连线进来的题材名由此表提供导向文案）
+        "青春成长": "青春成长：少年心境、成长蜕变与自我寻找，希望感收尾",
+        "家庭温馨": "家庭温馨：亲情日常、暖系细节与陪伴感，治愈收束",
+        "历史史诗": "历史史诗：宏大场面、命运抉择与厚重叙事",
+        "恐怖异灵": "恐怖异灵：灵异悬疑、氛围压迫与伏笔突现",
+        "喜剧搞笑": "喜剧搞笑：笑点密集、角色梗多、包袱节奏快",
+        "科幻未来": "科幻未来：未来世界观、科技美学与人类命题",
+        "都市末世": "都市末世：末世求生、资源稀缺与人性考验",
+        "都市异能": "都市异能：现代都市+超能力体系、能力成长与爽点名场面",
     }
 
     EMOTION_MAP = {
@@ -76,7 +86,7 @@ class AgnesScreenplayGenerator:
                 }),
                 "tag": (list(cls.TAG_MAP.keys()), {
                     "default": "逆袭爽文",
-                    "tooltip": "题材标签（讲什么）：逆袭爽文/甜宠CP/悬疑解谜/搞笑沙雕/热血动作/治愈日常/虐心催泪"
+                    "tooltip": "题材标签（讲什么），可选下拉值；也可连线输入外部题材名（如「Agnes 风格选择」的 导演风格 输出），连线后覆盖下拉值；未知题材名自动按通用描述兜底，不会报错"
                 }),
                 "emotion": (list(cls.EMOTION_MAP.keys()), {
                     "default": "爽",
@@ -111,6 +121,11 @@ class AgnesScreenplayGenerator:
                     "placeholder": "每行一个角色：名字 + 一句人设，如「团团：胖橘猫，傲娇贪吃」「张大婶：热心洗衣大婶」",
                     "tooltip": "可选：角色列表（每行一个，名字+一句人设），让剧本对白/动作保持角色一致"
                 }),
+                "tag": ("STRING", {
+                    "default": "",
+                    "placeholder": "外部题材名（留空=用上方下拉值）",
+                    "tooltip": "可选连线口：接外部题材名（如「Agnes 风格选择」的 导演风格 输出「科幻未来」「都市异能」…）；不连线时使用节点上 tag 下拉框的值。未知名会按通用描述兜底"
+                }),
             },
         }
 
@@ -140,9 +155,13 @@ class AgnesScreenplayGenerator:
         if not api_key.strip():
             return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
 
-        tag_desc = self.TAG_MAP[tag]
-        emotion_desc = self.EMOTION_MAP[emotion]
-        rhythm_req, sec_lo, sec_hi, sec_avg = self.RHYTHM_MAP[rhythm]
+        # 三轴兜底：外部连线进来的未知题材名/空值不崩（KeyError 防护 + 通用描述）
+        tag = (tag or "").strip() or "逆袭爽文"
+        emotion = (emotion or "").strip() or "爽"
+        rhythm = (rhythm or "").strip() or "中速"
+        tag_desc = self.TAG_MAP.get(tag, f"{tag}：以「{tag}」为题材方向创作")
+        emotion_desc = self.EMOTION_MAP.get(emotion, f"{emotion}（以该情绪基调创作）")
+        rhythm_req, sec_lo, sec_hi, sec_avg = self.RHYTHM_MAP.get(rhythm, self.RHYTHM_MAP["中速"])
         target_scenes = max(3, round(target_duration / sec_avg))
         characters_block = f"\n角色设定（剧本中的对白/动作请保持这些角色一致）：\n{characters}\n" if characters.strip() else ""
 
