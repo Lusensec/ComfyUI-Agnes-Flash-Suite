@@ -8,7 +8,7 @@ import re
 import os
 import time
 import traceback
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 
 
 class AgnesDirectorMaster:
@@ -46,13 +46,6 @@ class AgnesDirectorMaster:
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
-                }),
-                "max_tokens": ("INT", {
-                    "default": 1024,
-                    "min": 512,
-                    "max": 16000,
-                    "step": 128,
-                    "tooltip": "输出 token 预算：50 个分镜块需要大预算；思考模型（reasoning_effort≥medium）下建议拉满 16000 防空正文/截断"
                 }),
             }
         }
@@ -120,8 +113,7 @@ class AgnesDirectorMaster:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=1024):
-        max_tokens = sanitize_max_tokens(max_tokens, 1024)
+    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -207,7 +199,6 @@ class AgnesDirectorMaster:
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=0.2,
-                max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
             )
@@ -222,10 +213,10 @@ class AgnesDirectorMaster:
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(content or "")
 
-            meta_line = format_chat_meta(meta, max_tokens)
+            meta_line = format_chat_meta(meta)
             if not (content or "").strip():
                 log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
-                       f"常见于思考模型预算耗尽——降低思考等级或调大 max_tokens 后重试（0 个分镜）")
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或换 agnes-2.5-flash 后重试（0 个分镜）")
             else:
                 log = f"✅ Agnes 导演完成: {len(shots)} 个分镜\n· 响应元数据：{meta_line}\n📋 脚本: {script_path}"
             print(log)
@@ -243,7 +234,7 @@ class AgnesDirectorMaster:
         except Exception as e:
             tb = traceback.format_exc()
             error_msg = (f"❌ Agnes 导演失败（{type(e).__name__}）: {e}\n"
-                         f"· 请求参数: model={model}；max_tokens={max_tokens}\n"
+                         f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                          f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
             result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]

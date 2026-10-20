@@ -142,33 +142,24 @@ def normalize_reasoning_effort(v):
     return s if s in _REASONING_EFFORT_VALID else None
 
 
-def format_chat_meta(meta, max_tokens):
+def format_chat_meta(meta, max_tokens=None):
     """响应元数据一行摘要（finish_reason / 完成 token / 思考占比），供各 LLM 节点诊断日志使用。
 
     meta 来自 client.chat(return_meta=True)；传 None 也安全。
+    max_tokens=None（模型自动输出模式）时不显示上限。
     空正文 + finish_reason=length 通常 = 思考模型预算耗尽。
     """
     meta = meta or {}
     usage = meta.get("usage") or {}
-    line = f"finish_reason={meta.get('finish_reason')}；completion_tokens={usage.get('completion_tokens')}（上限 {max_tokens}）"
+    if max_tokens is not None:
+        cap = f"（上限 {max_tokens}）"
+    else:
+        cap = "（上限=模型默认）"
+    line = f"finish_reason={meta.get('finish_reason')}；completion_tokens={usage.get('completion_tokens')}{cap}"
     reasoning = meta.get("reasoning_tokens")
     if reasoning:
         line = f"{line}，其中思考 {reasoning} tokens"
     return line
-
-
-def sanitize_max_tokens(value, default):
-    """INT 控件值修复：旧工作流 widgets_values 位置错位 / 前端 NaN 显示时，
-    该槽位可能载到字符串（"auto"、"\\n" 等）甚至 undefined（JSON null → None），
-    数值化后可能是 float NaN。统一回落到 default，避免 int(None) 崩溃或 NaN 进 API 请求。"""
-    if value is None:
-        return default
-    try:
-        if value != value:  # NaN（float('nan')）
-            return default
-        return int(value)
-    except (TypeError, ValueError):
-        return default
 
 
 MIME_MAP = {
@@ -466,7 +457,7 @@ class AgnesClient:
         messages: List[Dict[str, Any]],
         model: str = CHAT_MODEL,
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: Optional[int] = None,
         stream: bool = False,
         chat_template_kwargs: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
@@ -477,15 +468,19 @@ class AgnesClient:
         return_meta=True 时返回 (content, meta) 元组：meta 含 finish_reason /
         usage（总消耗与思考 token 明细）等响应元数据，用于诊断空响应、
         思考预算耗尽等问题；False（默认）保持旧行为，仅返回 content 字符串。
+
+        max_tokens 默认 None = 不传该参数，输出长度上限由模型/服务端默认决定，
+        模型自然停止（finish_reason=stop）；仅在需要显式限制输出长度时传值。
         """
         url = f"{self.base_url}/chat/completions"
         payload = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": max_tokens,
             "stream": stream,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         # Thinking 模式（2.5-flash 5 档 none~max；3.0-flash 7 档）
         if chat_template_kwargs:
             payload["chat_template_kwargs"] = chat_template_kwargs
@@ -892,7 +887,6 @@ class AgnesClient:
             messages,
             model=model,
             temperature=0.3,
-            max_tokens=2048,
             reasoning_effort=normalize_reasoning_effort(reasoning_effort),
         )
 

@@ -6,7 +6,7 @@ import requests
 import json
 import re
 import traceback
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 
 
 class AgnesAssetExtractor:
@@ -41,13 +41,6 @@ class AgnesAssetExtractor:
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
-                }),
-                "max_tokens": ("INT", {
-                    "default": 1024,
-                    "min": 512,
-                    "max": 8192,
-                    "step": 128,
-                    "tooltip": "输出 token 预算：5 路资产 JSON 约需 1000-2000；思考模型（reasoning_effort≥medium）下建议调大（4000+）防空正文"
                 }),
             },
             "optional": {}
@@ -94,8 +87,7 @@ class AgnesAssetExtractor:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=1024):
-        max_tokens = sanitize_max_tokens(max_tokens, 1024)
+    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -153,11 +145,10 @@ class AgnesAssetExtractor:
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=0.3,
-                max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
             )
-            meta_line = format_chat_meta(meta, max_tokens)
+            meta_line = format_chat_meta(meta)
 
             # 清理 markdown 代码块
             content = (raw or "").strip()
@@ -168,7 +159,7 @@ class AgnesAssetExtractor:
 
             if not content:
                 log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
-                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或换 agnes-2.5-flash 后重试")
                 print(f"[Agnes Asset] {log}")
                 return ("", "", "", "", "", log)
 
@@ -206,7 +197,7 @@ class AgnesAssetExtractor:
         except Exception as e:
             tb = traceback.format_exc()
             log = (f"❌ 资产提取失败（{type(e).__name__}）: {e}\n"
-                   f"· 请求参数: model={model}；max_tokens={max_tokens}\n"
+                   f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                    f"── 完整堆栈 ──\n{tb}")
             print(f"[Agnes Asset] 失败: {e}")
             return ("", "", "", "", "", log)

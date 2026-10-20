@@ -179,7 +179,6 @@ class AgnesScreenplayGenerator:
         emotion_desc = self.EMOTION_MAP.get(emotion, f"{emotion}（以该情绪基调创作）")
         rhythm_req, sec_lo, sec_hi, sec_avg = self.RHYTHM_MAP.get(rhythm, self.RHYTHM_MAP["中速"])
         target_scenes = max(3, round(target_duration / sec_avg))
-        max_tokens = target_scenes * 200
         characters_block = f"\n角色设定（剧本中的对白/动作请保持这些角色一致）：\n{characters}\n" if characters.strip() else ""
 
         if not api_key.strip():
@@ -224,7 +223,7 @@ class AgnesScreenplayGenerator:
 - 不要用【】等标记符号，不要「第一、第二」列表式结构
 - 不要总结性废话，直接输出剧本："""
 
-        print(f"[Agnes 漫剧剧本] {tag}×{emotion}×{rhythm}：生成分场剧本（约 {target_scenes} 场 / {target_duration} 秒，max_tokens={max_tokens}），思考等级={eff_re or '默认'}...")
+        print(f"[Agnes 漫剧剧本] {tag}×{emotion}×{rhythm}：生成分场剧本（约 {target_scenes} 场 / {target_duration} 秒），思考等级={eff_re or '默认'}...")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
@@ -232,7 +231,6 @@ class AgnesScreenplayGenerator:
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=temperature,
-                max_tokens=max_tokens,
                 reasoning_effort=eff_re,
                 return_meta=True,
             )
@@ -247,7 +245,7 @@ class AgnesScreenplayGenerator:
             usage = meta.get("usage") or {}
             tag_src = f"tag 输入 = {tag_raw}" if tag_raw else "tag 留空，用默认「逆袭爽文」"
             resp_meta_line = (f"· 响应元数据：finish_reason={meta.get('finish_reason')}；"
-                              f"completion_tokens={usage.get('completion_tokens')}（上限 {max_tokens}）"
+                              f"completion_tokens={usage.get('completion_tokens')}（上限=模型默认）"
                               + (f"，其中思考 {meta.get('reasoning_tokens')} tokens" if meta.get("reasoning_tokens") else "")
                               + "；total_tokens=" + str(usage.get("total_tokens")))
             raw_excerpt = raw[:400] + ("..." if len(raw) > 400 else "")
@@ -267,7 +265,7 @@ class AgnesScreenplayGenerator:
 
             log = (f"✅ 生成成功（耗时 {elapsed:.1f} 秒）\n"
                    f"· 三维参数：{tag} × {emotion} × {rhythm}（{tag_src}）\n"
-                   f"· 场次估算：约 {target_scenes} 场 / 目标 {target_duration} 秒（{sec_lo}–{sec_hi} 秒/场），max_tokens={max_tokens}\n"
+                   f"· 场次估算：约 {target_scenes} 场 / 目标 {target_duration} 秒（{sec_lo}–{sec_hi} 秒/场）\n"
                    f"{resp_meta_line}\n"
                    f"· 模型：{model}（reasoning_effort={eff_re or '默认'}，temperature={temperature}）\n"
                    f"· 请求地址：{client.base_url}\n"
@@ -280,7 +278,7 @@ class AgnesScreenplayGenerator:
             base_disp = base_url.strip() or ("（跟随全局，当前 " + get_base_url() + "）")
             log = (f"❌ API 调用失败（{type(e).__name__}）\n"
                    f"· 异常信息：{e}\n"
-                   f"· 请求参数：tag={tag} × emotion={emotion} × rhythm={rhythm}；model={model}；reasoning_effort={eff_re or '默认'}；temperature={temperature}；max_tokens={max_tokens}\n"
+                   f"· 请求参数：tag={tag} × emotion={emotion} × rhythm={rhythm}；model={model}；reasoning_effort={eff_re or '默认'}；temperature={temperature}\n"
                    f"· 请求地址：{base_disp}\n"
                    f"· 提示词 {len(prompt)} 字 / 大纲 {len(story_outline)} 字 / 角色设定 {len(characters)} 字\n"
                    f"· 已耗时 {time.time() - t0:.1f} 秒（含客户端自动重试等待）\n"

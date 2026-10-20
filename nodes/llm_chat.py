@@ -8,7 +8,7 @@ Agnes LLM 对话节点
 from typing import Any, Dict, Tuple
 import traceback
 
-from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, sanitize_max_tokens
+from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 from ._output_docs import OutputDocsMixin
 
 
@@ -58,13 +58,6 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "step": 0.05,
                     "tooltip": "采样温度（越高越发散/有创意）",
                 }),
-                "max_tokens": ("INT", {
-                    "default": 1024,
-                    "min": 1,
-                    "max": 32768,
-                    "step": 1,
-                    "tooltip": "响应最大 token 数",
-                }),
             },
             "optional": {
                 "system_prompt": ("STRING", {
@@ -93,12 +86,10 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         api_key: str = "",
         model: str = CHAT_MODEL,
         temperature: float = 0.7,
-        max_tokens: int = 1024,
         system_prompt: str = "",
         enable_thinking: bool = False,
         reasoning_effort: str = "auto",
     ) -> Tuple[str, str]:
-        max_tokens = sanitize_max_tokens(max_tokens, 1024)
         if not prompt.strip():
             return ("[错误] 提示词为空：请输入消息", "提示词为空，已跳过。")
 
@@ -122,18 +113,17 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                 messages=messages,
                 model=model,
                 temperature=temperature,
-                max_tokens=max_tokens,
                 chat_template_kwargs=ctk,
                 reasoning_effort=effort,
                 return_meta=True,
             )
-            meta_line = format_chat_meta(meta, max_tokens)
+            meta_line = format_chat_meta(meta)
             if not (response or "").strip():
                 log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
-                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或换 agnes-2.5-flash 后重试")
                 print(f"[Agnes LLM 对话] {log}")
                 return ("", log)
-            log = f"✅ 回复完成（{len(response)} 字，预算 {max_tokens} tokens）\n· 响应元数据：{meta_line}"
+            log = f"✅ 回复完成（{len(response)} 字）\n· 响应元数据：{meta_line}"
             print(f"[Agnes LLM 对话] 完成 {len(response)} 字")
             return (response, log)
         except Exception as e:
