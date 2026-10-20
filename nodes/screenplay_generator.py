@@ -17,8 +17,9 @@ Agnes 剧本生成节点（漫剧短视频）
 
 输出 2 路：
   - script   漫剧剧本
-  - log_text 响应日志（成功=参数/场次/耗时/原始响应摘录；失败=异常类型/完整堆栈/
-             请求参数/请求地址/解决建议，覆盖 API Key 缺失、网络、HTTP 错误、响应格式异常全部报错情况）
+  - log_text 响应日志（成功=参数/场次/响应元数据 finish_reason+token 消耗+思考 token 明细/耗时/
+             原始响应摘录；空响应=⚠️ 警示+三条排查建议；失败=异常类型/完整堆栈/请求参数/
+             请求地址，覆盖 API Key 缺失、网络、HTTP 错误、响应格式异常全部报错情况）
 
 与「Agnes 解说剧本生成（AgnesScriptGenerator）」的区别：
   - 解说剧本生成 = 口播解说稿（配音轨，对观众的叙述腔）
@@ -227,12 +228,13 @@ class AgnesScreenplayGenerator:
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            raw = client.chat(
+            raw, meta = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 reasoning_effort=eff_re,
+                return_meta=True,
             )
 
             # 清理（与 解说剧本生成 一致的兜底）
@@ -242,11 +244,31 @@ class AgnesScreenplayGenerator:
             script = script.strip()
 
             elapsed = time.time() - t0
-            raw_excerpt = raw[:400] + ("..." if len(raw) > 400 else "")
+            usage = meta.get("usage") or {}
             tag_src = f"tag 输入 = {tag_raw}" if tag_raw else "tag 留空，用默认「逆袭爽文」"
+            resp_meta_line = (f"· 响应元数据：finish_reason={meta.get('finish_reason')}；"
+                              f"completion_tokens={usage.get('completion_tokens')}（上限 {max_tokens}）"
+                              + (f"，其中思考 {meta.get('reasoning_tokens')} tokens" if meta.get("reasoning_tokens") else "")
+                              + "；total_tokens=" + str(usage.get("total_tokens")))
+            raw_excerpt = raw[:400] + ("..." if len(raw) > 400 else "")
+            if not raw:
+                warn = ("⚠️ 空响应（API 返回 200 但正文为空）：常见于思考型模型预算耗尽"
+                        "（finish_reason=length 时，思考链占满输出上限、正文 0 token）。"
+                        "建议：① 降低思考等级（medium→low/none）② 换 agnes-2.5-flash "
+                        "③ 减场次（中速节奏或缩短 target_duration）后重试")
+                print(f"[Agnes 漫剧剧本] {warn.split('：')[0]}")
+                log = (f"⚠️ 空响应（未生成剧本）（耗时 {elapsed:.1f} 秒）\n"
+                       f"· 三维参数：{tag} × {emotion} × {rhythm}（{tag_src}）\n"
+                       f"{resp_meta_line}\n"
+                       f"· 模型：{model}（reasoning_effort={eff_re or '默认'}，temperature={temperature}）\n"
+                       f"· 请求地址：{client.base_url}\n"
+                       f"── 诊断 ──\n{warn}")
+                return ("", log)
+
             log = (f"✅ 生成成功（耗时 {elapsed:.1f} 秒）\n"
                    f"· 三维参数：{tag} × {emotion} × {rhythm}（{tag_src}）\n"
                    f"· 场次估算：约 {target_scenes} 场 / 目标 {target_duration} 秒（{sec_lo}–{sec_hi} 秒/场），max_tokens={max_tokens}\n"
+                   f"{resp_meta_line}\n"
                    f"· 模型：{model}（reasoning_effort={eff_re or '默认'}，temperature={temperature}）\n"
                    f"· 请求地址：{client.base_url}\n"
                    f"· 原始响应 {len(raw)} 字 → 清理后 {len(script)} 字\n"

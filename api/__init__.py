@@ -440,8 +440,14 @@ class AgnesClient:
         stream: bool = False,
         chat_template_kwargs: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
-    ) -> str:
-        """Call the chat completions endpoint."""
+        return_meta: bool = False,
+    ):
+        """Call the chat completions endpoint.
+
+        return_meta=True 时返回 (content, meta) 元组：meta 含 finish_reason /
+        usage（总消耗与思考 token 明细）等响应元数据，用于诊断空响应、
+        思考预算耗尽等问题；False（默认）保持旧行为，仅返回 content 字符串。
+        """
         url = f"{self.base_url}/chat/completions"
         payload = {
             "model": model,
@@ -459,9 +465,23 @@ class AgnesClient:
 
         data = resp.json()
         try:
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError):
             raise RuntimeError(f"[Chat 错误] 意外的响应格式: {data}")
+        if not return_meta:
+            return content
+        usage = data.get("usage") or {}
+        reasoning_tokens = (
+            (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+            or (data["choices"][0].get("message") or {}).get("reasoning_tokens")
+        )
+        meta = {
+            "finish_reason": data["choices"][0].get("finish_reason"),
+            "usage": usage,
+            "reasoning_tokens": reasoning_tokens,
+            "model": data.get("model"),
+        }
+        return content, meta
 
     # ------------------------------------------------------------------
     # Image Generation
