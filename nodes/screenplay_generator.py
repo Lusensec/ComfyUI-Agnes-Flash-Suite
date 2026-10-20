@@ -12,8 +12,8 @@ Agnes 剧本生成节点（漫剧短视频）
   - emotion（情绪基调，观众什么感受）：爽/暖/爆笑/热血/紧张/泪
   - rhythm（节奏，多快）：快节奏/中速/慢热（同时决定每场秒数与钩子密度）
 
-外部连线：tag_in（可选 STRING 输入口）接外部题材名（如「Agnes 风格选择」的 导演风格 输出），
-连线后覆盖 tag 下拉框值；未知名按通用描述兜底，不报错。
+题材输入：tag（STRING 输入口）——可直接手输题材名，或连「Agnes 风格选择」的 导演风格 输出
+（连线后覆盖手输值）；留空=默认「逆袭爽文」；未知题材名按通用描述兜底，不报错。
 
 输出 2 路：
   - script   漫剧剧本
@@ -94,9 +94,10 @@ class AgnesScreenplayGenerator:
                     "default": CHAT_MODEL,
                     "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
                 }),
-                "tag": (list(cls.TAG_MAP.keys()), {
+                "tag": ("STRING", {
                     "default": "逆袭爽文",
-                    "tooltip": "题材标签（讲什么），下拉选择；也可用下方「tag_in」输入口连线外部题材名（如「Agnes 风格选择」的 导演风格 输出），连线后覆盖下拉值；未知题材名自动按通用描述兜底，不会报错"
+                    "placeholder": "题材名（可手输，也可连线）：逆袭爽文/甜宠CP/悬疑解谜/搞笑沙雕/热血动作/治愈日常/虐心催泪/青春成长/家庭温馨/历史史诗/恐怖异灵/喜剧搞笑/科幻未来/都市末世/都市异能",
+                    "tooltip": "题材标签（讲什么）：手输题材名，或直接连「Agnes 风格选择」的 导演风格 输出（连线后覆盖手输值）；留空=默认逆袭爽文；未知题材名自动按通用描述兜底，不会报错"
                 }),
                 "emotion": (list(cls.EMOTION_MAP.keys()), {
                     "default": "爽",
@@ -131,11 +132,6 @@ class AgnesScreenplayGenerator:
                     "placeholder": "每行一个角色：名字 + 一句人设，如「团团：胖橘猫，傲娇贪吃」「张大婶：热心洗衣大婶」",
                     "tooltip": "可选：角色列表（每行一个，名字+一句人设），让剧本对白/动作保持角色一致"
                 }),
-                "tag_in": ("STRING", {
-                    "default": "",
-                    "placeholder": "外部题材名（留空=用 tag 下拉值）",
-                    "tooltip": "连线口：接「Agnes 风格选择」的 导演风格 输出（「科幻未来」「都市异能」「历史史诗」…），连线后覆盖 tag 下拉框的值；不连线/留空时仍用 tag 下拉框。未知名按通用描述兜底，不报错"
-                }),
             },
         }
 
@@ -166,14 +162,16 @@ class AgnesScreenplayGenerator:
             }
         return extra
 
-    def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters="", tag_in=""):
+    def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters=""):
         t0 = time.time()
         eff_re = normalize_reasoning_effort(reasoning_effort)
 
-        # 题材优先级：外部连线 tag_in（如「Agnes 风格选择」导演风格）> tag 下拉框 > 默认
-        tag = (tag_in or "").strip() or (tag or "").strip() or "逆袭爽文"
+        # tag 为 STRING 输入：可手输题材名、可连「Agnes 风格选择」导演风格、可留空用默认；
+        # 未知题材名按通用描述兜底（KeyError 防护）
+        tag_raw = (tag or "").strip()
+        tag = tag_raw or "逆袭爽文"
 
-        # 三轴兜底：未知情绪/节奏/题材不崩（KeyError 防护 + 通用描述）
+        # 三轴兜底：未知情绪/节奏不崩（KeyError 防护 + 通用描述）
         emotion = (emotion or "").strip() or "爽"
         rhythm = (rhythm or "").strip() or "中速"
         tag_desc = self.TAG_MAP.get(tag, f"{tag}：以「{tag}」为题材方向创作")
@@ -244,10 +242,10 @@ class AgnesScreenplayGenerator:
             script = script.strip()
 
             elapsed = time.time() - t0
-            tag_source = "（题材来自连线输入 tag_in）" if (tag_in or "").strip() else "（题材来自 tag 下拉框）"
             raw_excerpt = raw[:400] + ("..." if len(raw) > 400 else "")
+            tag_src = f"tag 输入 = {tag_raw}" if tag_raw else "tag 留空，用默认「逆袭爽文」"
             log = (f"✅ 生成成功（耗时 {elapsed:.1f} 秒）\n"
-                   f"· 三维参数：{tag} × {emotion} × {rhythm} {tag_source}\n"
+                   f"· 三维参数：{tag} × {emotion} × {rhythm}（{tag_src}）\n"
                    f"· 场次估算：约 {target_scenes} 场 / 目标 {target_duration} 秒（{sec_lo}–{sec_hi} 秒/场），max_tokens={max_tokens}\n"
                    f"· 模型：{model}（reasoning_effort={eff_re or '默认'}，temperature={temperature}）\n"
                    f"· 请求地址：{client.base_url}\n"
