@@ -7,6 +7,7 @@ Agnes AI 小说推文插件 - 集成 comfyui-agnes-ai 核心 API
 
 - 场景拆分 (AgnesSceneSplitter)
 - 文本输入 (AgnesNovelTextSource)
+- 风格选择 (AgnesStyleSelector)
 - 总导演分镜 (AgnesDirectorMaster)
 - 资产提取 (AgnesAssetExtractor)
 - 提示词生成 (AgnesScenePromptGenerator)

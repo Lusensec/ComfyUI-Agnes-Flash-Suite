@@ -6,7 +6,7 @@
  * 本扩展通过标准 beforeRegisterNodeDef 钩子，按功能分类给 Agnes* 节点类写入配色：
  *
  *   ┌ 配置类（琥珀）── API Key 配置（单节点，不分级）
- *   │ 文本类·绿 ── 主绿：文本输入/解说剧本/漫剧剧本 ｜ 浅绿：场景切分/总导演/资产提取/LLM 对话
+ *   │ 文本类·绿 ── 主绿：文本输入/解说剧本/漫剧剧本/风格选择 ｜ 浅绿：场景切分/总导演/资产提取/LLM 对话
  *   │               ｜ 墨绿：分镜提示词/文本拆分/资产提示词/三视图提示词/字符串合并
  *   │ 图片类·蓝 ── 主蓝：图像生成 ｜ 浅蓝：图生图 ｜ 深蓝：三视图生成/图像反推提示词
  *   └ 视频类·紫 ── 主紫：文生视频 ｜ 浅紫：关键帧生视频 ｜ 深紫：参考视频生成
@@ -63,6 +63,7 @@
         "AgnesTurnaroundPromptGenerator": "text",
         "AgnesStringMerge": "text",
         "AgnesNovelLLMChat": "text",
+        "AgnesStyleSelector": "text",
         // 图片类
         "AgnesImageGen": "image",
         "AgnesNovelImageToImage": "image",
@@ -89,6 +90,7 @@
         "AgnesAssetPromptGenerator": "deep",
         "AgnesTurnaroundPromptGenerator": "deep",
         "AgnesStringMerge": "deep",
+        "AgnesStyleSelector": "main",
         // 图片类：蓝
         "AgnesImageGen": "main",
         "AgnesNovelImageToImage": "light",

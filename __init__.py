@@ -17,6 +17,7 @@ ComfyUI Agnes Novel Plugin
 - 通用节点（从 comfyui-agnes-ai 集成）:
   * AgnesAPIKeyConfig: API Key 配置
   * AgnesTextSource: 文本输入（小说章节/故事想法，管线文本起点）
+  * AgnesStyleSelector: 风格选择（视觉风格×导演风格双轴，纯本地组合）
   * AgnesLLMChat: LLM 对话
   * AgnesImageReverse: 图像反转
   * AgnesImageToImage: 图生图
