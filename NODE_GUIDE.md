@@ -143,11 +143,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 🎬 Agnes 总导演 (AgnesDirectorMaster)
 
-**功能：** 生成完整编号分镜脚本
+**功能：** 将故事内容（**小说章节或 漫剧剧本 均可**）生成为完整编号分镜脚本（5 秒/镜）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| chapter_text | STRING | "" | 小说章节文本 |
+| chapter_text | STRING | "" | 故事内容：小说章节原文（建议 3000-8000 字），或「Agnes 剧本生成」（漫剧剧本）的输出 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
@@ -157,6 +157,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - log_text: 处理日志
 - scene_1 ~ scene_50: 分镜脚本
 - chapter_text_out / api_key_out / base_url_out / model_out: 透传
+
+> 两种接法：
+> - 小说线：章节原文 → 总导演（章→镜一步到位）
+> - 漫剧线：大纲 → Agnes 剧本生成（漫剧，场级 5–15 秒）→ 总导演（场→镜精化，每场拆 2–4 镜）→ 分镜提示词生成 → 生图/生视频
+> - 注意：漫剧线 快节奏（5–8 秒/场）× 180 秒 ≈ 30 场 → 60+ 镜，会超出 scene_50 上限；建议漫剧线用 中速/慢热 或缩短 target_duration
 
 ---
 
