@@ -157,6 +157,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - log_text: 处理日志（成功=分镜数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
 - scene_1 ~ scene_50: 分镜脚本
 - chapter_text_out / api_key_out / base_url_out / model_out: 透传
+- shot_count: 分镜总数（统计实际解析出的分镜数；超过 50 时标注「N（仅显示前 50 个）」；失败/无 Key 时为空）
 
 > 两种接法：
 > - 小说线：章节原文 → 总导演（章→镜一步到位）

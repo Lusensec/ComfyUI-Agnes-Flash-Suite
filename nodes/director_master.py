@@ -51,7 +51,7 @@ class AgnesDirectorMaster:
         }
         return inputs
 
-    RETURN_TYPES = ("STRING",) * 55
+    RETURN_TYPES = ("STRING",) * 56
     RETURN_NAMES = (
         "log_text",
         "scene_1", "scene_2", "scene_3", "scene_4", "scene_5",
@@ -65,6 +65,7 @@ class AgnesDirectorMaster:
         "scene_41", "scene_42", "scene_43", "scene_44", "scene_45",
         "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
+        "shot_count",
     )
     RETURN_LABELS = (
         "处理日志",
@@ -79,10 +80,12 @@ class AgnesDirectorMaster:
         "分镜 41", "分镜 42", "分镜 43", "分镜 44", "分镜 45",
         "分镜 46", "分镜 47", "分镜 48", "分镜 49", "分镜 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+        "分镜总数（超 50 标注）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（分镜统计/响应元数据/空响应警示/错误详情）",) + (
         ("编号分镜脚本（5秒/段，含画面/对白/运镜，连接提示词生成节点）",) * 50
-    ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
+    ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+         "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -107,6 +110,7 @@ class AgnesDirectorMaster:
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
+        outputs["shot_count"] = "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）"
         
         for key in outputs:
             if key in kwargs:
@@ -118,7 +122,7 @@ class AgnesDirectorMaster:
             api_key = get_api_key()
         if not api_key.strip():
             error_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
             return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes 总导演 - {model}]")
@@ -228,6 +232,9 @@ class AgnesDirectorMaster:
             result.append(api_key)
             result.append(base_url)
             result.append(model)
+            total_shots = max(shots) if shots else 0
+            shot_count = f"{total_shots}（仅显示前 50 个）" if total_shots > 50 else str(total_shots)
+            result.append(shot_count)
 
             return tuple(result)
 
@@ -237,7 +244,7 @@ class AgnesDirectorMaster:
                          f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                          f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
             return tuple(result)
 
     def _parse_shots(self, content):
