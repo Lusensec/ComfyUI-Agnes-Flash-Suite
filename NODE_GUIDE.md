@@ -285,9 +285,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
-### 📝 Agnes 剧本生成 (AgnesScriptGenerator)
+### 📝 Agnes 解说剧本生成 (AgnesScriptGenerator)
 
-**功能：** 生成影视解说文案
+**功能：** 生成影视解说文案（口播稿/配音轨，对观众的叙述腔）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -302,6 +302,33 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 **输出：**
 - script: 解说文案
+
+---
+
+### 🎭 Agnes 剧本生成 (AgnesScreenplayGenerator)
+
+**功能：** 生成**漫剧短视频分场剧本**（与「解说剧本生成」的区分：本节点产"画面+对白+氛围"的分场结构，不是对观众的口播解说腔）：
+开头一行「核心钩子」+ 逐场三行结构（场景行/画面/对白/氛围），画面描述具象可视、可直接转镜头
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| story_outline | STRING(多行) | "" | 故事大纲或章节摘要 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-2.5-flash | 文本生成模型 |
+| style | COMBO | 逆袭爽文 | 漫剧类型：逆袭爽文/甜宠治愈/悬疑惊悚/搞笑沙雕/热血冒险/虐心催泪 |
+| target_duration | INT | 180 | 目标总时长（秒），按每场 5–15 秒估算场次 |
+| temperature | FLOAT | 0.8 | 生成温度（0-1） |
+| reasoning_effort | COMBO | auto | 思考等级（2.5/3.0 文本模型）：auto/none/low/medium/high/max |
+| characters（可选） | STRING(多行) | "" | 角色列表：每行「名字：一句人设」，让对白/动作保持角色一致 |
+
+**输出：**
+- script: 漫剧剧本（核心钩子 + 分场三行结构：场景行/画面/对白/氛围）
+
+> 用法示例：
+> 文本输入（章节）→ Agnes 剧本生成（漫剧分场剧本）→ 场景切分 → 分镜提示词生成 → 图像生成 → 关键帧生视频；
+> 或把输出接 SaveText 存档，人工修改对白后再进管线。
+> 橘猫团团这类治愈故事选「甜宠治愈」，黑熊冲突/熊掌印留悬念适合「悬疑惊悚」。
 
 ---
 

@@ -147,4 +147,4 @@ class AgnesScriptGenerator:
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScriptGenerator": AgnesScriptGenerator}
-NODE_DISPLAY_NAME_MAPPINGS = {"AgnesScriptGenerator": "📝 Agnes 剧本生成"}
+NODE_DISPLAY_NAME_MAPPINGS = {"AgnesScriptGenerator": "📝 Agnes 解说剧本生成"}

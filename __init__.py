@@ -12,7 +12,8 @@ ComfyUI Agnes Novel Plugin
   * AgnesScenePromptGenerator: 分镜提示词生成
   * AgnesImageGen: 图像生成
   * AgnesNovelTextToVideo: 文生视频（原 AgnesVideoGen 已删除）
-  * AgnesScriptGenerator: 剧本生成
+  * AgnesScriptGenerator: 解说剧本生成（影视解说文案/口播稿）
+  * AgnesScreenplayGenerator: 剧本生成（漫剧短视频分场剧本：钩子+画面/对白/氛围）
 - 通用节点（从 comfyui-agnes-ai 集成）:
   * AgnesAPIKeyConfig: API Key 配置
   * AgnesTextSource: 文本输入（小说章节/故事想法，管线文本起点）
