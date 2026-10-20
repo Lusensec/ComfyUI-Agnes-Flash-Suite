@@ -13,7 +13,7 @@ Agnes AI 小说推文插件 - 集成 comfyui-agnes-ai 核心 API
 - 文生视频 (AgnesNovelTextToVideo)
 - 剧本生成 (AgnesScriptGenerator)
 
-- 统一配色：所有 Agnes 节点在画布上自动呈现 Agnes 蓝（标题 `#4c7dff` / 主体 `#1e2f52`），由前端扩展 `web/js/agnes-node-colors.js` 实现；仍可用右键「Set color」给单个节点换色
+- 分类配色：Agnes 节点在画布上按功能自动着色（配置类=琥珀 / 文本类=绿 / 图片类=蓝 / 视频类=紫，同类同色），由前端扩展 `web/js/agnes-node-colors.js` 实现；仍可用右键「Set color」给单个节点换色
 
 ## 依赖
 
