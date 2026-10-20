@@ -5,11 +5,14 @@
  * 节点颜色只能由前端决定（LiteGraph 渲染链：实例值 → 类静态值 → 全局默认灰 #333/#353535）。
  * 本扩展通过标准 beforeRegisterNodeDef 钩子，按功能分类给 Agnes* 节点类写入配色：
  *
- *   ┌ 配置类（琥珀）── API Key 配置
- *   │ 文本类（绿）  ── 文本输入 / 剧本生成 / 场景切分 / 总导演 / 资产提取 / 分镜提示词 /
- *   │                   文本拆分 / 资产提示词 / 三视图提示词 / 字符串合并 / LLM 对话
- *   │ 图片类（蓝）  ── 图像生成 / 图生图 / 三视图生成 / 图像反推提示词
- *   └ 视频类（紫）  ── 文生视频 / 关键帧生视频 / 参考视频生成
+ *   ┌ 配置类（琥珀）── API Key 配置（单节点，不分级）
+ *   │ 文本类·绿 ── 主绿：文本输入/剧本生成 ｜ 浅绿：场景切分/总导演/资产提取/LLM 对话
+ *   │               ｜ 墨绿：分镜提示词/文本拆分/资产提示词/三视图提示词/字符串合并
+ *   │ 图片类·蓝 ── 主蓝：图像生成 ｜ 浅蓝：图生图 ｜ 深蓝：三视图生成/图像反推提示词
+ *   └ 视频类·紫 ── 主紫：文生视频 ｜ 浅紫：关键帧生视频 ｜ 深紫：参考视频生成
+ *
+ * 同功能类用同一色系（一眼认出"这是文本/图片/视频节点"），类内再用主/浅/深三阶
+ * 小幅度区分"主功能 / 次功能 / 工具与中间层"，避免全族单色无法分辨。
  *
  * 效果：新增节点一出现就带分类色；旧图里的节点在扩展 init 时补色；
  * 用户仍可右键「Set color」给单个节点换色（实例值优先，且会保存在工作流文件里）。
@@ -20,12 +23,24 @@
 (function () {
     "use strict";
 
-    // ── 功能分类配色板（想换颜色改这里） ─────────────────
+    // ── 功能分类配色板（想换颜色改这里；每类 main/light/deep 三阶，同色系微调） ──
     var PALETTE = {
-        config: { color: "#e8a33d", bgcolor: "#3a2d16" },  // 配置·琥珀
-        text:   { color: "#3fae62", bgcolor: "#1d3a28" },  // 文本·绿
-        image:  { color: "#4c7dff", bgcolor: "#1e2f52" },  // 图片·蓝（Agnes 品牌色）
-        video:  { color: "#a063d6", bgcolor: "#2b1d42" },  // 视频·紫
+        config: { color: "#e8a33d", bgcolor: "#3a2d16" },  // 配置·琥珀（单节点，不分级）
+        text: {                                            // 文本·绿
+            main:  { color: "#3fae62", bgcolor: "#1d3a28" },  // 主绿
+            light: { color: "#6cc58c", bgcolor: "#28483a" },  // 浅绿
+            deep:  { color: "#2e8250", bgcolor: "#152d20" },  // 墨绿
+        },
+        image: {                                           // 图片·蓝（Agnes 品牌色）
+            main:  { color: "#4c7dff", bgcolor: "#1e2f52" },  // 主蓝
+            light: { color: "#7ba0ff", bgcolor: "#2a3f6e" },  // 浅蓝
+            deep:  { color: "#3159c2", bgcolor: "#15203c" },  // 深蓝
+        },
+        video: {                                           // 视频·紫
+            main:  { color: "#a063d6", bgcolor: "#2b1d42" },  // 主紫
+            light: { color: "#c392ec", bgcolor: "#3d2c5c" },  // 浅紫
+            deep:  { color: "#7a44ad", bgcolor: "#221533" },  // 深紫
+        },
     };
 
     // ── 节点 → 功能分类（与 nodes/__init__.py 的菜单分组一致） ──
@@ -55,10 +70,38 @@
         "AgnesVideoReference": "video",
     };
 
+    // ── 节点 → 类内色阶：main=主功能 / light=次功能 / deep=工具与中间层（未登记=main） ──
+    var SHADE_BY_NODE = {
+        // 文本类：绿
+        "AgnesNovelTextSource": "main",
+        "AgnesScriptGenerator": "main",
+        "AgnesSceneSplitter": "light",
+        "AgnesDirectorMaster": "light",
+        "AgnesAssetExtractor": "light",
+        "AgnesNovelLLMChat": "light",
+        "AgnesScenePromptGenerator": "deep",
+        "AgnesTextSplitter": "deep",
+        "AgnesAssetPromptGenerator": "deep",
+        "AgnesTurnaroundPromptGenerator": "deep",
+        "AgnesStringMerge": "deep",
+        // 图片类：蓝
+        "AgnesImageGen": "main",
+        "AgnesNovelImageToImage": "light",
+        "AgnesSubjectTurnaround": "deep",
+        "AgnesNovelImageReverse": "deep",
+        // 视频类：紫
+        "AgnesNovelTextToVideo": "main",
+        "AgnesNovelImageToVideo": "light",
+        "AgnesVideoReference": "deep",
+    };
+
     function paletteOf(nodeName) {
         if (typeof nodeName !== "string" || nodeName.indexOf("Agnes") !== 0) return null;
         var cat = CATEGORY_BY_NODE[nodeName];
-        return PALETTE[cat] || PALETTE.image;  // 新增的 Agnes 节点默认归图片类蓝色
+        if (!cat) return PALETTE.image.main;  // 新增的 Agnes 节点默认图片类主蓝
+        var pal = PALETTE[cat];
+        if (pal && pal.main) return pal[SHADE_BY_NODE[nodeName]] || pal.main;
+        return pal;  // 配置类（单节点，无分级）
     }
 
     function paint(cls, def) {
@@ -116,7 +159,7 @@
     if (api && api.registerExtension) {
         try {
             api.registerExtension(extension);
-            console.log("[AgnesFlashSuite] Agnes 节点分类配色扩展已注册（配置=琥珀 文本=绿 图片=蓝 视频=紫）");
+            console.log("[AgnesFlashSuite] Agnes 节点分类配色扩展已注册（配置=琥珀；文本=绿三阶；图片=蓝三阶；视频=紫三阶）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 配色扩展注册失败（不影响节点功能）:", e);
         }
