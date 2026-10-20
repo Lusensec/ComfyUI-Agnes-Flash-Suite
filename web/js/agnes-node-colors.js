@@ -6,7 +6,7 @@
  * 本扩展通过标准 beforeRegisterNodeDef 钩子，按功能分类给 Agnes* 节点类写入配色：
  *
  *   ┌ 配置类（琥珀）── API Key 配置
- *   │ 文本类（绿）  ── 剧本生成 / 场景切分 / 总导演 / 资产提取 / 分镜提示词 /
+ *   │ 文本类（绿）  ── 文本输入 / 剧本生成 / 场景切分 / 总导演 / 资产提取 / 分镜提示词 /
  *   │                   文本拆分 / 资产提示词 / 三视图提示词 / 字符串合并 / LLM 对话
  *   │ 图片类（蓝）  ── 图像生成 / 图生图 / 三视图生成 / 图像反推提示词
  *   └ 视频类（紫）  ── 文生视频 / 关键帧生视频 / 参考视频生成
@@ -33,6 +33,7 @@
         // 配置类
         "AgnesNovelAPIKeyConfig": "config",
         // 文本类
+        "AgnesNovelTextSource": "text",
         "AgnesScriptGenerator": "text",
         "AgnesSceneSplitter": "text",
         "AgnesDirectorMaster": "text",
