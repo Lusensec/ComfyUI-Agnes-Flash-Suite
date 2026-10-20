@@ -2,7 +2,7 @@
 Agnes 剧本生成节点（漫剧短视频）
 =================
 使用 Agnes LLM 把故事大纲改写成「漫剧短视频分场剧本」：
-核心钩子 + 分场三行结构（画面/对白/氛围），画面描述具象可视，
+核心钩子 + 分场四行结构（场景行/画面/对白/氛围），画面描述具象可视，
 可直接接 场景切分 → 分镜提示词生成 → 图像生成 → 关键帧生视频 管线，
 也可人工修改后作为漫剧/短剧的分镜脚本。
 
@@ -12,13 +12,23 @@ Agnes 剧本生成节点（漫剧短视频）
   - emotion（情绪基调，观众什么感受）：爽/暖/爆笑/热血/紧张/泪
   - rhythm（节奏，多快）：快节奏/中速/慢热（同时决定每场秒数与钩子密度）
 
+外部连线：tag_in（可选 STRING 输入口）接外部题材名（如「Agnes 风格选择」的 导演风格 输出），
+连线后覆盖 tag 下拉框值；未知名按通用描述兜底，不报错。
+
+输出 2 路：
+  - script   漫剧剧本
+  - log_text 响应日志（成功=参数/场次/耗时/原始响应摘录；失败=异常类型/完整堆栈/
+             请求参数/请求地址/解决建议，覆盖 API Key 缺失、网络、HTTP 错误、响应格式异常全部报错情况）
+
 与「Agnes 解说剧本生成（AgnesScriptGenerator）」的区别：
   - 解说剧本生成 = 口播解说稿（配音轨，对观众的叙述腔）
   - 本节点       = 分场剧本（画面+对白+氛围，漫剧结构）
 """
 
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
+import time
+import traceback
+from ..api import AgnesClient, get_api_key, get_base_url, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
 
 
 class AgnesScreenplayGenerator:
@@ -86,7 +96,7 @@ class AgnesScreenplayGenerator:
                 }),
                 "tag": (list(cls.TAG_MAP.keys()), {
                     "default": "逆袭爽文",
-                    "tooltip": "题材标签（讲什么），可选下拉值；也可连线输入外部题材名（如「Agnes 风格选择」的 导演风格 输出），连线后覆盖下拉值；未知题材名自动按通用描述兜底，不会报错"
+                    "tooltip": "题材标签（讲什么），下拉选择；也可用下方「tag_in」输入口连线外部题材名（如「Agnes 风格选择」的 导演风格 输出），连线后覆盖下拉值；未知题材名自动按通用描述兜底，不会报错"
                 }),
                 "emotion": (list(cls.EMOTION_MAP.keys()), {
                     "default": "爽",
@@ -121,18 +131,21 @@ class AgnesScreenplayGenerator:
                     "placeholder": "每行一个角色：名字 + 一句人设，如「团团：胖橘猫，傲娇贪吃」「张大婶：热心洗衣大婶」",
                     "tooltip": "可选：角色列表（每行一个，名字+一句人设），让剧本对白/动作保持角色一致"
                 }),
-                "tag": ("STRING", {
+                "tag_in": ("STRING", {
                     "default": "",
-                    "placeholder": "外部题材名（留空=用上方下拉值）",
-                    "tooltip": "可选连线口：接外部题材名（如「Agnes 风格选择」的 导演风格 输出「科幻未来」「都市异能」…）；不连线时使用节点上 tag 下拉框的值。未知名会按通用描述兜底"
+                    "placeholder": "外部题材名（留空=用 tag 下拉值）",
+                    "tooltip": "连线口：接「Agnes 风格选择」的 导演风格 输出（「科幻未来」「都市异能」「历史史诗」…），连线后覆盖 tag 下拉框的值；不连线/留空时仍用 tag 下拉框。未知名按通用描述兜底，不报错"
                 }),
             },
         }
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("script",)
-    RETURN_LABELS = ("漫剧剧本",)
-    OUTPUT_TOOLTIPS = ("漫剧短视频分场剧本（核心钩子+分场三行结构：画面/对白/氛围）；可接 场景切分/分镜提示词生成 继续管线，或接 SaveText 存档",)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("script", "log_text")
+    RETURN_LABELS = ("漫剧剧本", "响应日志")
+    OUTPUT_TOOLTIPS = (
+        "漫剧短视频分场剧本（核心钩子+分场四行结构：场景行/画面/对白/氛围）；可接 总导演/资产提取/分镜提示词生成 继续管线，或接 SaveText 存档",
+        "响应/诊断日志：成功=三维参数+场次估算+模型参数+耗时+原始响应摘录；失败=异常类型/完整堆栈/请求参数/请求地址/解决建议，覆盖 API Key 缺失、网络超时、HTTP 错误、响应格式异常等全部报错情况，直接在节点上查看",
+    )
     FUNCTION = "generate"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -145,25 +158,39 @@ class AgnesScreenplayGenerator:
         extra = {}
         if "script" in kwargs:
             extra["script"] = {
-                "description": "漫剧短视频分场剧本，含核心钩子与分场画面/对白/氛围结构"
+                "description": "漫剧短视频分场剧本，含核心钩子与分场场景行/画面/对白/氛围结构"
+            }
+        if "log_text" in kwargs:
+            extra["log_text"] = {
+                "description": "响应日志（参数/耗时/原始响应摘录 或 异常诊断）"
             }
         return extra
 
-    def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters=""):
-        if not api_key.strip():
-            api_key = get_api_key()
-        if not api_key.strip():
-            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
+    def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters="", tag_in=""):
+        t0 = time.time()
+        eff_re = normalize_reasoning_effort(reasoning_effort)
 
-        # 三轴兜底：外部连线进来的未知题材名/空值不崩（KeyError 防护 + 通用描述）
-        tag = (tag or "").strip() or "逆袭爽文"
+        # 题材优先级：外部连线 tag_in（如「Agnes 风格选择」导演风格）> tag 下拉框 > 默认
+        tag = (tag_in or "").strip() or (tag or "").strip() or "逆袭爽文"
+
+        # 三轴兜底：未知情绪/节奏/题材不崩（KeyError 防护 + 通用描述）
         emotion = (emotion or "").strip() or "爽"
         rhythm = (rhythm or "").strip() or "中速"
         tag_desc = self.TAG_MAP.get(tag, f"{tag}：以「{tag}」为题材方向创作")
         emotion_desc = self.EMOTION_MAP.get(emotion, f"{emotion}（以该情绪基调创作）")
         rhythm_req, sec_lo, sec_hi, sec_avg = self.RHYTHM_MAP.get(rhythm, self.RHYTHM_MAP["中速"])
         target_scenes = max(3, round(target_duration / sec_avg))
+        max_tokens = target_scenes * 200
         characters_block = f"\n角色设定（剧本中的对白/动作请保持这些角色一致）：\n{characters}\n" if characters.strip() else ""
+
+        if not api_key.strip():
+            api_key = get_api_key()
+        if not api_key.strip():
+            err = ("❌ 未发起 API 请求（配置缺失）：缺少 API Key。\n"
+                   "· 节点内 api_key 为空，且全局配置（「Agnes API Key 配置」节点 / 环境变量 AGNES_API_KEY / config.yaml）均未提供\n"
+                   "· 解决：在本节点 api_key 栏填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）")
+            print(f"[Agnes 漫剧剧本] {err}")
+            return ("[错误] 缺少 API Key（详情见「响应日志」输出）", err)
 
         prompt = f"""你是一位专业的漫剧短视频编剧，擅长把故事大纲改写成适合 AI 漫剧（动态漫画短剧）的分场剧本：节奏快、画面感强、每场都能直接转成画面与镜头。请根据以下故事大纲创作剧本。
 
@@ -198,30 +225,48 @@ class AgnesScreenplayGenerator:
 - 不要用【】等标记符号，不要「第一、第二」列表式结构
 - 不要总结性废话，直接输出剧本："""
 
-        print(f"[Agnes 漫剧剧本] {tag}×{emotion}×{rhythm}：生成分场剧本（约 {target_scenes} 场 / {target_duration} 秒），思考等级={normalize_reasoning_effort(reasoning_effort) or '默认'}...")
+        print(f"[Agnes 漫剧剧本] {tag}×{emotion}×{rhythm}：生成分场剧本（约 {target_scenes} 场 / {target_duration} 秒，max_tokens={max_tokens}），思考等级={eff_re or '默认'}...")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            script = client.chat(
+            raw = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=temperature,
-                max_tokens=target_scenes * 200,
-                reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+                max_tokens=max_tokens,
+                reasoning_effort=eff_re,
             )
 
             # 清理（与 解说剧本生成 一致的兜底）
-            script = re.sub(r'【[^】]*】', '', script)
+            script = re.sub(r'【[^】]*】', '', raw)
             script = re.sub(r'\[[^\]]*\]', '', script)
             script = re.sub(r'\n{3,}', '\n\n', script)
             script = script.strip()
 
+            elapsed = time.time() - t0
+            tag_source = "（题材来自连线输入 tag_in）" if (tag_in or "").strip() else "（题材来自 tag 下拉框）"
+            raw_excerpt = raw[:400] + ("..." if len(raw) > 400 else "")
+            log = (f"✅ 生成成功（耗时 {elapsed:.1f} 秒）\n"
+                   f"· 三维参数：{tag} × {emotion} × {rhythm} {tag_source}\n"
+                   f"· 场次估算：约 {target_scenes} 场 / 目标 {target_duration} 秒（{sec_lo}–{sec_hi} 秒/场），max_tokens={max_tokens}\n"
+                   f"· 模型：{model}（reasoning_effort={eff_re or '默认'}，temperature={temperature}）\n"
+                   f"· 请求地址：{client.base_url}\n"
+                   f"· 原始响应 {len(raw)} 字 → 清理后 {len(script)} 字\n"
+                   f"── 原始响应（前 400 字）──\n{raw_excerpt}")
             print(f"[Agnes Screenplay] Generated {len(script)} chars")
-            return (script,)
+            return (script, log)
 
         except Exception as e:
-            print(f"[Agnes Screenplay] Failed: {e}")
-            return (f"[Error] {str(e)}",)
+            base_disp = base_url.strip() or ("（跟随全局，当前 " + get_base_url() + "）")
+            log = (f"❌ API 调用失败（{type(e).__name__}）\n"
+                   f"· 异常信息：{e}\n"
+                   f"· 请求参数：tag={tag} × emotion={emotion} × rhythm={rhythm}；model={model}；reasoning_effort={eff_re or '默认'}；temperature={temperature}；max_tokens={max_tokens}\n"
+                   f"· 请求地址：{base_disp}\n"
+                   f"· 提示词 {len(prompt)} 字 / 大纲 {len(story_outline)} 字 / 角色设定 {len(characters)} 字\n"
+                   f"· 已耗时 {time.time() - t0:.1f} 秒（含客户端自动重试等待）\n"
+                   f"── 完整堆栈 ──\n{traceback.format_exc()}")
+            print(f"[Agnes Screenplay] Failed: {type(e).__name__}: {e}")
+            return (f"[Error] {type(e).__name__}: {e}", log)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScreenplayGenerator": AgnesScreenplayGenerator}
