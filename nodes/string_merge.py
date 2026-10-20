@@ -26,6 +26,9 @@ class AgnesStringMerge(OutputDocsMixin):
     @classmethod
     def INPUT_TYPES(cls):
         return {
+            # 前端控件顺序 = required 组在前、optional 组在后（各自按声明顺序）；
+            # 分组 [string_1, string_3] + [string_2, separator] ⇒ 面板自上而下：
+            # 第一段（上）→ 第二段（中）→ 第三段（下）→ 分隔符
             "required": {
                 "string_1": ("STRING", {
                     "multiline": True,
@@ -33,27 +36,25 @@ class AgnesStringMerge(OutputDocsMixin):
                     "placeholder": "第一段字符串（上）...",
                     "tooltip": "第一段字符串（上），支持多行文本；可连任意 STRING 输出",
                 }),
-                "string_2": ("STRING", {
+                "string_3": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "第二段字符串（下）...",
-                    "tooltip": "第二段字符串（下），支持多行文本；可连任意 STRING 输出",
+                    "placeholder": "第二段字符串（中）：人工衔接语，如「随后镜头缓缓推进至…」，或连 LLM 对话/文本节点输出",
+                    "tooltip": "第二段字符串（中，上、下之间的人工衔接语）：手输一句过渡/连接描述，或连任意 STRING 输出；留空=上、下直接合并",
                 }),
             },
             "optional": {
+                "string_2": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "第三段字符串（下）...",
+                    "tooltip": "第三段字符串（下），支持多行文本；可连任意 STRING 输出",
+                }),
                 "separator": ("STRING", {
                     "multiline": False,
                     "default": "\n",
                     "placeholder": "分隔符",
                     "tooltip": "段落之间的分隔符（默认一个换行；留空=直接首尾相接）。空段落被跳过时不产生尾随分隔符",
-                }),
-                # 合并顺序固定为 上→中→下（与控件位置无关）；optional 组追加在
-                # separator 之后 = 旧工作流 widgets_values 位置映射不变（3 值节点无错位）
-                "string_3": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "中段：人工衔接语，如「随后镜头缓缓推进至…」，或连 LLM 对话/文本节点输出",
-                    "tooltip": "中段（上、下之间的人工衔接语）：手输一句过渡/连接描述，或连任意 STRING 输出；留空=上、下直接合并（等同旧版两槽行为）",
                 }),
             },
         }
