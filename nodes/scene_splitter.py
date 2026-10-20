@@ -114,6 +114,12 @@ class AgnesSceneSplitter:
         return extra
 
     def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
+        chapter_text = (chapter_text or "").strip()
+        if not chapter_text:
+            skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 的文本输出，或直接粘贴故事章节"
+            print(f"[Agnes 场景拆分] {skip_msg}")
+            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model]
+            return tuple(result)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

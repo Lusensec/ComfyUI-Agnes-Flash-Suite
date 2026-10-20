@@ -164,6 +164,10 @@ class AgnesScreenplayGenerator:
         return extra
 
     def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters=""):
+        if not (story_outline or "").strip():
+            skip_msg = "[跳过] 故事大纲为空：请连接 Agnes 文本输入 的文本输出，或直接粘贴故事大纲"
+            print(f"[Agnes 漫剧剧本] {skip_msg}")
+            return (skip_msg, "输入为空，已跳过。")
         t0 = time.time()
         eff_re = normalize_reasoning_effort(reasoning_effort)
 

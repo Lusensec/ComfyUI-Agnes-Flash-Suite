@@ -139,6 +139,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - chapter_text_out: 原文本（透传）
 - api_key_out / base_url_out / model_out: 配置透传
 
+> 输入为空（chapter_text 留空/上游未连）时直接跳过、不调 API：log_text 显示「[跳过] 输入为空…」，各槽为空。
+
 ---
 
 ### 🎬 Agnes 总导演 (AgnesDirectorMaster)
@@ -157,7 +159,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - log_text: 处理日志（成功=分镜数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
 - scene_1 ~ scene_50: 分镜脚本
 - chapter_text_out / api_key_out / base_url_out / model_out: 透传
-- shot_count: 分镜总数（统计实际解析出的分镜数；超过 50 时标注「N（仅显示前 50 个）」；失败/无 Key 时为空）
+- shot_count: 分镜总数（统计实际解析出的分镜数；超过 50 时标注「N（仅显示前 50 个）」；失败/无 Key/输入为空时为空）
+
+> 输入为空（chapter_text 留空/上游未连）时直接跳过、不调 API：log_text 显示「[跳过] 输入为空…」，各槽为空。
 
 > 两种接法：
 > - 小说线：章节原文 → 总导演（章→镜一步到位）
@@ -188,6 +192,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 > 空正文排查：log_text 显示 "⚠️ 空响应"（5 个 JSON 槽全空）：① reasoning_effort → none/low ② 换 agnes-2.5-flash ③ 原样重跑一次（排除服务器偶发）。
 
+> 输入为空（chapter_text 留空/上游未连）时直接跳过、不调 API：log_text 显示「[跳过] 输入为空…」，各槽为空。
+
 > 两种接法：
 > - 小说线：章节原文 → 资产提取（章节里什么都有，服装/天气字段较全）
 > - 漫剧线：Agnes 剧本生成（漫剧）→ 资产提取（资产=该集要拍的，更准更省；但漫剧剧本格式里服装/天气字段偏弱，这两路 JSON 可能偏稀——没有就不生成，属正常）
@@ -212,6 +218,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 **输出：**
 - detailed_prompt: 英文提示词
 - log_text: 处理日志（成功=字数+响应元数据；空响应=⚠️警示；失败=异常+堆栈）
+
+> 输入为空（scene_text 留空/上游未连）时直接跳过、不调 API：日志显示「[跳过] 分镜文本为空…」，detailed_prompt 为跳过提示。
 
 ---
 
@@ -238,6 +246,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 > 原「Agnes 文生图」节点（AgnesNovelTextToImage）的多张生成功能（n 1-4）已并入本节点，
 > 文生图节点已删除；单张出图直接用本节点（n=1）
+
+> 提示词为空（prompt 留空/上游未连）时直接跳过、不调 API：输出黑图占位 + 日志「[跳过] 提示词为空…」，避免空请求被误判为「空响应」。
 
 ---
 
@@ -344,6 +354,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 > 空正文排查：log_text 显示 "⚠️ 空响应"（script 槽为空）：① reasoning_effort → none/low ② 换 agnes-2.5-flash ③ 原样重跑一次。
 
+> 输入为空（story_outline 留空/上游未连）时直接跳过、不调 API：日志显示「[跳过] 故事大纲为空…」，script 为跳过提示。
+
 ---
 
 ### 🎭 Agnes 剧本生成 (AgnesScreenplayGenerator)
@@ -379,6 +391,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 风格联动：Agnes 风格选择（导演风格，如「科幻未来」）→ 剧本生成（**tag 输入，直接连线**，覆盖手输值）→ 剧本按该题材方向创作；视觉风格用于后续资产生成。
 > 排错：执行报错看节点「响应日志」输出（覆盖 API Key/网络/HTTP/响应格式全部情况）；若日志显示 "Failed to validate prompt / Return type mismatch"（校验失败、节点没跑），多为旧存档问题——删掉该节点重新拖入、把「风格选择.导演风格」连到 **tag** 输入即可。
 > 空响应：若日志显示 "⚠️ 空响应（API 返回 200 但正文为空）"，多为思考型模型预算耗尽（3.0-flash medium + 场次多，思考链占满输出上限）——降思考等级（none/low）、换 agnes-2.5-flash 或减场次后重跑；日志里的 finish_reason 与 token 消耗可佐证。
+> 输入为空（story_outline 留空/上游未连）时直接跳过、不调 API：日志显示「[跳过] 故事大纲为空…」，script 为跳过提示。
 
 ---
 
@@ -412,22 +425,23 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 ### ✍️ Agnes 三视图提示词生成 (AgnesTurnaroundPromptGenerator)
 
 **功能：** 把原始主体描述/提示词（资产提示词生成节点输出，或手写的中英文描述）
-转成一条**完整可见的三视图英文提示词**（内置三视图构图指令 + 纯主体规格
-「纯白背景、平光无阴影」+ 质量尾词），并**自动去掉原文中与三视图矛盾的单视图
+转成一条**完整可见的三视图英文提示词**（内置分栏布局指令「左侧 1/3 区域超大特写 +
+右侧 2/3 区域整齐排布三视图」+ 虚幻引擎渲染风格/PBR材质/柔和漫射光 +
+纯主体规格「纯白背景、干净极简、无阴影」+ 8K 质量尾词），并**自动去掉原文中与三视图矛盾的单视图
 字样（single front view / facing the camera 等）**。输出可复制到
 三视图生成节点的 subject_desc 手工修改优化后再出图
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | subject_prompt | STRING(多行) | "" | 原始主体描述/提示词：连 Agnes 资产提示词生成 的「英文资产生成提示词」输出，或手动粘贴任意中英文描述 |
-| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（决定三视图构图指令：角色=全身正侧背 / 场景=正立面+侧立面+俯视 / 载具=整车三视图…） |
+| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（决定分栏布局指令：角色=面部特写+全身正侧背 / 物品=细节特写+三视图 / 服装=细节特写+正侧背 / 场景=局部特写+正立面/侧立面/俯视 / 载具=局部特写+整车三视图 / 通用） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
 
 **输出：**
-- 三视图提示词: 完整三视图英文提示词（主体全部细节保留 + 三视图构图 + 纯白底平光 + 质量尾词），可连 三视图生成 或复制后手工修改
+- 三视图提示词: 完整三视图英文提示词（主体全部细节保留 + 分栏布局「左 1/3 特写 + 右 2/3 三视图」+ 虚幻引擎渲染风格/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词），可连 三视图生成 或复制后手工修改
 - 处理日志: 成功=提示词摘要+响应元数据；空响应=⚠️警示；失败=异常+堆栈
 
 > 空正文排查：处理日志显示 "⚠️ 空响应"（三视图提示词槽为空）：① reasoning_effort → none/low ② 换 agnes-2.5-flash ③ 原样重跑一次。

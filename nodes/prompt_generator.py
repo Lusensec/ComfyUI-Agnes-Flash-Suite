@@ -88,6 +88,10 @@ class AgnesScenePromptGenerator:
         return extra
 
     def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", reasoning_effort="auto"):
+        if not (scene_text or "").strip():
+            skip_msg = "[跳过] 分镜文本为空：请连接 Agnes 总导演 / Agnes 场景切分 的分镜输出，或直接粘贴分镜文本"
+            print(f"[Agnes 分镜提示词] {skip_msg}")
+            return (skip_msg, "输入为空，已跳过。")
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

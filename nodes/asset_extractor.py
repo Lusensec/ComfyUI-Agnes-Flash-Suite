@@ -88,6 +88,10 @@ class AgnesAssetExtractor:
         return extra
 
     def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
+        if not (chapter_text or "").strip():
+            skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 的文本输出，或直接粘贴故事章节"
+            print(f"[Agnes Asset] {skip_msg}")
+            return (skip_msg, "", "", "", "", "输入为空，已跳过。")
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

@@ -121,6 +121,12 @@ class AgnesImageGen:
 
     def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL, aspect_ratio="16:9", n=1):
         n = max(1, min(4, int(n or 1)))
+        if not (prompt or "").strip():
+            import torch as _torch
+            skip_msg = "[跳过] 提示词为空：请连接 Agnes 分镜提示词生成 / Agnes 字符串合并 的英文提示词输出，或直接粘贴画面描述"
+            print(f"[Agnes Image] {skip_msg}")
+            black = _torch.zeros(1, height, width, 3)
+            return (black, skip_msg, "")
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():

@@ -6,7 +6,8 @@ Agnes 三视图生成节点
 完整三视图提示词生成三视图设定图（turnaround sheet）。
 
 完整三视图提示词推荐由 Agnes 三视图提示词生成 节点输出（原始描述 →
-LLM 合并三视图构图指令 + 纯白背景平光无阴影规格 + 质量尾词，
+LLM 合并分栏布局指令（左侧 1/3 特写 + 右侧 2/3 三视图）+ 虚幻引擎渲染风格/PBR/柔和漫射光
++ 纯白背景无阴影 + 8K 质量尾词，
 输出对用户可见、可手工修改优化后再填入本节点）。
 
 可选连接参考图（定妆图/已有设定图）走图生图模式，保证与已有资产一致。
@@ -32,7 +33,7 @@ QUALITIES = ["1K", "2K", "3K", "4K"]
 
 
 class AgnesSubjectTurnaround(OutputDocsMixin):
-    """生成主体三视图设定图（角色/物品/场景/载具/通用，正视图并排）"""
+    """生成主体三视图设定图（角色/物品/场景/载具/通用，左 1/3 特写 + 右 2/3 三视图分栏）"""
 
     DESCRIPTION = "三视图生成：直接用输入的完整三视图提示词出图（无内置模板，提示词推荐由 Agnes 三视图提示词生成 节点输出），可选参考图保持一致"
 
@@ -41,7 +42,7 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
     RETURN_NAMES = ("image", "resolution", "final_prompt")
     RETURN_LABELS = ("三视图", "分辨率", "最终提示词")
     OUTPUT_DOCS = {
-        "image": "三视图设定图张量（三个视图并排），可连接 SaveImage 存档或作为后续生成的参考图",
+        "image": "三视图设定图张量（左侧 1/3 特写 + 右侧 2/3 三视图分栏），可连接 SaveImage 存档或作为后续生成的参考图",
         "resolution": "三视图实际输出分辨率（WxH）",
         "final_prompt": "实际使用的完整提示词（subject_desc + extra_prompt 补充词），可复制复用或微调",
     }
@@ -55,7 +56,7 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
                 "subject_desc": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "完整三视图提示词（推荐连 Agnes 三视图提示词生成 的输出）：\nSu Chen, 20-year-old sword cultivator, three orthographic views side by side: front, side, back, full body, pure white background, even flat lighting...",
+                    "placeholder": "完整三视图提示词（推荐连 Agnes 三视图提示词生成 的输出）：\nSu Chen, 20-year-old sword cultivator, panel layout: left one-third ultra-large face close-up, right two-thirds three full-body views (front, side, back), pure white background, soft diffused lighting, 8K...",
                     "tooltip": "完整三视图提示词（无内置模板，出什么图由这段提示词决定）：推荐连 Agnes 三视图提示词生成 节点输出，或手动粘贴/手工修改后的提示词",
                 }),
                 "base_url": ("STRING", {
