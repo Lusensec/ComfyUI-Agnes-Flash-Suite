@@ -5,7 +5,8 @@ Agnes 资产提取节点
 import requests
 import json
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
+import traceback
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 
 
 class AgnesAssetExtractor:
@@ -41,18 +42,26 @@ class AgnesAssetExtractor:
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
+                "max_tokens": ("INT", {
+                    "default": 3000,
+                    "min": 500,
+                    "max": 8192,
+                    "step": 250,
+                    "tooltip": "输出 token 预算：5 路资产 JSON 约需 1000-2000；思考模型（reasoning_effort≥medium）下建议调大（4000+）防空正文"
+                }),
             },
             "optional": {}
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("characters_json", "locations_json", "props_json", "costumes_json", "weather_json")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("characters_json", "locations_json", "props_json", "costumes_json", "weather_json", "log_text")
     RETURN_LABELS = (
         "角色信息 JSON",
         "场景信息 JSON",
         "道具列表 JSON",
         "服装信息 JSON",
-        "天气信息 JSON"
+        "天气信息 JSON",
+        "处理日志",
     )
     OUTPUT_TOOLTIPS = (
         "角色列表 JSON（姓名/性别/年龄/外貌/性格，连接提示词节点增强角色一致性）",
@@ -60,6 +69,7 @@ class AgnesAssetExtractor:
         "道具列表 JSON（重要物品名称+描述，可连 LLM 对话节点生成道具定妆文）",
         "服装列表 JSON（角色名+对应服装描述，可连 LLM 对话节点生成服装定妆文）",
         "天气/氛围 JSON（场景氛围补充，连接提示词节点增强一致性）",
+        "处理日志（成功=各路统计+响应元数据；空响应=⚠️警示；JSON 解析失败=提示；异常=堆栈）",
     )
     FUNCTION = "extract"
     CATEGORY = "Agnes Novel"
@@ -77,18 +87,19 @@ class AgnesAssetExtractor:
             "props_json": "提取的道具列表，包含重要物品的名称和描述",
             "costumes_json": "提取的服装列表，包含角色名和对应的服装描述",
             "weather_json": "提取的天气信息，包含场景中的天气状况描述",
+            "log_text": "处理日志（响应元数据/空响应警示/JSON 解析失败提示/异常堆栈）",
         }
         for key in outputs:
             if key in kwargs:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
+    def extract(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=3000):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             err = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            return (err, "", "", "", "")
+            return (err, "", "", "", "", "API Key 缺失。")
         print(f"\n{'='*50}")
         print(f"📋 Agnes 资产提取")
         print(f"{'='*50}")
@@ -137,25 +148,33 @@ class AgnesAssetExtractor:
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            content = client.chat(
+            raw, meta = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=0.3,
-                max_tokens=3000,
+                max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+                return_meta=True,
             )
+            meta_line = format_chat_meta(meta, max_tokens)
 
             # 清理 markdown 代码块
-            content = content.strip()
+            content = (raw or "").strip()
             if content.startswith("```"):
                 content = content.split("\n", 1)[1] if "\n" in content else content[3:]
             if content.endswith("```"):
                 content = content[:-3]
 
+            if not content:
+                log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                print(f"[Agnes Asset] {log}")
+                return ("", "", "", "", "", log)
+
             # 尝试解析 JSON
             try:
                 data = json.loads(content)
-                
+
                 # 提取各字段
                 characters = json.dumps(data.get("characters", []), ensure_ascii=False, indent=2)
                 locations = json.dumps(data.get("locations", []), ensure_ascii=False, indent=2)
@@ -170,15 +189,26 @@ class AgnesAssetExtractor:
                 print(f"  - 服装: {len(data.get('costumes', []))} 套")
                 print(f"  - 天气: {len(data.get('weather', []))} 种")
 
-                return (characters, locations, props, costumes, weather)
+                log = (f"✅ 提取完成：角色 {len(data.get('characters', []))} / 场景 {len(data.get('locations', []))} / "
+                       f"道具 {len(data.get('props', []))} / 服装 {len(data.get('costumes', []))} / 天气 {len(data.get('weather', []))}\n"
+                       f"· 响应元数据：{meta_line}")
+                return (characters, locations, props, costumes, weather, log)
 
             except json.JSONDecodeError:
+                log = (f"⚠️ JSON 解析失败：原始文本（{len(content)} 字）已放入「角色信息 JSON」槽，其余槽为空\n"
+                       f"· 响应元数据：{meta_line}\n"
+                       f"· 建议：章节过短/模型跑题时重试，或换 agnes-2.5-flash + 思考 none")
                 print(f"[Agnes Asset] JSON 解析失败，返回原始内容")
-                return (content, "", "", "", "")
+                print(log)
+                return (content, "", "", "", "", log)
 
         except Exception as e:
+            tb = traceback.format_exc()
+            log = (f"❌ 资产提取失败（{type(e).__name__}）: {e}\n"
+                   f"· 请求参数: model={model}；max_tokens={max_tokens}\n"
+                   f"── 完整堆栈 ──\n{tb}")
             print(f"[Agnes Asset] 失败: {e}")
-            return ("", "", "", "", "")
+            return ("", "", "", "", "", log)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesAssetExtractor": AgnesAssetExtractor}

@@ -6,8 +6,9 @@ Agnes LLM 对话节点
 """
 
 from typing import Any, Dict, Tuple
+import traceback
 
-from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
+from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 from ._output_docs import OutputDocsMixin
 
 
@@ -15,11 +16,12 @@ class AgnesNovelLLMChat(OutputDocsMixin):
     """Agnes AI LLM 对话节点：与 Agnes 对话模型多轮交互（可带系统提示词）。"""
 
     CATEGORY = "Agnes Novel"
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("response",)
-    RETURN_LABELS = ('AI回复',)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("response", "log_text")
+    RETURN_LABELS = ('AI回复', '响应日志')
     OUTPUT_DOCS = {
         "response": "Agnes 对话模型返回的完整文本（可连接任意文本节点，或直接复制使用）",
+        "log_text": "响应日志（成功=字数+响应元数据；空响应=⚠️警示；失败=异常详情+堆栈）",
     }
     FUNCTION = "chat"
 
@@ -95,15 +97,15 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         system_prompt: str = "",
         enable_thinking: bool = False,
         reasoning_effort: str = "auto",
-    ) -> Tuple[str]:
+    ) -> Tuple[str, str]:
         if not prompt.strip():
-            return ("[错误] 提示词为空：请输入消息",)
+            return ("[错误] 提示词为空：请输入消息", "提示词为空，已跳过。")
 
         # 运行时回退：widget 值为空时从全局配置（api_key_config.json 等）取 API Key
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
+            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）", "API Key 缺失。")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
@@ -115,17 +117,29 @@ class AgnesNovelLLMChat(OutputDocsMixin):
             ctk = {"enable_thinking": True} if enable_thinking else None
             effort = normalize_reasoning_effort(reasoning_effort)
 
-            response = client.chat(
+            response, meta = client.chat(
                 messages=messages,
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 chat_template_kwargs=ctk,
                 reasoning_effort=effort,
+                return_meta=True,
             )
-            return (response,)
+            meta_line = format_chat_meta(meta, max_tokens)
+            if not (response or "").strip():
+                log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                print(f"[Agnes LLM 对话] {log}")
+                return ("", log)
+            log = f"✅ 回复完成（{len(response)} 字，预算 {max_tokens} tokens）\n· 响应元数据：{meta_line}"
+            print(f"[Agnes LLM 对话] 完成 {len(response)} 字")
+            return (response, log)
         except Exception as e:
-            return (f"[错误] {str(e)}",)
+            tb = traceback.format_exc()
+            log = f"❌ 调用失败（{type(e).__name__}）: {e}\n── 完整堆栈 ──\n{tb}"
+            print(f"[Agnes LLM 对话] 失败: {e}")
+            return (f"[错误] {str(e)}", log)
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelLLMChat": AgnesNovelLLMChat}
 NODE_DISPLAY_NAME_MAPPINGS = {"AgnesNovelLLMChat": "💬 Agnes LLM 对话"}

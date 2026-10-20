@@ -141,6 +141,22 @@ def normalize_reasoning_effort(v):
     s = str(v).strip().lower()
     return s if s in _REASONING_EFFORT_VALID else None
 
+
+def format_chat_meta(meta, max_tokens):
+    """响应元数据一行摘要（finish_reason / 完成 token / 思考占比），供各 LLM 节点诊断日志使用。
+
+    meta 来自 client.chat(return_meta=True)；传 None 也安全。
+    空正文 + finish_reason=length 通常 = 思考模型预算耗尽。
+    """
+    meta = meta or {}
+    usage = meta.get("usage") or {}
+    line = f"finish_reason={meta.get('finish_reason')}；completion_tokens={usage.get('completion_tokens')}（上限 {max_tokens}）"
+    reasoning = meta.get("reasoning_tokens")
+    if reasoning:
+        line = f"{line}，其中思考 {reasoning} tokens"
+    return line
+
+
 MIME_MAP = {
     "png": "image/png",
     "jpg": "image/jpeg",

@@ -14,6 +14,7 @@ LLM 对话批量路线（整份 JSON 一次出全部【名】英文提示词，�
 """
 
 import re
+import traceback
 from typing import Tuple
 
 from ..api import (
@@ -23,6 +24,7 @@ from ..api import (
     AVAILABLE_CHAT_MODELS,
     REASONING_EFFORTS,
     normalize_reasoning_effort,
+    format_chat_meta,
 )
 from ._output_docs import OutputDocsMixin
 
@@ -61,7 +63,7 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
     RETURN_LABELS = ("英文资产生成提示词", "处理日志")
     OUTPUT_DOCS = {
         "english_prompt": "可直接用于 文生图/三视图(subject_desc) 的英文提示词：保留 JSON 全部描述字段 + 主体构图指令 + 风格尾词 + quality 词；失败时返回 [Error] 前缀",
-        "log_text": "处理日志（成功=摘要预览；失败=错误原因）",
+        "log_text": "处理日志（成功=摘要预览+响应元数据；空响应=⚠️警示；失败=异常详情+堆栈）",
     }
     FUNCTION = "generate"
     OUTPUT_NODE = True
@@ -159,19 +161,28 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            raw = client.chat(
+            raw, meta = client.chat(
                 messages=[{"role": "user", "content": self._build_user_prompt(asset_json, subject_type, style)}],
                 model=model,
                 temperature=0.4,
                 max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+                return_meta=True,
             )
+            meta_line = format_chat_meta(meta, max_tokens)
             prompt = self._clean_prompt(raw)
-            log = f"✅ 资产提示词已生成（{subject_type}/{style}，预算 {max_tokens} tokens）：{prompt[:60].strip()}..."
+            if not prompt:
+                log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                print(f"[Agnes 资产提示词] {log}")
+                return ("", log)
+            log = (f"✅ 资产提示词已生成（{subject_type}/{style}，预算 {max_tokens} tokens）：{prompt[:60].strip()}...\n"
+                   f"· 响应元数据：{meta_line}")
             print(log)
             return (prompt, log)
         except Exception as e:
-            log = f"❌ 资产提示词生成失败: {e}"
+            tb = traceback.format_exc()
+            log = f"❌ 资产提示词生成失败（{type(e).__name__}）: {e}\n── 完整堆栈 ──\n{tb}"
             print(log)
             return (f"[Error] {e}", log)
 

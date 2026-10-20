@@ -7,7 +7,8 @@ import json
 import re
 import os
 import time
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, VIDEO_MAX_WAIT, VIDEO_POLL_INTERVAL
+import traceback
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, VIDEO_MAX_WAIT, VIDEO_POLL_INTERVAL, format_chat_meta
 
 
 class AgnesSceneSplitter:
@@ -46,6 +47,13 @@ class AgnesSceneSplitter:
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
+                "max_tokens": ("INT", {
+                    "default": 12000,
+                    "min": 2000,
+                    "max": 16000,
+                    "step": 1000,
+                    "tooltip": "输出 token 预算：切分长章节需要大预算；思考模型（reasoning_effort≥medium）下建议拉满 16000 防空正文"
+                }),
             }
         }
         return inputs
@@ -79,7 +87,7 @@ class AgnesSceneSplitter:
         "场景 46", "场景 47", "场景 48", "场景 49", "场景 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
     )
-    OUTPUT_TOOLTIPS = ("处理日志（场景统计/错误信息）",) + (
+    OUTPUT_TOOLTIPS = ("处理日志（场景统计/响应元数据/空响应警示/错误详情）",) + (
         ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * 50
     ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
     FUNCTION = "split_scenes"
@@ -93,7 +101,7 @@ class AgnesSceneSplitter:
     def get_extra_pnginfo(self, **kwargs):
         extra = {}
         outputs = {
-            "log_text": "处理日志，包含成功/失败信息和输出文件路径",
+            "log_text": "处理日志，包含成功/失败信息、响应元数据（finish_reason/token 消耗）、空响应警示和输出文件路径",
             "scene_1": "第 1 个场景段落",
             "scene_2": "第 2 个场景段落",
             "scene_3": "第 3 个场景段落",
@@ -112,7 +120,7 @@ class AgnesSceneSplitter:
                 extra[key] = {"description": outputs[key]}
         return extra
 
-    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
+    def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto", max_tokens=12000):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
@@ -191,15 +199,16 @@ class AgnesSceneSplitter:
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            content = client.chat(
+            content, meta = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=0.2,
-                max_tokens=12000,
+                max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+                return_meta=True,
             )
 
-            scenes = self._parse_scenes(content)
+            scenes = self._parse_scenes(content or "")
 
             # 保存到输出目录
             output_dir = os.path.join(os.path.expanduser("~"), "Documents", "AgnesOutput")
@@ -207,9 +216,14 @@ class AgnesSceneSplitter:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             script_path = os.path.join(output_dir, f"storyboard_agnes_{timestamp}.txt")
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(content)
+                f.write(content or "")
 
-            log = f"✅ Agnes 切段完成: {len(scenes)} 个段落\n📋 脚本: {script_path}"
+            meta_line = format_chat_meta(meta, max_tokens)
+            if not (content or "").strip():
+                log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
+                       f"常见于思考模型预算耗尽——降低思考等级或调大 max_tokens 后重试（0 个段落）")
+            else:
+                log = f"✅ Agnes 切段完成: {len(scenes)} 个段落\n· 响应元数据：{meta_line}\n📋 脚本: {script_path}"
             print(log)
 
             result = [log]
@@ -223,7 +237,10 @@ class AgnesSceneSplitter:
             return tuple(result)
 
         except Exception as e:
-            error_msg = f"❌ Agnes 切段失败: {e}"
+            tb = traceback.format_exc()
+            error_msg = (f"❌ Agnes 切段失败（{type(e).__name__}）: {e}\n"
+                         f"· 请求参数: model={model}；max_tokens={max_tokens}\n"
+                         f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
             result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
             return tuple(result)

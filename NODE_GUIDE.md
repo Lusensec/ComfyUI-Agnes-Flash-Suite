@@ -132,9 +132,10 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| max_tokens | INT | 12000 | 输出 token 预算（切分长章节需要大预算）；思考模型 ≥medium 建议拉满 16000 |
 
 **输出：**
-- log_text: 处理日志
+- log_text: 处理日志（成功=段落数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
 - scene_1 ~ scene_50: 最多 50 个场景片段
 - chapter_text_out: 原文本（透传）
 - api_key_out / base_url_out / model_out: 配置透传
@@ -152,9 +153,10 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| max_tokens | INT | 12000 | 输出 token 预算（50 个分镜块需要大预算）；思考模型 ≥medium 建议拉满 16000 |
 
 **输出：**
-- log_text: 处理日志
+- log_text: 处理日志（成功=分镜数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
 - scene_1 ~ scene_50: 分镜脚本
 - chapter_text_out / api_key_out / base_url_out / model_out: 透传
 
@@ -176,6 +178,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| max_tokens | INT | 3000 | 输出 token 预算：5 路资产 JSON 约需 1000–2000；思考模型 ≥medium 建议 4000+ 防空正文 |
 
 **输出：**
 - characters_json: 角色信息 JSON
@@ -183,6 +186,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - props_json: 道具列表 JSON
 - costumes_json: 服装信息 JSON
 - weather_json: 天气信息 JSON
+- log_text: 处理日志（成功=各路统计+响应元数据；空响应=⚠️警示；JSON 解析失败=提示；异常=堆栈）
+
+> 空正文排查：log_text 显示 "⚠️ 空响应"（5 个 JSON 槽全空）：① reasoning_effort → none/low ② max_tokens 调大 ③ 原样重跑一次（排除服务器偶发）。
 
 > 两种接法：
 > - 小说线：章节原文 → 资产提取（章节里什么都有，服装/天气字段较全）
@@ -202,11 +208,13 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | style | COMBO | cinematic | 图像风格：cinematic/anime/realistic/watercolor/oil_painting |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| max_tokens | INT | 2000 | 输出 token 预算：一条分镜提示词约需 300–500；思考模型 ≥medium 建议 4000+ 防空正文 |
 | characters_json | STRING | "" | 角色信息 JSON（可选） |
 | locations_json | STRING | "" | 场景信息 JSON（可选） |
 
 **输出：**
 - detailed_prompt: 英文提示词
+- log_text: 处理日志（成功=字数+响应元数据；空响应=⚠️警示；失败=异常+堆栈）
 
 ---
 
@@ -332,9 +340,13 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | target_duration | INT | 180 | 目标时长（秒） |
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| max_tokens | INT | 0 | 输出 token 预算：0=自动（目标字数×2，原行为）；思考模型 ≥medium 建议填 目标字数×4 防空正文 |
 
 **输出：**
 - script: 解说文案
+- log_text: 响应日志（成功=字数+响应元数据；空响应=⚠️警示；失败=异常+堆栈）
+
+> 空正文排查：log_text 显示 "⚠️ 空响应"（script 槽为空）：① reasoning_effort → none/low ② max_tokens 调大 ③ 原样重跑一次。
 
 ---
 
@@ -417,10 +429,13 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
+| max_tokens | INT | 1000 | 输出 token 预算：三视图提示词约需 150–300；思考模型 ≥medium 建议 4000+ 防空正文 |
 
 **输出：**
 - 三视图提示词: 完整三视图英文提示词（主体全部细节保留 + 三视图构图 + 纯白底平光 + 质量尾词），可连 三视图生成 或复制后手工修改
-- 处理日志: 成功=提示词摘要预览；失败=错误原因
+- 处理日志: 成功=提示词摘要+响应元数据；空响应=⚠️警示；失败=异常+堆栈
+
+> 空正文排查：处理日志显示 "⚠️ 空响应"（三视图提示词槽为空）：① reasoning_effort → none/low ② max_tokens 调大 ③ 原样重跑一次。
 
 > 完整资产三视图链路：
 > `资产提取 → 文本拆分(第N条) → 资产提示词生成 → 三视图提示词生成 → [查看/手工改三视图提示词] → 三视图生成`
@@ -482,6 +497,29 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ---
 
+### 💬 Agnes LLM 对话 (AgnesNovelLLMChat)
+
+**功能：** 与 Agnes 对话模型自由对话（通用 LLM 文本节点：扩写/改写/批量转换/任意指令），
+可选系统提示词、Thinking 开关与思考等级。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| prompt | STRING(多行) | "" | 用户消息 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL |
+| api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
+| model | COMBO | agnes-2.5-flash | 对话模型（2.5-flash 默认 / 3.0-flash Agent） |
+| temperature | FLOAT | 0.7 | 采样温度 |
+| max_tokens | INT | 4096 | 输出 token 预算上限（思考模型下思考链与正文共享该预算，思考档拉高时按需调大） |
+| system_prompt（可选） | STRING(多行) | "" | 系统提示词（角色/行为设定） |
+| enable_thinking（可选） | BOOLEAN | 关 | Thinking 模式开关（消耗更多 token） |
+| reasoning_effort（可选） | COMBO | auto | 思考强度：auto/none/low/medium/high/max |
+
+**输出：**
+- AI回复: 完整回复文本
+- 响应日志: 成功=字数+响应元数据（finish_reason/token 消耗）；空响应=⚠️警示；失败=异常+堆栈
+
+---
+
 ### 🖌️ Agnes 资产提示词生成 (AgnesAssetPromptGenerator)
 
 **功能：** 把单条资产 JSON 转成**可直接生图的英文提示词**（内置 art-director 模板，
@@ -504,7 +542,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - 英文资产生成提示词: 保留 JSON 全部描述字段（专名拼音化）+ 构图指令 + 风格/质量尾词，直接喂生图
 - 处理日志: 成功=提示词摘要预览（含所用预算）；失败=错误原因
 
-> 空正文排查：日志显示"已生成"但输出仍为空（API 200 但正文 0 字，多为思考模型预算耗尽）：
+> 空正文排查：处理日志显示 "⚠️ 空响应"（API 200 但正文 0 字，多为思考模型预算耗尽）：
 > ① reasoning_effort → none/low ② max_tokens 调大（4000+）③ 原样重跑一次（排除服务器偶发）。
 
 > **资产线完整接法（角色/道具/场景/服装 → 设定图）：**

@@ -4,7 +4,8 @@ Agnes 剧本生成节点
 """
 import requests
 import re
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
+import traceback
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 
 
 class AgnesScriptGenerator:
@@ -57,14 +58,22 @@ class AgnesScriptGenerator:
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
+                "max_tokens": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "max": 16000,
+                    "step": 100,
+                    "tooltip": "输出 token 预算：0=自动（目标字数×2，原行为）；或填固定值。思考模型（reasoning_effort≥medium）下建议填 目标字数×4 防空正文"
+                }),
             },
             "optional": {}
         }
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("script",)
-    RETURN_LABELS = ("解说文案")
-    OUTPUT_TOOLTIPS = ("影视解说文案（含开场/讲解/结尾完整结构，连接 SaveText 或作为配音稿）",)
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("script", "log_text")
+    RETURN_LABELS = ("解说文案", "响应日志")
+    OUTPUT_TOOLTIPS = ("影视解说文案（含开场/讲解/结尾完整结构，连接 SaveText 或作为配音稿）",
+                       "响应日志（成功=字数+响应元数据；空响应=⚠️警示；失败=异常详情），方便定位空正文/截断问题")
     FUNCTION = "generate"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -79,15 +88,20 @@ class AgnesScriptGenerator:
             extra["script"] = {
                 "description": "影视解说文案，包含开场、讲解、结尾等完整内容"
             }
+        if "log_text" in kwargs:
+            extra["log_text"] = {
+                "description": "响应日志（响应元数据/空响应警示/异常详情）"
+            }
         return extra
 
-    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto"):
+    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", max_tokens=0):
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）",)
+            return ("[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）", "API Key 缺失。")
 
         target_chars = target_duration * 5
+        eff_max = int(max_tokens) if (max_tokens or 0) else target_chars * 2
 
         style_map = {
             "casual": "风趣幽默、接地气，像朋友聊天一样自然",
@@ -120,30 +134,42 @@ class AgnesScriptGenerator:
 
 请直接输出解说文案，不要有任何额外说明："""
 
-        print(f"[Agnes 剧本] 生成解说文案（目标 {target_chars} 字），思考等级={normalize_reasoning_effort(reasoning_effort) or '默认'}...")
+        print(f"[Agnes 剧本] 生成解说文案（目标 {target_chars} 字，预算 {eff_max} tokens），思考等级={normalize_reasoning_effort(reasoning_effort) or '默认'}...")
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            script = client.chat(
+            raw, meta = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=temperature,
-                max_tokens=target_chars * 2,
+                max_tokens=eff_max,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+                return_meta=True,
             )
 
             # 清理
-            script = re.sub(r'【[^】]*】', '', script)
+            script = re.sub(r'【[^】]*】', '', raw)
             script = re.sub(r'\[[^\]]*\]', '', script)
             script = re.sub(r'\n{3,}', '\n\n', script)
             script = script.strip()
 
+            meta_line = format_chat_meta(meta, eff_max)
+            if not script:
+                log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                print(f"[Agnes Script] 空响应（0 字），预算 {eff_max}")
+                return ("", log)
+
+            log = (f"✅ 生成完成（{len(script)} 字，预算 {eff_max} tokens）\n"
+                   f"· 响应元数据：{meta_line}")
             print(f"[Agnes Script] Generated {len(script)} chars")
-            return (script,)
+            return (script, log)
 
         except Exception as e:
             print(f"[Agnes Script] Failed: {e}")
-            return (f"[Error] {str(e)}",)
+            tb = traceback.format_exc()
+            log = f"❌ API 调用失败（{type(e).__name__}）: {e}\n── 完整堆栈 ──\n{tb}"
+            return (f"[Error] {str(e)}", log)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScriptGenerator": AgnesScriptGenerator}

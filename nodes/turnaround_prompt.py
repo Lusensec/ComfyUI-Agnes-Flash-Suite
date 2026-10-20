@@ -15,6 +15,7 @@ Agnes 三视图提示词生成节点
 """
 
 from typing import Tuple
+import traceback
 
 from ..api import (
     AgnesClient,
@@ -23,6 +24,7 @@ from ..api import (
     AVAILABLE_CHAT_MODELS,
     REASONING_EFFORTS,
     normalize_reasoning_effort,
+    format_chat_meta,
 )
 from ._output_docs import OutputDocsMixin
 
@@ -65,7 +67,7 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
     RETURN_LABELS = ("三视图提示词", "处理日志")
     OUTPUT_DOCS = {
         "three_view_prompt": "完整三视图英文提示词：主体全部细节 + 三视图构图指令 + 纯白背景平光无阴影 + 质量尾词。可直接连 三视图生成(subject_desc)，或复制后手工修改再填入",
-        "log_text": "处理日志（成功=提示词摘要预览；失败=错误原因）",
+        "log_text": "处理日志（成功=提示词摘要+响应元数据；空响应=⚠️警示；失败=异常详情+堆栈）",
     }
     FUNCTION = "generate"
     OUTPUT_NODE = True
@@ -104,6 +106,13 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
                 }),
+                "max_tokens": ("INT", {
+                    "default": 1000,
+                    "min": 256,
+                    "max": 8192,
+                    "step": 128,
+                    "tooltip": "输出 token 预算：三视图提示词约需 150-300；思考模型（reasoning_effort≥medium）下建议 4000+ 防空正文",
+                }),
             },
             "optional": {},
         }
@@ -133,7 +142,8 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
         return t.strip().strip('"')
 
     def generate(self, subject_prompt="", subject_type="角色",
-                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto") -> Tuple[str, str]:
+                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto",
+                 max_tokens=1000) -> Tuple[str, str]:
         subject_prompt = (subject_prompt or "").strip()
         if not subject_prompt:
             err = "[Error: subject_prompt 为空。请连接 Agnes 资产提示词生成的输出，或手动粘贴主体描述。]"
@@ -149,19 +159,28 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            raw = client.chat(
+            raw, meta = client.chat(
                 messages=[{"role": "user", "content": self._build_user_prompt(subject_prompt, subject_type)}],
                 model=model,
                 temperature=0.4,
-                max_tokens=1000,
+                max_tokens=max_tokens,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+                return_meta=True,
             )
+            meta_line = format_chat_meta(meta, max_tokens)
             prompt = self._clean_prompt(raw)
-            log = f"✅ 三视图提示词已生成（{subject_type}）：{prompt[:60].strip()}..."
+            if not prompt:
+                log = (f"⚠️ 空响应（{meta_line}）：API 返回 200 但正文为空，"
+                       f"常见于思考模型预算耗尽——降低思考等级（none/low）或调大 max_tokens 后重试")
+                print(f"[Agnes 三视图提示词] {log}")
+                return ("", log)
+            log = (f"✅ 三视图提示词已生成（{subject_type}，预算 {max_tokens} tokens）：{prompt[:60].strip()}...\n"
+                   f"· 响应元数据：{meta_line}")
             print(log)
             return (prompt, log)
         except Exception as e:
-            log = f"❌ 三视图提示词生成失败: {e}"
+            tb = traceback.format_exc()
+            log = f"❌ 三视图提示词生成失败（{type(e).__name__}）: {e}\n── 完整堆栈 ──\n{tb}"
             print(log)
             return (f"[Error] {e}", log)
 
