@@ -1,6 +1,6 @@
 """
 Agnes 资产提取节点
-从小说文本中提取角色、场景、道具等资产信息
+从故事内容（小说章节或 漫剧剧本 均可）中提取角色、场景、道具等资产信息
 """
 import requests
 import json
@@ -11,7 +11,7 @@ from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT
 class AgnesAssetExtractor:
     """使用 Agnes LLM 提取资产信息"""
     
-    DESCRIPTION = "从小说章节中提取角色、场景、道具、服装、天气等资产信息，输出为 JSON 格式"
+    DESCRIPTION = "从故事内容（小说章节或漫剧剧本）中提取角色、场景、道具、服装、天气等资产信息，输出为 JSON 格式"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -20,8 +20,8 @@ class AgnesAssetExtractor:
                 "chapter_text": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "输入小说章节全文...",
-                    "tooltip": "待处理的小说章节文本，建议 3000-8000 字"
+                    "placeholder": "输入故事内容（章节或剧本均可）...\n章节原文建议 3000-8000 字；也可连「Agnes 剧本生成」的漫剧剧本输出（提取该集要拍的资产）",
+                    "tooltip": "故事内容：小说章节原文，或「Agnes 剧本生成」（漫剧剧本）的输出；生成 5 路资产 JSON"
                 }),
                 "base_url": ("STRING", {
                     "default": "",
@@ -93,7 +93,7 @@ class AgnesAssetExtractor:
         print(f"📋 Agnes 资产提取")
         print(f"{'='*50}")
 
-        prompt = f"""你是一位专业的影视制片助理。请分析以下小说章节，提取以下资产信息：
+        prompt = f"""你是一位专业的影视制片助理。请分析以下故事内容（小说章节或漫剧剧本，均可），提取以下资产信息：
 
 【资产分类】
 1. 角色：姓名、性别、年龄感、外貌特征、性格特点
@@ -132,7 +132,7 @@ class AgnesAssetExtractor:
   "weather": ["天气1", "天气2"]
 }}
 
-【小说章节】
+【故事内容（小说章节或漫剧剧本）】
 {chapter_text}"""
 
         try:
