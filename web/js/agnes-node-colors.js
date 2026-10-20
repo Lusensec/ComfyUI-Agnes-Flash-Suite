@@ -24,22 +24,25 @@
     "use strict";
 
     // ── 功能分类配色板（想换颜色改这里；每类 main/light/deep 三阶，同色系微调） ──
+    // 设计原则：标题/边框用亮色，主体(bgcColor)也要「明显带色系」——
+    // 暖色（琥珀）主体压暗仍认得出色系；冷色（绿/蓝/紫）压暗会塌成黑，
+    // 所以冷色主体必须提亮到"一眼是该色系"，整块节点才算"整体染色"。
     var PALETTE = {
         config: { color: "#e8a33d", bgcolor: "#3a2d16" },  // 配置·琥珀（单节点，不分级）
         text: {                                            // 文本·绿
-            main:  { color: "#3fae62", bgcolor: "#1d3a28" },  // 主绿
-            light: { color: "#6cc58c", bgcolor: "#28483a" },  // 浅绿
-            deep:  { color: "#2e8250", bgcolor: "#152d20" },  // 墨绿
+            main:  { color: "#3fae62", bgcolor: "#2f5c44" },  // 主绿
+            light: { color: "#6cc58c", bgcolor: "#447458" },  // 浅绿
+            deep:  { color: "#2e8250", bgcolor: "#234a35" },  // 墨绿
         },
         image: {                                           // 图片·蓝（Agnes 品牌色）
-            main:  { color: "#4c7dff", bgcolor: "#1e2f52" },  // 主蓝
-            light: { color: "#7ba0ff", bgcolor: "#2a3f6e" },  // 浅蓝
-            deep:  { color: "#3159c2", bgcolor: "#15203c" },  // 深蓝
+            main:  { color: "#4c7dff", bgcolor: "#2f4c8a" },  // 主蓝
+            light: { color: "#7ba0ff", bgcolor: "#4668b0" },  // 浅蓝
+            deep:  { color: "#3159c2", bgcolor: "#24386b" },  // 深蓝
         },
         video: {                                           // 视频·紫
-            main:  { color: "#a063d6", bgcolor: "#2b1d42" },  // 主紫
-            light: { color: "#c392ec", bgcolor: "#3d2c5c" },  // 浅紫
-            deep:  { color: "#7a44ad", bgcolor: "#221533" },  // 深紫
+            main:  { color: "#a063d6", bgcolor: "#4a3670" },  // 主紫
+            light: { color: "#c392ec", bgcolor: "#66528f" },  // 浅紫
+            deep:  { color: "#7a44ad", bgcolor: "#382857" },  // 深紫
         },
     };
 

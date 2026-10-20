@@ -14,7 +14,7 @@ Agnes AI 小说推文插件 - 集成 comfyui-agnes-ai 核心 API
 - 文生视频 (AgnesNovelTextToVideo)
 - 剧本生成 (AgnesScriptGenerator)
 
-- 分类配色：Agnes 节点在画布上按功能自动着色（配置类=琥珀 / 文本类=绿 / 图片类=蓝 / 视频类=紫，同类同色系），且类内按 主/浅/深 三阶小幅度区分主功能、次功能、工具与中间层；由前端扩展 `web/js/agnes-node-colors.js` 实现，仍可用右键「Set color」给单个节点换色
+- 分类配色：Agnes 节点在画布上按功能整体染色（配置类=琥珀 / 文本类=绿 / 图片类=蓝 / 视频类=紫，同类同色系，主体色明显带色而非近黑），且类内按 主/浅/深 三阶小幅度区分主功能、次功能、工具与中间层；由前端扩展 `web/js/agnes-node-colors.js` 实现，仍可用右键「Set color」给单个节点换色
 
 ## 依赖
 
