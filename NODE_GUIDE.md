@@ -61,7 +61,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | reasoning_effort（思考等级） | 仅文本模型 | - | - | - |
 
 > 思考等级：走 LLM 的节点（场景切分/总导演/资产提取/分镜提示词/剧本生成/LLM 对话/
-> 资产提示词生成/三视图提示词生成/图像反推提示词）均带 reasoning_effort 下拉
+> 资产提示词生成/资产提示词批量生成/三视图提示词生成/图像反推提示词）均带 reasoning_effort 下拉
 > （auto/none/low/medium/high/max；auto=不传参数跟随模型默认）；
 > 2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
 | quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
@@ -598,12 +598,43 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 > **资产线完整接法（角色/道具/场景/服装 → 设定图）：**
 > ① `Agnes 资产提取.角色JSON` → `Agnes 文本拆分`（JSON 数组模式）
-> ② 拆分 `第 N 条` → `Agnes 资产提示词生成`（subject_type=角色，style 自选）
+> ② 拆分 `第 N 条` → `Agnes 资产提示词生成`（subject_type=角色，style 自选；
+> 20 条并发生成请改接 `Agnes 资产提示词批量生成`，见其独立章节）
 > ③ `英文资产生成提示词` → `Agnes 图像生成`（n=1，或 三视图提示词生成 → 三视图生成 subject_desc，
 >    想系列一致再 reference_image 接一张已出图）
 > 场景/道具/服装走同一条链，换 subject_type 即可
 > 批量省调用：也可用 LLM 对话一次把整份 JSON 转成【名】英文提示词，
 > 再接 文本拆分(【】括号块模式) 扇出（少 19 次 LLM 调用）
+
+---
+
+### 🖌️ Agnes 资产提示词批量生成 (AgnesAssetPromptBatch)
+
+**功能：** 与「Agnes 文本拆分」20 路输出一一对应的批量资产提示词生成节点：
+20 个资产 JSON 输入槽（asset_1..20 ↔ 文本拆分 item_1..20），线程池并发生成
+英文生图提示词，`max_concurrency` 限制同时请求数（默认 10，超出排队执行），
+20 路 english_prompt 输出。除 20 个输入槽外参数与单条「Agnes 资产提示词生成」
+完全一致，20 槽共用。空槽跳过（不发请求，输出空字符串）；单槽失败不影响其他槽。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| asset_1..asset_20 | STRING(多行) ×20 | "" | 第 i 条资产 JSON：连 文本拆分 item_i（或 资产提取 输出），或逐槽粘贴；留空=跳过该槽 |
+| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（20 槽共用，决定构图指令） |
+| style | COMBO | cinematic | 生图风格尾词（20 槽共用）：cinematic/anime/realistic/watercolor/oil_painting |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖 |
+| api_key | STRING | 留空自动加载 | Agnes AI API Key |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（20 槽共用） |
+| reasoning_effort | COMBO | auto | 思考等级（20 槽共用） |
+| max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空资产 JSON 超过该值时排队；频繁 429/503 就调小 |
+
+**输出（20 路）：**
+- english_prompt_1..english_prompt_20：各槽英文资产生图提示词（保留 JSON 全部描述字段 + 构图指令 + 风格/质量尾词），
+  可直接接 图像生成 / 三视图生成(subject_desc)；空输入=空字符串；失败=`[Error]` 前缀文本
+
+> 典型接法（资产线批量）：
+> `资产提取.角色JSON → 文本拆分(JSON 数组) → 资产提示词批量生成(asset_1..20) → english_prompt_1..20 → 图像生成 × N`
+> 也可 20 个 资产提示词生成 实例逐条输出后分别接各槽（可人工逐条审核改词）。
+> 日志：`[Agnes 资产提示词批量] 共 20 槽，非空 N 条，并发 M`，每槽完成打印 `#i 成功 预览...` / `#i 失败 原因`，收尾打印 `完成：成功 X/N`。
 
 ---
 

@@ -9,8 +9,9 @@ Agnes Asset Prompt Generator Node
   Agnes 资产提取.角色JSON → Agnes 文本拆分(JSON 数组模式)
   → 第 N 条 → Agnes 资产提示词生成(subject_type=角色, style=cinematic)
   → english_prompt → Agnes 文生图 / 三视图生成(subject_desc)
-每条资产一个节点实例（各占 1 次 LLM 调用）；想省调用可改用
-LLM 对话批量路线（整份 JSON 一次出全部【名】英文提示词，再接文本拆分）。
+每条资产一个节点实例（各占 1 次 LLM 调用）；20 条并发生成请用
+「Agnes 资产提示词批量生成」节点；想省调用也可改用 LLM 对话批量路线
+（整份 JSON 一次出全部【名】英文提示词，再接文本拆分）。
 """
 
 import re
