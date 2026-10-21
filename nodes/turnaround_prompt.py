@@ -13,6 +13,7 @@ Agnes 三视图提示词生成节点
   资产提取.角色JSON → 文本拆分(第N条) → 资产提示词生成
   → 三视图提示词生成(subject_type=角色) → [输出槽查看/手工修改]
   → 三视图生成(subject_desc) → 三视图设定图
+（20 条并发生成请用「Agnes 三视图提示词批量生成」节点）
 """
 
 from typing import Tuple
