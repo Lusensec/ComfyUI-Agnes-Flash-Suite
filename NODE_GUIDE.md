@@ -136,6 +136,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 **输出：**
 - log_text: 处理日志（成功=段落数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
 - scene_1 ~ scene_50: 最多 50 个场景片段
+- all_scenes: 50 个场景段落按序合并（跳过空槽）；可直连 总导演 单路输入 / LLM 对话 / 存档
 - chapter_text_out: 原文本（透传）
 - api_key_out / base_url_out / model_out: 配置透传
 
@@ -442,6 +443,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 **输出（21 路）：**
 - image_1..image_20：各槽三视图张量（成功=真实图；跳过/失败=512×512 黑图占位），可接 SaveImage 存档或作参考图
 - status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号],"empty":[空输入槽号]}`（成功槽的实际分辨率 WxH 见控制台日志）；
+  全部请求失败（success 为空且 error 非空）时额外含 `"reason"` 字段——各槽同一原因=字符串，不同=槽号→原因映射；
   可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，或接 LLM 对话让模型解读哪些槽需要重试
 
 > 典型接法（资产线）：
@@ -504,6 +506,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
   + 虚幻引擎渲染/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词），可直接接 三视图生成(subject_desc)；
   空输入=空字符串；失败=`[Error]` 前缀文本
 - status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号，含空响应],"empty":[空输入槽号]}`；
+  全部请求失败（success 为空且 error 非空）时额外含 `"reason"` 字段——各槽同一原因=字符串，不同=槽号→原因映射；
   可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，
   或接 LLM 对话让模型解读哪些槽需要重试（空响应=API 200 但正文为空，常见为思考预算耗尽：降 reasoning_effort / 换 agnes-2.5-flash）
 
@@ -667,6 +670,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - english_prompt_1..english_prompt_20：各槽英文资产生图提示词（保留 JSON 全部描述字段 + 构图指令 + 风格/质量尾词），
   可直接接 图像生成 / 三视图生成(subject_desc)；空输入=空字符串；失败=`[Error]` 前缀文本
 - status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号，含空响应],"empty":[空输入槽号]}`；
+  全部请求失败（success 为空且 error 非空）时额外含 `"reason"` 字段——各槽同一原因=字符串，不同=槽号→原因映射；
   可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，
   或接 LLM 对话让模型解读哪些槽需要重试（空响应=API 200 但正文为空，常见为思考预算耗尽：降 reasoning_effort / 换 agnes-2.5-flash）
 

@@ -51,7 +51,7 @@ class AgnesSceneSplitter:
         }
         return inputs
 
-    RETURN_TYPES = ("STRING",) * 55
+    RETURN_TYPES = ("STRING",) * 56
     RETURN_NAMES = (
         "log_text",
         "scene_1", "scene_2", "scene_3", "scene_4", "scene_5",
@@ -65,6 +65,7 @@ class AgnesSceneSplitter:
         "scene_41", "scene_42", "scene_43", "scene_44", "scene_45",
         "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
+        "all_scenes",
     )
     RETURN_LABELS = (
         "处理日志",
@@ -79,10 +80,12 @@ class AgnesSceneSplitter:
         "场景 41", "场景 42", "场景 43", "场景 44", "场景 45",
         "场景 46", "场景 47", "场景 48", "场景 49", "场景 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+        "场景全文（合并）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（场景统计/响应元数据/空响应警示/错误详情）",) + (
         ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * 50
-    ) + ("原始故事文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
+    ) + ("原始故事文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+         "50 个场景段落按序合并（跳过空槽）；可直连 总导演 单路输入 / LLM 对话 / 存档")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -107,6 +110,7 @@ class AgnesSceneSplitter:
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
+        outputs["all_scenes"] = "50 个场景段落按序合并（跳过空槽）；可直连 总导演 单路输入 / LLM 对话 / 存档"
         
         for key in outputs:
             if key in kwargs:
@@ -118,13 +122,13 @@ class AgnesSceneSplitter:
         if not chapter_text:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 / Agnes 解说剧本生成 的文本输出，或直接粘贴小说章节 / 剧本全文"
             print(f"[Agnes 场景拆分] {skip_msg}")
-            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model]
+            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model, ""]
             return tuple(result)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             error_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
             return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes 场景拆分 - {model}]")
@@ -236,6 +240,9 @@ class AgnesSceneSplitter:
             result.append(api_key)
             result.append(base_url)
             result.append(model)
+            # all_scenes：50 个场景段落按序合并（跳过空槽），供直连 总导演 单路输入 / 存档
+            all_scenes = "\n".join(x for x in result[1:51] if x.strip())
+            result.append(all_scenes)
 
             return tuple(result)
 
@@ -245,7 +252,7 @@ class AgnesSceneSplitter:
                          f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                          f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model]
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
             return tuple(result)
 
     def _parse_scenes(self, content):

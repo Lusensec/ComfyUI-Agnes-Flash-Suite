@@ -6,7 +6,8 @@ Agnes 三视图批量生成节点
 20 个提示词输入槽，线程池并发请求图像 API（max_concurrency 限制同时
 请求数，默认 10，超出排队），20 路 image + 1 路 status 输出（整批执行状态 JSON：
 {"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
-可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析）。
+可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析；
+全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）。
 
 - 空槽跳过：该槽不发请求，输出黑图占位 + [跳过] 状态
 - 单槽失败不影响其他槽：该槽黑图占位 + [错误] 状态
@@ -66,7 +67,8 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
            for i in range(1, MAX_SLOTS + 1)},
         "status": (
             "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号],\"empty\":[空输入跳过槽号]}；"
-            "成功槽的实际分辨率 WxH 见控制台日志；可直接连 Agnes 文本拆分（JSON 数组模式）"
+            "成功槽的实际分辨率 WxH 见控制台日志；全部请求失败时额外含 \"reason\" 字段"
+            "（各槽同一原因=字符串，不同=槽号→原因映射）；可直接连 Agnes 文本拆分（JSON 数组模式）"
             "拆成 3 条名单（成功/失败/空输入）做对接分析，或接 LLM 对话让模型解读哪些槽需要重试"
         ),
     }
@@ -128,21 +130,23 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
         p = [str(x or "").strip() for x in prompts]
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or 10)))
 
-        def _status_json(success, error, empty):
-            return json.dumps(
-                {"success": success, "error": error, "empty": empty},
-                ensure_ascii=False, indent=2,
-            )
+        def _status_json(success, error, empty, reason=None):
+            data = {"success": success, "error": error, "empty": empty}
+            # 全部请求失败（success 为空且 error 非空）→ 附失败原因：
+            # 各槽同一原因=字符串；不同=槽号→原因 映射
+            if reason is not None and not success and error:
+                data["reason"] = reason
+            return json.dumps(data, ensure_ascii=False, indent=2)
 
         # ── Key 解析 ──
         api_key = str(api_key or "").strip()
         if not api_key:
             api_key = str(get_api_key() or "").strip()
         if not api_key:
-            msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            print(f"[Agnes 三视图批量] {msg}")
+            reason = "缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
+            print(f"[Agnes 三视图批量] [错误] {reason}")
             return tuple(_black_placeholder() for _ in range(MAX_SLOTS)) + (
-                _status_json([], list(range(1, MAX_SLOTS + 1)), []),
+                _status_json([], list(range(1, MAX_SLOTS + 1)), [], reason),
             )
 
         # ── 全空跳过：一发请求都不发 ──
@@ -182,6 +186,7 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
 
         images = [None] * MAX_SLOTS
         success, error = [], []
+        reasons = {}
         empty = [i for i in range(1, MAX_SLOTS + 1) if i not in {k for k, _ in tasks}]
         for i in empty:
             images[i - 1] = _black_placeholder()
@@ -200,14 +205,20 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
                 except Exception as e:
                     images[i - 1] = _black_placeholder()
                     error.append(i)
+                    reasons[i] = str(e) or type(e).__name__
                     fail += 1
                     print(f"[Agnes 三视图批量] #{i} 失败: {e}")
         success.sort()
         error.sort()
+        reason = None
+        if not success and error:
+            uniq = {reasons[i] for i in error}
+            reason = uniq.pop() if len(uniq) == 1 else {str(i): reasons[i] for i in error}
         print(f"[Agnes 三视图批量] 完成：成功 {ok}/{len(tasks)}，失败 {fail}（并发 {max_conc}）")
-        print(f"[Agnes 三视图批量] 状态: success={success} error={error} empty={empty}")
+        print(f"[Agnes 三视图批量] 状态: success={success} error={error} empty={empty}"
+              + (f" reason={reason}" if reason is not None else ""))
 
-        return tuple(images) + (_status_json(success, error, empty),)
+        return tuple(images) + (_status_json(success, error, empty, reason),)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesTurnaroundBatch": AgnesTurnaroundBatch}
