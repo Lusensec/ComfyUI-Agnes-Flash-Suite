@@ -1,7 +1,8 @@
 """
-Agnes AI API Client (Fallback)
-===============================
-当 comfyui-agnes-ai 未安装时使用的备用 API 客户端
+Agnes AI API Client (Legacy Fallback, 当前无节点引用)
+================================
+历史遗留的独立备用客户端（现未被任何节点导入；
+实际在用的 API 客户端见 api/__init__.py 中的 AgnesClient）
 
 主要功能：
 - AgnesClient: API 客户端类
