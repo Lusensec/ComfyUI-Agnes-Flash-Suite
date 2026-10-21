@@ -498,10 +498,12 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | reasoning_effort | COMBO | auto | 思考等级（20 槽共用） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空提示词超过该值时排队；频繁 429/503 就调小 |
 
-**输出（20 路）：**
+**输出（40 路）：**
 - three_view_prompt_1..three_view_prompt_20：各槽完整三视图英文提示词（主体全部细节 + 分栏布局「左 1/3 特写 + 右 2/3 三视图」
   + 虚幻引擎渲染/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词），可直接接 三视图生成(subject_desc)；
   空输入=空字符串；失败=`[Error]` 前缀文本
+- status_1..status_20：各槽执行状态——成功=`成功 N 字`；空输入=`[跳过] 输入为空`；失败=`[错误] 原因`；
+  API 200 但正文为空=`[错误] 空响应（常见为思考预算耗尽：降 reasoning_effort / 换 agnes-2.5-flash）`
 
 > 典型接法（资产线批量）：
 > `资产提取.角色JSON → 文本拆分(JSON 数组) → 资产提示词批量生成(english_prompt_1..20) → 三视图提示词批量生成(prompt_1..20) → three_view_prompt_1..20 → 三视图批量生成 / 三视图生成 × N`
@@ -658,9 +660,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | reasoning_effort | COMBO | auto | 思考等级（20 槽共用） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空资产 JSON 超过该值时排队；频繁 429/503 就调小 |
 
-**输出（20 路）：**
+**输出（40 路）：**
 - english_prompt_1..english_prompt_20：各槽英文资产生图提示词（保留 JSON 全部描述字段 + 构图指令 + 风格/质量尾词），
   可直接接 图像生成 / 三视图生成(subject_desc)；空输入=空字符串；失败=`[Error]` 前缀文本
+- status_1..status_20：各槽执行状态——成功=`成功 N 字`；空输入=`[跳过] 输入为空`；失败=`[错误] 原因`；
+  API 200 但正文为空=`[错误] 空响应（常见为思考预算耗尽：降 reasoning_effort / 换 agnes-2.5-flash）`
 
 > 典型接法（资产线批量）：
 > `资产提取.角色JSON → 文本拆分(JSON 数组) → 资产提示词批量生成(asset_1..20) → english_prompt_1..20 → 图像生成 × N`
