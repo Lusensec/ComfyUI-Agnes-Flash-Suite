@@ -68,6 +68,7 @@
         "AgnesImageGen": "image",
         "AgnesNovelImageToImage": "image",
         "AgnesSubjectTurnaround": "image",
+        "AgnesTurnaroundBatch": "image",
         "AgnesNovelImageReverse": "image",
         // 视频类
         "AgnesNovelTextToVideo": "video",
@@ -94,6 +95,7 @@
         "AgnesImageGen": "main",
         "AgnesNovelImageToImage": "light",
         "AgnesSubjectTurnaround": "deep",
+        "AgnesTurnaroundBatch": "main",
         "AgnesNovelImageReverse": "deep",
         // 视频类：紫
         "AgnesNovelTextToVideo": "main",

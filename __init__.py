@@ -2,28 +2,12 @@
 ComfyUI Agnes Novel Plugin
 ===========================
 小说推文工作流插件 - 集成 Agnes AI 核心 API（API 客户端内置于 api/ 模块，自包含，不依赖外部插件）
-包含小说创作节点和通用 Agnes 节点
-
-功能：
-- Novel 专用节点:
-  * AgnesSceneSplitter: 场景拆分
-  * AgnesDirectorMaster: 总导演分镜
-  * AgnesAssetExtractor: 资产提取
-  * AgnesScenePromptGenerator: 分镜提示词生成
-  * AgnesImageGen: 图像生成
-  * AgnesNovelTextToVideo: 文生视频（原 AgnesVideoGen 已删除）
-  * AgnesScriptGenerator: 解说剧本生成（影视解说文案/口播稿）
-  * AgnesScreenplayGenerator: 剧本生成（漫剧短视频分场剧本：钩子+画面/对白/氛围）
-- 通用节点（内置于本套件，不依赖外部插件）:
-  * AgnesAPIKeyConfig: API Key 配置
-  * AgnesTextSource: 文本输入（小说章节/故事想法，管线文本起点）
-  * AgnesStyleSelector: 风格选择（视觉风格×导演风格双轴，纯本地组合）
-  * AgnesLLMChat: LLM 对话
-  * AgnesImageReverse: 图像反转
-  * AgnesImageToImage: 图生图
-  * AgnesTextToImage: 文生图
-  * AgnesImageToVideo: 图生视频
-  * AgnesTextToVideo: 文生视频
+包含小说创作节点和通用 Agnes 节点，共 22 个（清单见 nodes/__init__.py）：
+- 文本类 (14): API Key 配置 / 风格选择 / 文本输入 / 解说剧本 / 漫剧剧本 /
+  场景切分 / 总导演 / 资产提取 / 文本拆分 / 资产提示词 / 三视图提示词 /
+  分镜提示词 / 字符串合并 / LLM 对话
+- 图片类 (5): 图像生成 / 图生图 / 三视图生成 / 三视图批量生成 / 图像反推
+- 视频类 (3): 文生视频 / 关键帧生视频 / 参考视频生成
 """
 
 import os
