@@ -1,6 +1,6 @@
 """
 Agnes 场景拆分节点
-将小说章节拆分为 5 秒/片的场景段落
+将故事文本（小说章节 或 漫剧/解说剧本）拆分为 5 秒/片的场景段落
 """
 import requests
 import json
@@ -17,7 +17,7 @@ class AgnesSceneSplitter:
     使用 agnes-2.5-flash 进行场景切分
     """
     
-    DESCRIPTION = "将小说章节切分为多个场景段落，每个段落约对应 5 秒视频内容，包含角色、动作、场景标注"
+    DESCRIPTION = "将故事文本（小说章节 或 漫剧剧本）切分为多个场景段落，每个段落约对应 5 秒视频内容，包含角色、动作、场景标注"
 
     @classmethod
     def INPUT_TYPES(s):
@@ -26,8 +26,8 @@ class AgnesSceneSplitter:
                 "chapter_text": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "输入小说章节全文...\n建议 3000-8000 字",
-                    "tooltip": "待处理的小说章节文本，单章建议 3000-8000 字"
+                    "placeholder": "输入故事文本（小说章节全文，或 漫剧/解说 剧本全文）...\n建议 3000-8000 字",
+                    "tooltip": "待处理的故事文本：小说章节全文，或 漫剧剧本（场景行/画面/对白/氛围 四行结构，各场景行=天然场景边界，直接切分）/解说文案；单份建议 3000-8000 字"
                 }),
                 "base_url": ("STRING", {
                     "default": "",
@@ -82,7 +82,7 @@ class AgnesSceneSplitter:
     )
     OUTPUT_TOOLTIPS = ("处理日志（场景统计/响应元数据/空响应警示/错误详情）",) + (
         ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * 50
-    ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
+    ) + ("原始故事文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -103,7 +103,7 @@ class AgnesSceneSplitter:
         }
         for i in range(1, 51):
             outputs[f"scene_{i}"] = f"第 {i} 个场景段落（如果存在）"
-        outputs["chapter_text_out"] = "原始小说章节文本（透传）"
+        outputs["chapter_text_out"] = "原始故事文本（小说章节/剧本，透传）"
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
@@ -116,7 +116,7 @@ class AgnesSceneSplitter:
     def split_scenes(self, chapter_text="", base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto"):
         chapter_text = (chapter_text or "").strip()
         if not chapter_text:
-            skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 的文本输出，或直接粘贴故事章节"
+            skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 / Agnes 解说剧本生成 的文本输出，或直接粘贴小说章节 / 剧本全文"
             print(f"[Agnes 场景拆分] {skip_msg}")
             result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model]
             return tuple(result)
@@ -130,7 +130,12 @@ class AgnesSceneSplitter:
         print(f"[Agnes 场景拆分 - {model}]")
         print(f"{'='*60}")
 
-        prompt = f"""你是一位专业的影视剪辑师。请将以下小说章节切分成段落，每个段落对应5秒视频能容纳的内容。
+        prompt = f"""你是一位专业的影视剪辑师。请将以下故事文本（小说章节 或 剧本）切分成段落，每个段落对应5秒视频能容纳的内容。
+
+【剧本输入处理】（输入为 场景行/画面/对白/氛围 结构的剧本时）
+• 每个场景行（如"场景一：DAY 小镇池塘石沿"）是天然场景边界，必须在此处切分，禁止跨场景行合并
+• "画面"描述按动作粒度切段；"对白"行原样归入对应段落（【角色】【性别】标签取自对白说话人与画面角色）
+• "氛围"中的镜头/音效设计随所属段落保留
 
 【核心规则】
 
@@ -193,7 +198,7 @@ class AgnesSceneSplitter:
 
 ... 继续直到内容结束 ...
 
-【小说章节】
+【故事文本（小说章节 或 剧本）】
 {chapter_text}"""
 
         try:

@@ -123,11 +123,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 🎬 Agnes 场景切分 (AgnesSceneSplitter)
 
-**功能：** 将小说章节拆分为 5 秒/片的场景段落
+**功能：** 将故事文本（**小说章节 或 漫剧剧本**）拆分为 5 秒/片的场景段落
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| chapter_text | STRING | "" | 小说章节文本，建议 3000-8000 字 |
+| chapter_text | STRING | "" | 故事文本：小说章节全文（建议 3000-8000 字），或「Agnes 剧本生成」（漫剧剧本）/「Agnes 解说剧本生成」的输出；剧本的场景行（如"场景一：DAY 地点"）= 天然场景边界，切分比小说更规整 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
