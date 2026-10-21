@@ -5,8 +5,9 @@ Agnes 三视图提示词批量生成节点
 与「Agnes 文本拆分」20 路输出一一对应的三视图提示词批量生成节点：
 20 个资产提示词输入槽（prompt_1..20 ↔ 资产提示词批量 english_prompt_1..20），
 线程池并发生成三视图英文提示词（max_concurrency 限制同时请求数，默认 10，
-超出排队执行），20 路 three_view_prompt + 20 路 status 输出（成功/跳过/错误，
-各槽状态一目了然）。
+超出排队执行），20 路 three_view_prompt + 1 路 status 输出（整批执行状态 JSON：
+{"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
+可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析）。
 
 - 参数与单条「Agnes 三视图提示词生成」完全一致（subject_type/base_url/
   api_key/model/reasoning_effort），20 槽共用，另加 max_concurrency 速率限制
@@ -21,6 +22,7 @@ Agnes 三视图提示词批量生成节点
       ─▶ three_view_prompt_1..20 ─▶ Agnes 三视图生成(subject_desc)
 """
 
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..api import (
@@ -37,34 +39,29 @@ MAX_SLOTS = 20
 
 
 class AgnesTurnaroundPromptBatch(OutputDocsMixin):
-    """三视图提示词批量生成：20 路资产提示词并发生成三视图英文提示词 + 20 路状态输出（线程池，速率可限）"""
+    """三视图提示词批量生成：20 路资产提示词并发生成三视图英文提示词 + 1 路整批状态 JSON（线程池，速率可限）"""
 
-    DESCRIPTION = "三视图提示词批量生成：20 个资产提示词输入对应 资产提示词批量 20 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），输出 20 路 three_view_prompt + 20 路 status（成功=成功 N 字；空输入=[跳过]；失败=[错误]），单槽失败不影响其他槽"
+    DESCRIPTION = "三视图提示词批量生成：20 个资产提示词输入对应 资产提示词批量 20 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），输出 20 路 three_view_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单），单槽失败不影响其他槽"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
     OUTPUT_NODE = True
 
-    # ── 输出：three_view_prompt_1..20 + status_1..20（共 40 槽）──
-    RETURN_NAMES = (
-        tuple(f"three_view_prompt_{i}" for i in range(1, MAX_SLOTS + 1))
-        + tuple(f"status_{i}" for i in range(1, MAX_SLOTS + 1))
-    )
-    RETURN_TYPES = ("STRING",) * MAX_SLOTS * 2
-    RETURN_LABELS = (
-        tuple(f"三视图提示词 {i}" for i in range(1, MAX_SLOTS + 1))
-        + tuple(f"状态 {i}" for i in range(1, MAX_SLOTS + 1))
-    )
+    # ── 输出：three_view_prompt_1..20 + status（共 21 槽）──
+    RETURN_NAMES = tuple(f"three_view_prompt_{i}" for i in range(1, MAX_SLOTS + 1)) + ("status",)
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 1)
+    RETURN_LABELS = tuple(f"三视图提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON",)
     OUTPUT_DOCS = {
         **{f"three_view_prompt_{i}": (
             f"第 {i} 条资产提示词的完整三视图英文提示词（主体全部细节 + 分栏布局（左 1/3 特写 + 右 2/3 三视图）"
             f"+ 虚幻引擎渲染/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词，"
             f"可直接接 三视图生成(subject_desc)；空输入=空字符串；失败=[Error] 前缀文本"
         ) for i in range(1, MAX_SLOTS + 1)},
-        **{f"status_{i}": (
-            f"第 {i} 槽执行状态：成功=成功 N 字；空输入=[跳过] 输入为空；失败=[错误] 原因；"
-            f"API 200 但正文为空=[错误] 空响应（常见为思考预算耗尽）"
-        ) for i in range(1, MAX_SLOTS + 1)},
+        "status": (
+            "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号，含空响应],\"empty\":[空输入跳过槽号]}；"
+            "可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，"
+            "或接 LLM 对话让模型解读哪些槽需要重试"
+        ),
     }
 
     @classmethod
@@ -131,17 +128,23 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
         api_key = str(api_key or "").strip()
         if not api_key:
             api_key = str(get_api_key() or "").strip()
+        def _status_json(success, error, empty):
+            return json.dumps(
+                {"success": success, "error": error, "empty": empty},
+                ensure_ascii=False, indent=2,
+            )
+
         if not api_key:
             msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
             print(f"[Agnes 三视图提示词批量] {msg}")
-            return tuple(msg for _ in range(MAX_SLOTS)) + tuple(msg for _ in range(MAX_SLOTS))
+            return tuple(msg for _ in range(MAX_SLOTS)) + (_status_json([], list(range(1, MAX_SLOTS + 1)), []),)
 
         # ── 全空跳过：一发请求都不发 ──
         tasks = [(i, t) for i, t in enumerate(p, 1) if t]
         if not tasks:
             skip_msg = "[跳过] 输入全部为空：请连接 资产提示词批量 的 english_prompt_1..20 输出（或 资产提示词生成 逐槽），或逐槽粘贴提示词"
             print(f"[Agnes 三视图提示词批量] {skip_msg}")
-            return ("",) * MAX_SLOTS + tuple(skip_msg for _ in range(MAX_SLOTS))
+            return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))),)
 
         print(f"\n[Agnes 三视图提示词批量] 共 {MAX_SLOTS} 槽，非空 {len(tasks)} 条，并发 {max_conc}")
         print(f"  模型: {model}, 主体类型: {subject_type}")
@@ -160,11 +163,8 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
             )[0]
 
         results = [""] * MAX_SLOTS
-        statuses = [""] * MAX_SLOTS
-        task_ids = {i for i, _ in tasks}
-        for i in range(1, MAX_SLOTS + 1):
-            if i not in task_ids:
-                statuses[i - 1] = "[跳过] 输入为空"
+        success, error = [], []
+        empty = [i for i in range(1, MAX_SLOTS + 1) if i not in {k for k, _ in tasks}]
 
         ok = fail = 0
         with ThreadPoolExecutor(max_workers=max_conc) as ex:
@@ -175,26 +175,29 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
                     r = fut.result()
                     results[i - 1] = r
                     if r and not r.startswith("[Error"):
-                        statuses[i - 1] = f"成功 {len(r)} 字"
+                        success.append(i)
                         ok += 1
                         print(f"[Agnes 三视图提示词批量] #{i} 成功 {len(r)} 字 | {r[:40].strip()}...")
                     elif r == "":
-                        statuses[i - 1] = "[错误] 空响应（API 返回 200 但正文为空：降 reasoning_effort / 换 agnes-2.5-flash 后重试）"
+                        error.append(i)
                         fail += 1
-                        print(f"[Agnes 三视图提示词批量] #{i} 失败: 空响应")
+                        print(f"[Agnes 三视图提示词批量] #{i} 失败: 空响应（API 返回 200 但正文为空：降 reasoning_effort / 换 agnes-2.5-flash 后重试）")
                     else:
                         reason = r.split("]", 1)[1].strip() if "]" in r else r
-                        statuses[i - 1] = f"[错误] {reason or r}"
+                        error.append(i)
                         fail += 1
                         print(f"[Agnes 三视图提示词批量] #{i} 失败: {reason or r}")
                 except Exception as e:
                     results[i - 1] = f"[Error] {e}"
-                    statuses[i - 1] = f"[错误] {e}"
+                    error.append(i)
                     fail += 1
                     print(f"[Agnes 三视图提示词批量] #{i} 失败: {e}")
+        success.sort()
+        error.sort()
         print(f"[Agnes 三视图提示词批量] 完成：成功 {ok}/{len(tasks)}，失败 {fail}（并发 {max_conc}）")
+        print(f"[Agnes 三视图提示词批量] 状态: success={success} error={error} empty={empty}")
 
-        return tuple(results) + tuple(statuses)
+        return tuple(results) + (_status_json(success, error, empty),)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesTurnaroundPromptBatch": AgnesTurnaroundPromptBatch}

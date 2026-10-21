@@ -24,7 +24,7 @@ class AgnesTextSplitter(OutputDocsMixin):
 
     CATEGORY = "Agnes Novel"
 
-    SPLIT_MODES = ("JSON 数组", "【】括号块", "编号列表", "空行段落")
+    SPLIT_MODES = ("JSON 数组", "JSON 对象", "【】括号块", "编号列表", "空行段落")
     MAX_SLOTS = 20
 
     RETURN_NAMES = tuple(f"item_{i}" for i in range(1, MAX_SLOTS + 1)) + ("count", "text_out",)
@@ -57,6 +57,7 @@ class AgnesTextSplitter(OutputDocsMixin):
                 "mode": (list(cls.SPLIT_MODES), {
                     "default": "JSON 数组",
                     "tooltip": "拆分模式：「JSON 数组」= 每个 JSON 对象/元素一条（资产提取输出的直接可用）；"
+                               "「JSON 对象」= 逐键一条（键: 值），批量节点 status 输出（success/error/empty）直接拆成 3 条名单；"
                                "「【】括号块」= 每个【名】起头到下一个【前」（LLM 输出的定妆文常用此格式）；"
                                "「编号列表」= 每行以 1. / 1、/ 一、 等编号起头；「空行段落」= 空行分隔的段落",
                 }),
@@ -83,6 +84,15 @@ class AgnesTextSplitter(OutputDocsMixin):
         return [json.dumps(it, ensure_ascii=False, indent=2) for it in items]
 
     @classmethod
+    def _split_json_object(cls, text: str):
+        # 批量节点 status 输出形如 {"success":[1,2],"error":[3],"empty":[4]}：
+        # 逐 key 一条（"key: [值]"），3 个 key → 3 条名单，供 文本拆分/LLM 对接分析
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            raise ValueError("不是 JSON 对象（键值对）")
+        return [f"{k}: {json.dumps(v, ensure_ascii=False)}" for k, v in data.items()]
+
+    @classmethod
     def _split_brackets(cls, text: str):
         # 每个【...】块：从【起，到下一个【前
         blocks = re.findall(r'【[^】\n]+】.*?(?=\n\s*【[^】\n]+】|\Z)', text, re.S)
@@ -105,6 +115,7 @@ class AgnesTextSplitter(OutputDocsMixin):
         if text.strip():
             handlers = {
                 "JSON 数组": self._split_json,
+                "JSON 对象": self._split_json_object,
                 "【】括号块": self._split_brackets,
                 "编号列表": self._split_numbered,
                 "空行段落": self._split_paragraphs,

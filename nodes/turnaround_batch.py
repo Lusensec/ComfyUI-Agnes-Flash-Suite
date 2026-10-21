@@ -4,7 +4,9 @@ Agnes 三视图批量生成节点
 ========================
 与「Agnes 文本拆分」20 路输出一一对应的批量三视图出图节点：
 20 个提示词输入槽，线程池并发请求图像 API（max_concurrency 限制同时
-请求数，默认 10，超出排队），20 路 image + 20 路 status 输出。
+请求数，默认 10，超出排队），20 路 image + 1 路 status 输出（整批执行状态 JSON：
+{"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
+可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析）。
 
 - 空槽跳过：该槽不发请求，输出黑图占位 + [跳过] 状态
 - 单槽失败不影响其他槽：该槽黑图占位 + [错误] 状态
@@ -17,6 +19,7 @@ Agnes 三视图批量生成节点
   也可 LLM 对话一次性批量扩写 20 条定妆描述后手动填入各槽。
 """
 
+import json
 import torch
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -44,7 +47,7 @@ def _black_placeholder():
 class AgnesTurnaroundBatch(OutputDocsMixin):
     """三视图批量生成：20 路提示词并发出图（线程池，速率可限）"""
 
-    DESCRIPTION = "三视图批量生成：20 个提示词输入对应文本拆分 20 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），空槽跳过，单槽失败不影响其他槽"
+    DESCRIPTION = "三视图批量生成：20 个提示词输入对应文本拆分 20 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），输出 20 路 image + 1 路 status 整批状态 JSON（success/error/empty 槽号清单），空槽跳过，单槽失败不影响其他槽"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -54,21 +57,18 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
     QUALITIES = ("1K", "2K", "3K", "4K")
     ASPECT_RATIOS = ("1:1", "4:3", "3:2", "16:9", "21:9")
 
-    # ── 输出：image_1..20 + status_1..20（共 40 槽）──
-    RETURN_NAMES = (
-        tuple(f"image_{i}" for i in range(1, MAX_SLOTS + 1))
-        + tuple(f"status_{i}" for i in range(1, MAX_SLOTS + 1))
-    )
-    RETURN_TYPES = ("IMAGE",) * MAX_SLOTS + ("STRING",) * MAX_SLOTS
-    RETURN_LABELS = (
-        tuple(f"三视图 {i}" for i in range(1, MAX_SLOTS + 1))
-        + tuple(f"状态 {i}" for i in range(1, MAX_SLOTS + 1))
-    )
+    # ── 输出：image_1..20 + status（共 21 槽）──
+    RETURN_NAMES = tuple(f"image_{i}" for i in range(1, MAX_SLOTS + 1)) + ("status",)
+    RETURN_TYPES = ("IMAGE",) * MAX_SLOTS + ("STRING",)
+    RETURN_LABELS = tuple(f"三视图 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON",)
     OUTPUT_DOCS = {
         **{f"image_{i}": f"第 {i} 条提示词的三视图张量（可接 SaveImage 存档或作参考图；跳过/失败为黑图占位）"
            for i in range(1, MAX_SLOTS + 1)},
-        **{f"status_{i}": f"第 {i} 条结果状态：成功=分辨率 WxH；空输入=[跳过]；失败=[错误]"
-           for i in range(1, MAX_SLOTS + 1)},
+        "status": (
+            "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号],\"empty\":[空输入跳过槽号]}；"
+            "成功槽的实际分辨率 WxH 见控制台日志；可直接连 Agnes 文本拆分（JSON 数组模式）"
+            "拆成 3 条名单（成功/失败/空输入）做对接分析，或接 LLM 对话让模型解读哪些槽需要重试"
+        ),
     }
 
     @classmethod
@@ -128,6 +128,12 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
         p = [str(x or "").strip() for x in prompts]
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or 10)))
 
+        def _status_json(success, error, empty):
+            return json.dumps(
+                {"success": success, "error": error, "empty": empty},
+                ensure_ascii=False, indent=2,
+            )
+
         # ── Key 解析 ──
         api_key = str(api_key or "").strip()
         if not api_key:
@@ -135,14 +141,18 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
         if not api_key:
             msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
             print(f"[Agnes 三视图批量] {msg}")
-            return tuple(_black_placeholder() for _ in range(MAX_SLOTS)) + tuple(msg for _ in range(MAX_SLOTS))
+            return tuple(_black_placeholder() for _ in range(MAX_SLOTS)) + (
+                _status_json([], list(range(1, MAX_SLOTS + 1)), []),
+            )
 
         # ── 全空跳过：一发请求都不发 ──
         tasks = [(i, t) for i, t in enumerate(p, 1) if t]
         if not tasks:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 文本拆分 的 item_1..20 输出（上游先过 三视图提示词生成/LLM 扩写），或逐槽粘贴三视图提示词"
             print(f"[Agnes 三视图批量] {skip_msg}")
-            return tuple(_black_placeholder() for _ in range(MAX_SLOTS)) + tuple(skip_msg for _ in range(MAX_SLOTS))
+            return tuple(_black_placeholder() for _ in range(MAX_SLOTS)) + (
+                _status_json([], [], list(range(1, MAX_SLOTS + 1))),
+            )
 
         # ── 尺寸参数（与单图三视图节点同逻辑）──
         if model in NEW_IMAGE_MODELS:
@@ -171,12 +181,10 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
             return idx, pil_to_tensor(img), f"{img.size[0]}x{img.size[1]}"
 
         images = [None] * MAX_SLOTS
-        statuses = [""] * MAX_SLOTS
-        task_ids = {i for i, _ in tasks}
-        for i in range(1, MAX_SLOTS + 1):
-            if i not in task_ids:
-                images[i - 1] = _black_placeholder()
-                statuses[i - 1] = "[跳过] 输入为空"
+        success, error = [], []
+        empty = [i for i in range(1, MAX_SLOTS + 1) if i not in {k for k, _ in tasks}]
+        for i in empty:
+            images[i - 1] = _black_placeholder()
 
         ok = fail = 0
         with ThreadPoolExecutor(max_workers=max_conc) as ex:
@@ -186,17 +194,20 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
                 try:
                     _, tensor, res = fut.result()
                     images[i - 1] = tensor
-                    statuses[i - 1] = res
+                    success.append(i)
                     ok += 1
                     print(f"[Agnes 三视图批量] #{i} 成功 {res} | {p[i - 1][:40]}...")
                 except Exception as e:
                     images[i - 1] = _black_placeholder()
-                    statuses[i - 1] = f"[错误] {e}"
+                    error.append(i)
                     fail += 1
                     print(f"[Agnes 三视图批量] #{i} 失败: {e}")
+        success.sort()
+        error.sort()
         print(f"[Agnes 三视图批量] 完成：成功 {ok}/{len(tasks)}，失败 {fail}（并发 {max_conc}）")
+        print(f"[Agnes 三视图批量] 状态: success={success} error={error} empty={empty}")
 
-        return tuple(images) + tuple(statuses)
+        return tuple(images) + (_status_json(success, error, empty),)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesTurnaroundBatch": AgnesTurnaroundBatch}

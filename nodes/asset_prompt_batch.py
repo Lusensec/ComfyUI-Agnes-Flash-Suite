@@ -5,7 +5,9 @@ Agnes 资产提示词批量生成节点
 与「Agnes 文本拆分」20 路输出一一对应的资产提示词批量生成节点：
 20 个资产 JSON 输入槽（asset_1..20 ↔ 文本拆分 item_1..20），线程池并发
 请求文本 API（max_concurrency 限制同时请求数，默认 10，超出排队执行），
-20 路 english_prompt + 20 路 status 输出（成功/跳过/错误，各槽状态一目了然）。
+20 路 english_prompt + 1 路 status 输出（整批执行状态 JSON：
+{"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
+可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析）。
 
 - 参数与单条「Agnes 资产提示词生成」完全一致（subject_type/style/base_url/
   api_key/model/reasoning_effort），20 槽共用，另加 max_concurrency 速率限制
@@ -19,6 +21,7 @@ Agnes 资产提示词批量生成节点
       ─▶ english_prompt_1..20 ─▶ Agnes 文生图 / 三视图生成(subject_desc)
 """
 
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..api import (
@@ -35,33 +38,28 @@ MAX_SLOTS = 20
 
 
 class AgnesAssetPromptBatch(OutputDocsMixin):
-    """资产提示词批量生成：20 路资产 JSON 并发生成英文提示词 + 20 路状态输出（线程池，速率可限）"""
+    """资产提示词批量生成：20 路资产 JSON 并发生成英文提示词 + 1 路整批状态 JSON（线程池，速率可限）"""
 
-    DESCRIPTION = "资产提示词批量生成：20 个资产 JSON 输入对应文本拆分 20 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），输出 20 路 english_prompt + 20 路 status（成功=成功 N 字；空输入=[跳过]；失败=[错误]），单槽失败不影响其他槽"
+    DESCRIPTION = "资产提示词批量生成：20 个资产 JSON 输入对应文本拆分 20 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），输出 20 路 english_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单），单槽失败不影响其他槽"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
     OUTPUT_NODE = True
 
-    # ── 输出：english_prompt_1..20 + status_1..20（共 40 槽）──
-    RETURN_NAMES = (
-        tuple(f"english_prompt_{i}" for i in range(1, MAX_SLOTS + 1))
-        + tuple(f"status_{i}" for i in range(1, MAX_SLOTS + 1))
-    )
-    RETURN_TYPES = ("STRING",) * MAX_SLOTS * 2
-    RETURN_LABELS = (
-        tuple(f"英文资产提示词 {i}" for i in range(1, MAX_SLOTS + 1))
-        + tuple(f"状态 {i}" for i in range(1, MAX_SLOTS + 1))
-    )
+    # ── 输出：english_prompt_1..20 + status（共 21 槽）──
+    RETURN_NAMES = tuple(f"english_prompt_{i}" for i in range(1, MAX_SLOTS + 1)) + ("status",)
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 1)
+    RETURN_LABELS = tuple(f"英文资产提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON",)
     OUTPUT_DOCS = {
         **{f"english_prompt_{i}": (
             f"第 {i} 条资产的英文生图提示词（保留 JSON 全部描述字段 + 主体构图指令 + 风格尾词 + quality 词，"
             f"可直接接 文生图/三视图生成(subject_desc)；空输入=空字符串；失败=[Error] 前缀文本"
         ) for i in range(1, MAX_SLOTS + 1)},
-        **{f"status_{i}": (
-            f"第 {i} 槽执行状态：成功=成功 N 字；空输入=[跳过] 输入为空；失败=[错误] 原因；"
-            f"API 200 但正文为空=[错误] 空响应（常见为思考预算耗尽）"
-        ) for i in range(1, MAX_SLOTS + 1)},
+        "status": (
+            "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号，含空响应],\"empty\":[空输入跳过槽号]}；"
+            "可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，"
+            "或接 LLM 对话让模型解读哪些槽需要重试"
+        ),
     }
 
     @classmethod
@@ -132,17 +130,23 @@ class AgnesAssetPromptBatch(OutputDocsMixin):
         api_key = str(api_key or "").strip()
         if not api_key:
             api_key = str(get_api_key() or "").strip()
+        def _status_json(success, error, empty):
+            return json.dumps(
+                {"success": success, "error": error, "empty": empty},
+                ensure_ascii=False, indent=2,
+            )
+
         if not api_key:
             msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
             print(f"[Agnes 资产提示词批量] {msg}")
-            return tuple(msg for _ in range(MAX_SLOTS)) + tuple(msg for _ in range(MAX_SLOTS))
+            return tuple(msg for _ in range(MAX_SLOTS)) + (_status_json([], list(range(1, MAX_SLOTS + 1)), []),)
 
         # ── 全空跳过：一发请求都不发 ──
         tasks = [(i, t) for i, t in enumerate(a, 1) if t]
         if not tasks:
             skip_msg = "[跳过] 输入全部为空：请连接 Agnes 文本拆分 的 item_1..20 输出，或逐槽粘贴资产 JSON"
             print(f"[Agnes 资产提示词批量] {skip_msg}")
-            return ("",) * MAX_SLOTS + tuple(skip_msg for _ in range(MAX_SLOTS))
+            return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))),)
 
         print(f"\n[Agnes 资产提示词批量] 共 {MAX_SLOTS} 槽，非空 {len(tasks)} 条，并发 {max_conc}")
         print(f"  模型: {model}, 主体类型: {subject_type}, 风格: {style}")
@@ -162,11 +166,8 @@ class AgnesAssetPromptBatch(OutputDocsMixin):
             )[0]
 
         prompts = [""] * MAX_SLOTS
-        statuses = [""] * MAX_SLOTS
-        task_ids = {i for i, _ in tasks}
-        for i in range(1, MAX_SLOTS + 1):
-            if i not in task_ids:
-                statuses[i - 1] = "[跳过] 输入为空"
+        success, error = [], []
+        empty = [i for i in range(1, MAX_SLOTS + 1) if i not in {k for k, _ in tasks}]
 
         ok = fail = 0
         with ThreadPoolExecutor(max_workers=max_conc) as ex:
@@ -177,26 +178,29 @@ class AgnesAssetPromptBatch(OutputDocsMixin):
                     p = fut.result()
                     prompts[i - 1] = p
                     if p and not p.startswith("[Error"):
-                        statuses[i - 1] = f"成功 {len(p)} 字"
+                        success.append(i)
                         ok += 1
                         print(f"[Agnes 资产提示词批量] #{i} 成功 {len(p)} 字 | {p[:40].strip()}...")
                     elif p == "":
-                        statuses[i - 1] = "[错误] 空响应（API 返回 200 但正文为空：降 reasoning_effort / 换 agnes-2.5-flash 后重试）"
+                        error.append(i)
                         fail += 1
-                        print(f"[Agnes 资产提示词批量] #{i} 失败: 空响应")
+                        print(f"[Agnes 资产提示词批量] #{i} 失败: 空响应（API 返回 200 但正文为空：降 reasoning_effort / 换 agnes-2.5-flash 后重试）")
                     else:
                         reason = p.split("]", 1)[1].strip() if "]" in p else p
-                        statuses[i - 1] = f"[错误] {reason or p}"
+                        error.append(i)
                         fail += 1
                         print(f"[Agnes 资产提示词批量] #{i} 失败: {reason or p}")
                 except Exception as e:
                     prompts[i - 1] = f"[Error] {e}"
-                    statuses[i - 1] = f"[错误] {e}"
+                    error.append(i)
                     fail += 1
                     print(f"[Agnes 资产提示词批量] #{i} 失败: {e}")
+        success.sort()
+        error.sort()
         print(f"[Agnes 资产提示词批量] 完成：成功 {ok}/{len(tasks)}，失败 {fail}（并发 {max_conc}）")
+        print(f"[Agnes 资产提示词批量] 状态: success={success} error={error} empty={empty}")
 
-        return tuple(prompts) + tuple(statuses)
+        return tuple(prompts) + (_status_json(success, error, empty),)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesAssetPromptBatch": AgnesAssetPromptBatch}
