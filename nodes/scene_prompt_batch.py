@@ -27,10 +27,10 @@ JSON 输出 + 3 路分段 all_prompts_1_20 / _21_40 / _41_60（各段成功提�
   Agnes 剧本生成/解说剧本生成（故事文本）
       ├─▶ Agnes 总导演（all_scenes 合并槽，JSON 数组）─▶ Agnes 分镜提示词批量生成（all_scenes）
       │      （+ Agnes 资产提取 角色/场景/服装/道具/天气 JSON 任选注入，整批共用）
-      │      ─▶ all_prompts（全部提示词 JSON）─▶ Agnes 分镜图批量生成（all_prompts，批量出关键帧）
+      │      ─▶ all_prompts（全部提示词 JSON）─▶ ≤20 条直连 Agnes 分镜图批量生成 all_prompts 出关键帧 / 整批审改存档
       │      ─▶ all_prompts_1_20 / _21_40 / _41_60（分段 JSON）
-      │         ─▶ Agnes 分镜图批量生成 ×3（batch/all_prompts，分波出图）
-      │            ─▶ all_images ─▶ Agnes 图像拼图（batch_images，分段总览拼图）
+      │         ─▶ Agnes 分镜图批量生成 实例①②③（batch 一根线各连一段，分波出图控 RPM）
+      │            ─▶ 各实例 all_images ─▶ Agnes 图像拼图（batch_images，每波一张 20 图分段总览）
        │      ─▶ detailed_prompt_1..60（单镜）─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
       └─▶ Agnes 资产提取 ─▶ 资产线（资产提示词批量/三视图批量 → 参考图回流分镜线保一致性）
   轻量替代：Agnes 场景切分（all_scenes 合并槽）直连本节点；
@@ -84,8 +84,8 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         ),
         "all_prompts": (
             "本批成功生成的英文生图提示词 JSON 数组（json.dumps ensure_ascii=False indent=2，按槽号升序；失败/空槽不含；"
-            "全空/缺 Key/零成功=空字符串）；可直连 Agnes 分镜图批量生成 all_prompts 输入（一根线批量出关键帧），"
-            "或连 LLM 对话整批审改 / 存档"
+            "全空/缺 Key/零成功=空字符串）；≤20 条时可直连 Agnes 分镜图批量生成 all_prompts 输入（一根线批量出关键帧），"
+            ">20 条（60 镜全量）请连 3 路分段 ×3 实例分波出图；亦可连 LLM 对话整批审改 / 存档"
         ),
         "all_prompts_1_20": (
             "槽 1-20 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"

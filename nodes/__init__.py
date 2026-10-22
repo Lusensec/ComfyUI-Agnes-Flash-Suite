@@ -62,9 +62,9 @@ from . import text2video, img2video, video_reference
 #           60 路 detailed_prompt + all_prompts + 3 路分段 all_prompts_1_20/_21_40/_41_60）
 # 图片类：图像反推提示词（位于 图像生成 上方）→ 图像生成 → 图生图 → 三视图生成 → 三视图批量生成
 #        （all_prompts 合并输入 → all_images 批量张量 (N,H,W,3)）
-#        → 分镜图批量生成（分镜线全量出图：all_prompts 全部提示词 JSON 或 batch 一根线
-#           （接 分镜提示词批量 3 路分段 all_prompts_1_20/_21_40/_41_60，分波控 RPM），
-#           60 路并发出关键帧 + all_images 批量张量 (N,H,W,3)）
+#        → 分镜图批量生成（分镜线 3 波出 60 镜全量：batch 一根线各连 分镜提示词批量 任一分段
+#           all_prompts_1_20/_21_40/_41_60（3 实例分波控 RPM；≤20 条也可 all_prompts 直连），
+#           20 路并发出关键帧 + all_images 批量张量 (N,H,W,3) 每波总览）
 #        → 图像拼图（位于 分镜图批量 之后，batch_images 批量张量总输入优先 / 批量图 20 路 → 1 路拼图）
 # 视频类：文生视频 → 关键帧生视频 → 参考视频生成
 for _mod in [

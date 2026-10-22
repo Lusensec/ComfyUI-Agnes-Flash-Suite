@@ -1,7 +1,7 @@
 # ComfyUI Agnes Flash Suite
 ===========================
 
-Agnes AI 全能力 ComfyUI 节点套件 — 27 个节点：LLM 文本管线（小说/分镜/剧本/解说/漫剧，分镜提示词 60 路批量）、文生图/图生图/三视图（单张+20 路批量）/分镜图 60 路批量生成，以及文生视频/关键帧生视频/参考视频生成。批量节点全部支持 JSON 合并输入/输出（文本拆分 all_items → 资产提示词批量 all_items→all_prompts → 三视图提示词批量 all_prompts→all_turnaround_prompts → 三视图批量 all_prompts→all_images → 图像拼图 batch_images；分镜线 总导演/场景切分 all_scenes → 分镜提示词批量 all_prompts/3 路分段 → 分镜图批量 batch/all_prompts→all_images → 图像拼图 batch_images），全链路一根线到底，免逐槽手接。
+Agnes AI 全能力 ComfyUI 节点套件 — 27 个节点：LLM 文本管线（小说/分镜/剧本/解说/漫剧，分镜提示词 60 路批量）、文生图/图生图/三视图（单张+20 路批量）/分镜图 20 路批量生成（3 实例分波出 60 镜全量），以及文生视频/关键帧生视频/参考视频生成。批量节点全部支持 JSON 合并输入/输出（文本拆分 all_items → 资产提示词批量 all_items→all_prompts → 三视图提示词批量 all_prompts→all_turnaround_prompts → 三视图批量 all_prompts→all_images → 图像拼图 batch_images；分镜线 总导演/场景切分 all_scenes → 分镜提示词批量 3 路分段 all_prompts_1_20/_21_40/_41_60 → 分镜图批量 ×3 batch/all_images → 图像拼图 batch_images），全链路一根线到底，免逐槽手接。
 
 ## 功能
 
@@ -31,7 +31,7 @@ Agnes AI 全能力 ComfyUI 节点套件 — 27 个节点：LLM 文本管线（�
 - 🖼️ Agnes 图生图
 - 📐 Agnes 三视图生成
 - 📐 Agnes 三视图批量生成（all_prompts 合并输入（JSON 数组，直连 三视图提示词批量 all_turnaround_prompts 输出，免 20 路手接）并发出图，输出 20 路图 + 整批执行状态 JSON + all_images 批量图张量 (N,H,W,3)（可直连 图像拼图 总输入一根线出总览），线程池速率可限，默认 10）
-- 🎞️ Agnes 分镜图批量生成（all_prompts 合并输入（JSON 数组，最多 60 条）+ batch 一根线输入（直连 分镜提示词批量 3 路分段 all_prompts_1_20/_21_40/_41_60，分波出图，batch 非空优先）并发出 60 路分镜关键帧，单条提示词纯文本也接受，画质档位/宽高比可配（默认 2K + 16:9），整批执行状态 JSON + all_images 批量图张量 (N,H,W,3)（可直连 图像拼图 batch_images）输出，线程池速率可限，默认 10）
+- 🎞️ Agnes 分镜图批量生成（20 槽/波：batch 一根线输入（直连 分镜提示词批量 任一分段 all_prompts_1_20/_21_40/_41_60，batch 非空优先；3 个实例各连一段=60 镜全量分波控 RPM）或 all_prompts 合并输入（JSON 数组，最多 20 条、超出截断）并发出 20 路分镜关键帧，单条提示词纯文本也接受，画质档位/宽高比可配（默认 2K + 16:9），整批执行状态 JSON + all_images 批量图张量 (N,H,W,3)（可直连 图像拼图 batch_images，每波一张 20 图分段总览）输出，线程池速率可限，默认 10）
 - 🔍 Agnes 图像反推提示词
 - 🧩 Agnes 图像拼图（batch_images 批量张量总输入（三视图批量/分镜图批量 all_images 直连，优先于 20 槽）或 20 路批量图 → 1 张 2 列网格拼图，全部 21 输入可选（不连线自动跳过不红框），自动跳过黑图占位，N 动态定行数，纯本地）
 
