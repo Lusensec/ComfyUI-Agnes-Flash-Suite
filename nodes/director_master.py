@@ -2,6 +2,7 @@
 Agnes 总导演节点
 生成完整编号分镜脚本
 输入：故事内容（小说章节或 漫剧剧本 均可），输出 5 秒/镜的编号分镜
++ all_shots 全文合并槽（50 镜按序合并，可直连 LLM 对话/存档）
 """
 import requests
 import re
@@ -51,7 +52,7 @@ class AgnesDirectorMaster:
         }
         return inputs
 
-    RETURN_TYPES = ("STRING",) * 56
+    RETURN_TYPES = ("STRING",) * 57
     RETURN_NAMES = (
         "log_text",
         "scene_1", "scene_2", "scene_3", "scene_4", "scene_5",
@@ -66,6 +67,7 @@ class AgnesDirectorMaster:
         "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
         "shot_count",
+        "all_shots",
     )
     RETURN_LABELS = (
         "处理日志",
@@ -81,11 +83,13 @@ class AgnesDirectorMaster:
         "分镜 46", "分镜 47", "分镜 48", "分镜 49", "分镜 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
         "分镜总数（超 50 标注）",
+        "分镜全文（合并）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（分镜统计/响应元数据/空响应警示/错误详情）",) + (
         ("编号分镜脚本（5秒/段，含画面/对白/运镜，连接提示词生成节点）",) * 50
-    ) + ("小说原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
-         "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）")
+    ) + ("故事原文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
+         "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）",
+         "50 个分镜按序换行合并（跳过空槽）；可直连 LLM 对话 / 存档，整段审读")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -106,11 +110,12 @@ class AgnesDirectorMaster:
         }
         for i in range(1, 51):
             outputs[f"scene_{i}"] = f"第 {i} 个分镜脚本（如果存在）"
-        outputs["chapter_text_out"] = "原始小说章节文本（透传）"
+        outputs["chapter_text_out"] = "原始故事文本（小说章节/剧本，透传）"
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
         outputs["shot_count"] = "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）"
+        outputs["all_shots"] = "50 个分镜按序换行合并（跳过空槽）；可直连 LLM 对话 / 存档"
         
         for key in outputs:
             if key in kwargs:
@@ -122,13 +127,13 @@ class AgnesDirectorMaster:
         if not chapter_text:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 的文本输出，或直接粘贴故事章节"
             print(f"[Agnes 总导演] {skip_msg}")
-            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model, ""]
+            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model, "", ""]
             return tuple(result)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             error_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, "", ""]
             return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes 总导演 - {model}]")
@@ -241,6 +246,8 @@ class AgnesDirectorMaster:
             total_shots = max(shots) if shots else 0
             shot_count = f"{total_shots}（仅显示前 50 个）" if total_shots > 50 else str(total_shots)
             result.append(shot_count)
+            # all_shots：50 个分镜按序合并（跳过空槽），供 直连 LLM 对话/存档
+            result.append("\n".join(x for x in result[1:51] if x.strip()))
 
             return tuple(result)
 
@@ -250,7 +257,7 @@ class AgnesDirectorMaster:
                          f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                          f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
+            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, "", ""]
             return tuple(result)
 
     def _parse_shots(self, content):

@@ -17,6 +17,7 @@ from .scene_splitter import AgnesSceneSplitter
 from .director_master import AgnesDirectorMaster
 from .asset_extractor import AgnesAssetExtractor
 from .prompt_generator import AgnesScenePromptGenerator
+from .scene_prompt_batch import AgnesScenePromptBatch
 from .text_split import AgnesTextSplitter
 from .asset_prompt import AgnesAssetPromptGenerator
 from .asset_prompt_batch import AgnesAssetPromptBatch
@@ -44,7 +45,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {}
 
 # 从各节点文件收集映射（顺序即菜单显示顺序）
 from . import api_key_config, style_selector, text_input, script_generator, screenplay_generator, scene_splitter, director_master
-from . import asset_extractor, prompt_generator, text_split, asset_prompt, asset_prompt_batch
+from . import asset_extractor, prompt_generator, scene_prompt_batch, text_split, asset_prompt, asset_prompt_batch
 from . import turnaround_prompt, turnaround_prompt_batch, image_mosaic, string_merge, llm_chat
 from . import image_gen, img2img, character_turnaround, turnaround_batch, image_reverse
 from . import text2video, img2video, video_reference
@@ -52,7 +53,7 @@ from . import text2video, img2video, video_reference
 # 文本类：API Key 配置 → 风格选择（配置信息，紧随 API Key）→ 文本输入（文本起点，替代灰色 PrimitiveNode）
 #        → 解说剧本生成（常用入口）→ 漫剧剧本生成（分场剧本）
 #        → 场景切分 → 总导演 → 资产提取
-#        → 分镜提示词生成 → 文本拆分 → 资产提示词生成 → 资产提示词批量生成 → 三视图提示词生成 → 三视图提示词批量生成
+#        → 分镜提示词生成 → 分镜提示词批量生成 → 文本拆分 → 资产提示词生成 → 资产提示词批量生成 → 三视图提示词生成 → 三视图提示词批量生成
 #        → 图像拼图（批量图 20 路 → 1 路拼图）→ 字符串合并 → LLM 对话
 # 图片类：图像生成 → 图生图 → 三视图生成 → 三视图批量生成 → 图像反推提示词
 # 视频类：文生视频 → 关键帧生视频 → 参考视频生成
@@ -60,7 +61,7 @@ for _mod in [
     # 文本类
     api_key_config, style_selector, text_input,
     script_generator, screenplay_generator, scene_splitter, director_master,
-    asset_extractor, prompt_generator, text_split, asset_prompt, asset_prompt_batch,
+    asset_extractor, prompt_generator, scene_prompt_batch, text_split, asset_prompt, asset_prompt_batch,
     turnaround_prompt, turnaround_prompt_batch, image_mosaic, string_merge, llm_chat,
     # 图片类
     image_gen, img2img, character_turnaround, turnaround_batch, image_reverse,

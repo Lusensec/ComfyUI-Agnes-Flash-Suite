@@ -1,6 +1,8 @@
 """
 Agnes 分镜提示词生成节点
 将分镜脚本转换为 Agnes Image API 可用的详细提示词
+资产信息（角色/场景/服装/道具/天气 JSON，来自 Agnes 资产提取）非空才注入，
+空槽不占提示词篇幅（避免模型对着空标题块自行脑补）
 """
 import requests
 import re
@@ -8,10 +10,14 @@ import traceback
 from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 
 
+# 图像风格（与 资产/三视图提示词节点同一套；批量节点共用导入）
+STYLE_OPTIONS = ("cinematic", "anime", "realistic", "watercolor", "oil_painting")
+
+
 class AgnesScenePromptGenerator:
     """使用 Agnes LLM 生成分镜提示词"""
     
-    DESCRIPTION = "将分镜脚本转换为高质量的英文图像生成提示词，支持多种艺术风格"
+    DESCRIPTION = "将分镜脚本转换为高质量的英文图像生成提示词，支持多种艺术风格；可选注入 资产提取 的角色/场景/服装/道具/天气 5 路 JSON 保跨镜一致性"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -37,7 +43,7 @@ class AgnesScenePromptGenerator:
                     "default": CHAT_MODEL,
                     "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
                 }),
-                "style": (["cinematic", "anime", "realistic", "watercolor", "oil_painting"], {
+                "style": (list(STYLE_OPTIONS), {
                     "default": "cinematic",
                     "tooltip": "图像风格：cinematic=电影感，anime=动漫，realistic=写实，watercolor=水彩，oil_painting=油画"
                 }),
@@ -46,14 +52,32 @@ class AgnesScenePromptGenerator:
                 "characters_json": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "{\"characters\":[...]}",
-                    "tooltip": "角色信息 JSON（从资产提取节点获取，可选）"
+                    "placeholder": "[{\"name\":\"角色名\",\"gender\":\"男/女\",\"appearance\":\"外貌描述\"}]",
+                    "tooltip": "角色信息 JSON（从资产提取节点获取，可选）；留空=不注入该信息块"
                 }),
                 "locations_json": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": "{\"locations\":[...]}",
-                    "tooltip": "场景信息 JSON（从资产提取节点获取，可选）"
+                    "placeholder": "[{\"name\":\"场景名\",\"description\":\"环境描述\",\"era\":\"时代背景\"}]",
+                    "tooltip": "场景信息 JSON（从资产提取节点获取，可选）；留空=不注入该信息块"
+                }),
+                "costumes_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "[{\"character\":\"角色名\",\"description\":\"服装描述\"}]",
+                    "tooltip": "服装信息 JSON（从资产提取节点获取，可选）；留空=不注入该信息块"
+                }),
+                "props_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "[\"道具1\", \"道具2\"]",
+                    "tooltip": "道具列表 JSON（从资产提取节点获取，可选）；留空=不注入该信息块"
+                }),
+                "weather_json": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "[\"天气/氛围 1\", \"天气/氛围 2\"]",
+                    "tooltip": "天气/氛围 JSON（从资产提取节点获取，可选）；留空=不注入该信息块"
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
@@ -87,7 +111,7 @@ class AgnesScenePromptGenerator:
             }
         return extra
 
-    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", reasoning_effort="auto"):
+    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", costumes_json="", props_json="", weather_json="", reasoning_effort="auto"):
         if not (scene_text or "").strip():
             skip_msg = "[跳过] 分镜文本为空：请连接 Agnes 总导演 / Agnes 场景切分 的分镜输出，或直接粘贴分镜文本"
             print(f"[Agnes 分镜提示词] {skip_msg}")
@@ -101,6 +125,22 @@ class AgnesScenePromptGenerator:
         print(f"{'='*50}")
         print(f"输入分镜: {scene_text[:200]}...")
 
+        # 资产信息注入（角色/场景/服装/道具/天气，来自 Agnes 资产提取 5 路 JSON）：
+        # 只注入非空块，空槽不占篇幅（避免模型对着空标题块自行脑补）
+        _asset_blocks = [
+            ("角色信息", characters_json),
+            ("场景信息", locations_json),
+            ("服装信息", costumes_json),
+            ("道具信息", props_json),
+            ("天气氛围", weather_json),
+        ]
+        _kept = [(name, (val or "").strip()) for name, val in _asset_blocks if (val or "").strip()]
+        if _kept:
+            asset_block = "\n\n".join(f"【{name}】\n{val}" for name, val in _kept)
+        else:
+            asset_block = "（未连接资产信息：仅依据分镜脚本描述，不自行脑补外貌/服装细节）"
+        print(f"资产注入: {('、'.join(name for name, _ in _kept)) if _kept else '无'}")
+
         prompt = f"""你是一位世界顶级的AI图像生成提示词工程师，专精于将影视分镜脚本转换为高质量的AI生图提示词。
 
 【任务】
@@ -109,11 +149,8 @@ class AgnesScenePromptGenerator:
 【输入分镜脚本】
 {scene_text}
 
-【角色信息】（如有）
-{characters_json}
-
-【场景信息】（如有）
-{locations_json}
+【资产信息】（来自 资产提取，非空才注入；其中角色/服装/场景描述必须沿用，不得自行改写）
+{asset_block}
 
 【风格要求】
 {style}

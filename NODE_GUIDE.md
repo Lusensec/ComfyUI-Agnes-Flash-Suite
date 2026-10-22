@@ -60,7 +60,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | 关键帧（首尾帧） | - | - | ✅ keyframe 模式 first_frame/last_frame（关键帧生视频节点） | ⚠️ 多图 img2video（无独立尾帧参数） |
 | reasoning_effort（思考等级） | 仅文本模型 | - | - | - |
 
-> 思考等级：走 LLM 的节点（场景切分/总导演/资产提取/分镜提示词/剧本生成/LLM 对话/
+> 思考等级：走 LLM 的节点（场景切分/总导演/资产提取/分镜提示词/分镜提示词批量/剧本生成/LLM 对话/
 > 资产提示词生成/资产提示词批量生成/三视图提示词生成/三视图提示词批量生成/图像反推提示词）均带 reasoning_effort 下拉
 > （auto/none/low/medium/high/max；auto=不传参数跟随模型默认）；
 > 2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
@@ -161,12 +161,14 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - scene_1 ~ scene_50: 分镜脚本
 - chapter_text_out / api_key_out / base_url_out / model_out: 透传
 - shot_count: 分镜总数（统计实际解析出的分镜数；超过 50 时标注「N（仅显示前 50 个）」；失败/无 Key/输入为空时为空）
+- all_shots: 50 个分镜按序换行合并（跳过空槽）；可直连 LLM 对话整段审读 / 存档；失败/无 Key/输入为空时为空
 
 > 输入为空（chapter_text 留空/上游未连）时直接跳过、不调 API：log_text 显示「[跳过] 输入为空…」，各槽为空。
 
 > 两种接法：
 > - 小说线：章节原文 → 总导演（章→镜一步到位）
 > - 漫剧线：大纲 → Agnes 剧本生成（漫剧，场级 5–15 秒）→ 总导演（场→镜精化，每场拆 2–4 镜）→ 分镜提示词生成 → 生图/生视频
+> - 分镜量大（>50 或想全量出图提示词）：总导演 分镜_1..50 → Agnes 分镜提示词批量生成（50 槽一次出全）；整段审读连 all_shots
 > - 注意：漫剧线 快节奏（5–8 秒/场）× 180 秒 ≈ 30 场 → 60+ 镜，会超出 scene_50 上限；建议漫剧线用 中速/慢热 或缩短 target_duration
 
 ---
@@ -213,14 +215,51 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | style | COMBO | cinematic | 图像风格：cinematic/anime/realistic/watercolor/oil_painting |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
-| characters_json | STRING | "" | 角色信息 JSON（可选） |
-| locations_json | STRING | "" | 场景信息 JSON（可选） |
+| characters_json | STRING | "" | 角色信息 JSON（可连 资产提取 角色JSON，可选）；留空=不注入该资产块 |
+| locations_json | STRING | "" | 场景信息 JSON（可连 资产提取 场景JSON，可选）；留空=不注入该资产块 |
+| costumes_json | STRING | "" | 服装信息 JSON（可连 资产提取 服装JSON，可选）；留空=不注入该资产块 |
+| props_json | STRING | "" | 道具列表 JSON（可连 资产提取 道具JSON，可选）；留空=不注入该资产块 |
+| weather_json | STRING | "" | 天气/氛围 JSON（可连 资产提取 天气JSON，可选）；留空=不注入该资产块 |
 
 **输出：**
 - detailed_prompt: 英文提示词
 - log_text: 处理日志（成功=字数+响应元数据；空响应=⚠️警示；失败=异常+堆栈）
 
 > 输入为空（scene_text 留空/上游未连）时直接跳过、不调 API：日志显示「[跳过] 分镜文本为空…」，detailed_prompt 为跳过提示。
+
+> 资产注入（跨镜一致性）：5 路资产 JSON 来自「Agnes 资产提取」（与总导演同源的剧本/章节），
+> 任一非空即随提示词发送、模型被要求沿用其中的角色/服装/场景描述；全空时提示词中显式标注
+> 「未连接资产信息，不自行脑补」——避免模型对着空标题块自由发挥。
+> 全量出图（50 镜）请用下方「Agnes 分镜提示词批量生成」。
+
+---
+
+### 🎨 Agnes 分镜提示词批量生成 (AgnesScenePromptBatch)
+
+**功能：** 将「Agnes 总导演 / Agnes 场景切分」的 50 路分镜并发生成英文生图提示词（线程池，速率可限）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| scene_1 ~ scene_50 | STRING | "" | 50 个分镜文本，对应 总导演 分镜_1..50 / 场景切分 场景_1..50 直连；留空槽=跳过该槽（不发请求，输出空串） |
+| style | COMBO | cinematic | 图像风格（50 槽共用） |
+| characters_json / locations_json / costumes_json / props_json / weather_json | STRING | "" | 资产提取 5 路 JSON（整批共用，非空才随每槽发送；留空=不注入该资产块） |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-2.5-flash | 文本生成模型 |
+| reasoning_effort | COMBO | auto | 思考等级（auto/none/low/medium/high/max；2.0 旧模型不生效） |
+| max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-50，默认 10）；非空分镜超过该值时排队执行，频繁 429/503 就调小 |
+
+**输出：**
+- detailed_prompt_1 ~ detailed_prompt_50: 每个分镜的英文生图提示词（可逐个连 Agnes 文生图/图生图 出关键帧）
+- status: 整批执行状态 JSON `{"success":[…],"error":[…],"empty":[…]}`（槽号升序；全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）；可直连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析
+
+> 典型接法（分镜线全量出图）：
+> 剧本/章节 → 总导演（分镜_1..50）+ 资产提取（5 路 JSON 任选）→ 分镜提示词批量生成
+> （scene_1..50 + 资产注入）→ detailed_prompt_1..50 → Agnes 文生图（逐镜关键帧）→ 关键帧生视频；
+> 资产线的参考图（三视图批量产物）可回流 图生图 保跨镜一致性。
+
+> 缺 Key：50 路全输出「[错误] 缺少 API Key…」，status error=全槽、reason=缺 Key 原因（零 API 调用）；
+> 全空：50 路全空串，status empty=全槽（零 API 调用）；单槽失败不影响其他槽。
 
 ---
 
