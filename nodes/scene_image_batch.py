@@ -2,12 +2,11 @@
 """
 Agnes 分镜图批量生成节点（20 槽/波，3 实例分波出 60 帧全量）
 ========================
-「Agnes 分镜提示词批量生成」分段输出（all_prompts_1_20 / _21_40 / _41_60，
-各段 JSON 数组 ≤20 条）驱动的 20 路分镜关键帧批量出图节点：3 个实例分别
-对接 3 路分段（batch 一根线输入），每波 ≤20 张分波出图控 RPM，3 波 = 60 镜
-全量关键帧；也可单实例处理 ≤20 条提示词（all_prompts/batch 任一输入，
-JSON 数组逐条出图；也接受单条英文提示词纯文本，视为 1 条；超 20 条截断并
-日志标注）。
+「Agnes 分镜提示词批量生成」单根线输入（all_prompts，≤20 条分镜提示词
+JSON 数组）驱动的 20 路分镜关键帧批量出图节点：3 个实例各连一段
+（3 路分段输出 all_prompts_1_20 / _21_40 / _41_60），每波 ≤20 张分波出图
+控 RPM，3 波 = 60 镜全量关键帧；也接受单条英文提示词纯文本（视为 1 条；
+超 20 条截断并日志标注）。
 线程池并发请求图像 API 批量出关键帧（max_concurrency 限制同时请求数，
 默认 10，超出排队执行），20 路 image + 1 路 status + 1 路 all_images 批量图
 张量 (N,H,W,3) 输出（整批执行状态 JSON：
@@ -15,11 +14,11 @@ JSON 数组逐条出图；也接受单条英文提示词纯文本，视为 1 条
 可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析；
 全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）。
 
-batch 输入（一根线，优先级高于 all_prompts）：直连 Agnes 分镜提示词批量生成
-的任一分段输出 all_prompts_1_20 / _21_40 / _41_60（各段 JSON 数组 ≤20 条，
-本节点专出该波；不支持嵌套 3 段 [[..],[..],[..]]——60 镜全量=3 实例分波）；
-batch 非空时忽略 all_prompts 输入；batch 空=回落 all_prompts 解析；
-双空=整批跳过零调用。
+all_prompts 输入（一根线）：可直连 Agnes 分镜提示词批量生成 的任一分段输出
+all_prompts_1_20 / _21_40 / _41_60（各段 JSON 数组 ≤20 条，本实例专出该波；
+60 镜全量=3 实例各连一段；不支持嵌套 3 段 [[..],[..],[..]]）；
+也接受 all_prompts 全量输出（≤20 条场景）或单条英文提示词纯文本；
+空输入=整批跳过零调用。
 
 - 空槽跳过：该槽不发请求，输出黑图占位（512×512）
 - 单槽失败不影响其他槽：该槽黑图占位，原因见 status
@@ -27,7 +26,7 @@ batch 非空时忽略 all_prompts 输入；batch 空=回落 all_prompts 解析�
 - 纯文生图：不接参考图——跨镜一致性（同一角色跨分镜长相）靠资产线参考图
   回流 图生图/关键帧生视频 节点解决，本节点负责"分波出全"
 
-all_prompts / batch 解析（从上到下）：JSON 数组=逐条处理（跳过空项，超 20 条
+all_prompts 解析（从上到下）：JSON 数组=逐条处理（跳过空项，超 20 条
 截断并日志标注"本节点每波出 20 张，60 镜全量请连 3 路分段 ×3 实例"）；
 JSON 字符串=1 条；非 JSON 纯文本（单条提示词直连/手动粘贴）=1 条；
 空输入=整批跳过（零 API 调用）
@@ -40,9 +39,9 @@ SaveImage/关键帧生视频）；接视频生成前请先用 status JSON 核对
 典型接法（分镜线 3 波出 60 镜全量，分段直连控 RPM）：
   Agnes 总导演/场景切分（all_scenes JSON 数组，≤60 条）
       ─▶ Agnes 分镜提示词批量生成（all_scenes；+ 资产提取 5 路 JSON 任选注入）
-      ├─▶ all_prompts_1_20 ─▶ Agnes 分镜图批量生成 实例①（batch 一根线，波 1 ≤20 张）
-      ├─▶ all_prompts_21_40 ─▶ Agnes 分镜图批量生成 实例②（batch，波 2 ≤20 张）
-      └─▶ all_prompts_41_60 ─▶ Agnes 分镜图批量生成 实例③（batch，波 3 ≤20 张）
+      ├─▶ all_prompts_1_20 ─▶ Agnes 分镜图批量生成 实例①（all_prompts 一根线，波 1 ≤20 张）
+      ├─▶ all_prompts_21_40 ─▶ Agnes 分镜图批量生成 实例②（all_prompts，波 2 ≤20 张）
+      └─▶ all_prompts_41_60 ─▶ Agnes 分镜图批量生成 实例③（all_prompts，波 3 ≤20 张）
   各实例 image_1..20（关键帧）─▶ SaveImage 存档 / 关键帧生视频（逐镜）
   各实例 all_images (N,H,W,3) ─▶ Agnes 图像拼图（batch_images，每波一张 20 图分段总览）
   ≤20 条单波场景：分镜提示词批量 all_prompts（≤20 条）或任一分段直连单实例
@@ -74,9 +73,9 @@ def _black_placeholder():
 
 
 class AgnesSceneImageBatch(OutputDocsMixin):
-    """分镜图批量生成（20 槽/波）：分段 batch/all_prompts 输入（JSON 数组 ≤20 条/纯文本）并发出关键帧（线程池，速率可限；3 实例 × 分段 = 60 镜全量）"""
+    """分镜图批量生成（20 槽/波）：all_prompts 一根线输入（分段 JSON 数组 ≤20 条/单条纯文本）并发出关键帧（线程池，速率可限；3 实例 × 3 路分段 = 60 镜全量）"""
 
-    DESCRIPTION = "分镜图批量生成（20 槽/波）：batch 一根线输入（可直连 分镜提示词批量 任一分段 all_prompts_1_20/_21_40/_41_60，各段 ≤20 条；3 个实例对接 3 路分段=60 镜全量分波出图控 RPM，batch 非空优先于 all_prompts）或 all_prompts 合并输入（分镜提示词批量 all_prompts 输出，JSON 数组从上到下逐条出图，最多 20 条、超出截断；单条英文提示词纯文本也接受）整批并发请求图像 API 出关键帧（max_concurrency 限制同时请求数，默认 10），画质档位/宽高比可配（默认 2K + 16:9），输出 20 路 image + 1 路 status 整批状态 JSON（success/error/empty 槽号清单）+ 1 路 all_images 批量图张量 (N,H,W,3)（可直连 Agnes 图像拼图 batch_images，每波一张 20 图分段总览），空槽/失败槽黑图占位，单槽失败不影响其他槽"
+    DESCRIPTION = "分镜图批量生成（20 槽/波）：all_prompts 一根线输入（可直连 分镜提示词批量 任一分段 all_prompts_1_20/_21_40/_41_60，各段 ≤20 条；3 个实例各连一段=60 镜全量分波出图控 RPM；JSON 数组从上到下逐条出图，最多 20 条、超出截断；单条英文提示词纯文本也接受）整批并发请求图像 API 出关键帧（max_concurrency 限制同时请求数，默认 10），画质档位/宽高比可配（默认 2K + 16:9），输出 20 路 image + 1 路 status 整批状态 JSON（success/error/empty 槽号清单）+ 1 路 all_images 批量图张量 (N,H,W,3)（可直连 Agnes 图像拼图 batch_images，每波一张 20 图分段总览），空槽/失败槽黑图占位，单槽失败不影响其他槽"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -91,11 +90,11 @@ class AgnesSceneImageBatch(OutputDocsMixin):
     RETURN_TYPES = ("IMAGE",) * MAX_SLOTS + ("STRING", "IMAGE")
     RETURN_LABELS = tuple(f"分镜图 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON", "批量图 (N,H,W,3)")
     OUTPUT_DOCS = {
-        **{f"image_{i}": f"第 {i} 条提示词（all_prompts/batch 第 {i} 条）的关键帧张量（可接 SaveImage 存档或 关键帧生视频；跳过/失败/条目不足为黑图占位）"
+        **{f"image_{i}": f"第 {i} 条提示词（all_prompts 第 {i} 条）的关键帧张量（可接 SaveImage 存档或 关键帧生视频；跳过/失败/条目不足为黑图占位）"
            for i in range(1, MAX_SLOTS + 1)},
         "status": (
             "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号],\"empty\":[空输入跳过槽号]}；"
-            "槽号=all_prompts/batch 条目序号（1 起），条目不足 20 时其余槽号进 empty；"
+            "槽号=all_prompts 条目序号（1 起），条目不足 20 时其余槽号进 empty；"
             "成功槽的实际分辨率 WxH 见控制台日志；全部请求失败时额外含 \"reason\" 字段"
             "（各槽同一原因=字符串，不同=槽号→原因映射）；可直接连 Agnes 文本拆分（JSON 数组模式）"
             "拆成 3 条名单（成功/失败/空输入）做对接分析，或接 LLM 对话让模型解读哪些槽需要重试"
@@ -145,12 +144,6 @@ class AgnesSceneImageBatch(OutputDocsMixin):
                 "step": 1,
                 "tooltip": f"并发速率限制：线程池大小（同时请求数 1-{MAX_SLOTS}，默认 10）。非空提示词超过该值时排队执行；频繁 429/503 就调小",
             }),
-            "batch": ("STRING", {
-                "multiline": True,
-                "default": "",
-                "placeholder": '[\n  "a cinematic shot of ...",\n  "a close-up of ..."\n]\n可连 Agnes 分镜提示词批量生成 分段输出 all_prompts_1_20 / _21_40 / _41_60（JSON 数组，一根线一波出图 ≤20 张）；\n单条英文提示词纯文本视为 1 条',
-                "tooltip": "分段一根线输入（优先级高于 all_prompts）：① JSON 数组（分镜提示词批量 任一分段 all_prompts_1_20/_21_40/_41_60 直连，≤20 条/波；不支持嵌套 3 段——60 镜全量=3 实例各连一段分波）② 单条纯文本=1 条 ③ 空=回落 all_prompts 输入（all_prompts 也空=整批跳过，零 API 调用）",
-            }),
         }
         return {"required": required, "optional": {}}
 
@@ -185,46 +178,9 @@ class AgnesSceneImageBatch(OutputDocsMixin):
             items = items[:MAX_SLOTS]
         return items, source, truncated
 
-    @staticmethod
-    def _parse_batch(raw):
-        """batch 输入解析（优先级高于 all_prompts）：
-        ① JSON 数组 → 逐条（仅字符串条目，去空白、跳过空项；嵌套 3 段 [[..],[..],[..]]
-           不支持——非字符串条目直接跳过，60 镜全量=3 实例各连一段）；
-        ② JSON 字符串 → 1 条；
-        ③ 非 JSON 纯文本 → 1 条。
-        返回 (items, source, truncated)；超出 MAX_SLOTS(20) 截断。"""
-        raw = str(raw or "").strip()
-        if not raw:
-            return [], "空输入", False
-        items, source = [], ""
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, list):
-                source = "JSON 数组"
-                items = [x.strip() for x in parsed if isinstance(x, str) and x.strip()]
-            elif isinstance(parsed, str):
-                source = "JSON 字符串"
-                items = [parsed.strip()] if parsed.strip() else []
-            else:
-                source = "非数组 JSON（按整段 1 条）"
-                items = [raw]
-        except json.JSONDecodeError:
-            source = "纯文本（1 条）"
-            items = [raw]
-        truncated = len(items) > MAX_SLOTS
-        if truncated:
-            items = items[:MAX_SLOTS]
-        return items, source, truncated
-
     def generate(self, all_prompts="", quality="2K", aspect_ratio="16:9",
-                 base_url="", api_key="", model=IMAGE_MODEL, max_concurrency=10,
-                 batch=""):
-        batch_items, batch_source, batch_trunc = self._parse_batch(batch)
-        prompt_items, prompt_source, prompt_trunc = self._parse_all_prompts(all_prompts)
-        if batch_items:
-            items, source, truncated = batch_items, f"batch 分段展开（{batch_source}）", batch_trunc
-        else:
-            items, source, truncated = prompt_items, prompt_source, prompt_trunc
+                 base_url="", api_key="", model=IMAGE_MODEL, max_concurrency=10):
+        items, source, truncated = self._parse_all_prompts(all_prompts)
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or 10)))
 
         def _empty_batch():
@@ -254,7 +210,7 @@ class AgnesSceneImageBatch(OutputDocsMixin):
         # ── 全空跳过：一发请求都不发 ──
         tasks = [(i, t) for i, t in enumerate(items, 1) if t]
         if not tasks:
-            skip_msg = "[跳过] 输入为空：请连接 Agnes 分镜提示词批量生成 的 batch/all_prompts 输出（JSON 数组），或连单条 detailed_prompt_i，或粘贴 JSON 数组/英文提示词"
+            skip_msg = "[跳过] 输入为空：请连接 Agnes 分镜提示词批量生成 的分段输出 all_prompts_1_20/_21_40/_41_60（各段 JSON 数组 ≤20 条），或连单条 detailed_prompt_i，或粘贴 JSON 数组/英文提示词"
             print(f"[Agnes 分镜图批量] {skip_msg}")
             return tuple(_black_placeholder() for _ in range(MAX_SLOTS)) + (
                 _status_json([], [], list(range(1, MAX_SLOTS + 1))),

@@ -29,7 +29,7 @@ JSON 输出 + 3 路分段 all_prompts_1_20 / _21_40 / _41_60（各段成功提�
       │      （+ Agnes 资产提取 角色/场景/服装/道具/天气 JSON 任选注入，整批共用）
       │      ─▶ all_prompts（全部提示词 JSON）─▶ ≤20 条直连 Agnes 分镜图批量生成 all_prompts 出关键帧 / 整批审改存档
       │      ─▶ all_prompts_1_20 / _21_40 / _41_60（分段 JSON）
-      │         ─▶ Agnes 分镜图批量生成 实例①②③（batch 一根线各连一段，分波出图控 RPM）
+      │         ─▶ Agnes 分镜图批量生成 实例①②③（all_prompts 一根线各连一段，分波出图控 RPM）
       │            ─▶ 各实例 all_images ─▶ Agnes 图像拼图（batch_images，每波一张 20 图分段总览）
        │      ─▶ detailed_prompt_1..60（单镜）─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
       └─▶ Agnes 资产提取 ─▶ 资产线（资产提示词批量/三视图批量 → 参考图回流分镜线保一致性）
@@ -89,15 +89,15 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         ),
         "all_prompts_1_20": (
             "槽 1-20 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"
-            "可直连 Agnes 分镜图批量生成 batch/all_prompts 输入（第一波 ≤20 张关键帧）"
+            "可直连 Agnes 分镜图批量生成 all_prompts 输入（第一波 ≤20 张关键帧）"
         ),
         "all_prompts_21_40": (
             "槽 21-40 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"
-            "可直连 Agnes 分镜图批量生成 batch/all_prompts 输入（第二波 ≤20 张关键帧）"
+            "可直连 Agnes 分镜图批量生成 all_prompts 输入（第二波 ≤20 张关键帧）"
         ),
         "all_prompts_41_60": (
             "槽 41-60 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"
-            "可直连 Agnes 分镜图批量生成 batch/all_prompts 输入（第三波 ≤20 张关键帧）"
+            "可直连 Agnes 分镜图批量生成 all_prompts 输入（第三波 ≤20 张关键帧）"
         ),
     }
 
@@ -319,7 +319,7 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         print(f"[Agnes 分镜提示词批量] all_prompts: {len(_ok_prompts)} 条成功提示词 → JSON 输出（可连 Agnes 分镜图批量生成）")
 
         # 3 路分段 JSON：槽 1-20 / 21-40 / 41-60 各自的成功提示词（段内升序、跳失败/空槽）
-        # 分段零成功=空串；供 分镜图批量生成 batch/all_prompts 输入分波出图（每波 ≤20 张，控 RPM）
+        # 分段零成功=空串；供 分镜图批量生成 all_prompts 输入分波出图（每波 ≤20 张，控 RPM）
         _succ = set(success)
 
         def _slice_json(lo, hi):
@@ -329,7 +329,7 @@ class AgnesScenePromptBatch(OutputDocsMixin):
 
         (s_1_20, n1), (s_21_40, n2), (s_41_60, n3) = _slice_json(1, 20), _slice_json(21, 40), _slice_json(41, 60)
         print(f"[Agnes 分镜提示词批量] 分段: 1-20 段 {n1} 条 / 21-40 段 {n2} 条 / 41-60 段 {n3} 条"
-              f"（可分波连 Agnes 分镜图批量生成 batch/all_prompts 出图）")
+              f"（可分波连 Agnes 分镜图批量生成 all_prompts 出图）")
 
         return tuple(prompts) + (
             _status_json(success, error, empty, reason),
