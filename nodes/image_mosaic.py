@@ -6,9 +6,11 @@ Agnes 图像拼图节点
 1 路批量图总输入（all_images 批量张量 (N,H,W,3)，一根线直连）
 汇聚成 1 路拼图，动态数量展示：
 
-- batch_images 总输入（新增）：接 三视图批量/分镜图批量 all_images 批量张量
+- batch_images 总输入：接 三视图批量/分镜图批量 all_images 批量张量
   （(N,H,W,3) 或单张 (H,W,3)/(1,H,W,3)）；连上时优先用它（20 个 image_i 槽
   忽略，日志标注），未连接时走 20 槽（旧图完全兼容）
+- 全部 21 个输入均为 optional（不连线=自动跳过，前端不画红框；连 1 根
+  batch_images 时其余 20 槽不会发红）
 - 20 个图像输入槽，未连接的空槽自动跳过
 - 全黑占位张量（批量节点跳过/失败槽的 512×512 黑图）自动过滤，不占用格子
 - PIL 合成 2 列 × ⌈N/2⌉ 行网格：单元格等宽（以最大图宽为准，上限 1600px）、
@@ -43,9 +45,9 @@ def _black_placeholder():
 
 
 class AgnesImageMosaic(OutputDocsMixin):
-    """图像拼图：20 路图像或 1 路批量张量总输入（batch_images）合成 2 列网格，自动跳过空槽与全黑占位，N 动态定行数"""
+    """图像拼图：1 路批量张量总输入（batch_images）或 20 路图像合成 2 列网格；全部输入可选（不连线自动跳过不红），N 动态定行数"""
 
-    DESCRIPTION = "图像拼图：batch_images 总输入（三视图批量/分镜图批量 all_images 批量张量 (N,H,W,3) 一根线直连，连上时优先）或 20 个图像输入（对应批量节点 image_1..20，旧接法兼容），合成 1 张 2 列网格拼图，自动跳过未连接槽与全黑占位图，有效图数 N 动态决定行数；全无效回落 1 张黑图占位；纯本地不调 API"
+    DESCRIPTION = "图像拼图：batch_images 总输入（三视图批量/分镜图批量 all_images 批量张量 (N,H,W,3) 一根线直连，连上时优先）或 20 个图像输入（对应批量节点 image_1..20，旧接法兼容），全部 21 个输入均为可选（不连线=自动跳过，前端不画红框），合成 1 张 2 列网格拼图，自动跳过未连接槽与全黑占位图，有效图数 N 动态决定行数；全无效回落 1 张黑图占位；纯本地不调 API"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -65,14 +67,18 @@ class AgnesImageMosaic(OutputDocsMixin):
 
     @classmethod
     def INPUT_TYPES(cls):
-        required = {
+        # 全部 21 个输入均为可选（不连线=自动跳过，前端不画红框）：
+        # batch_images 连上=优先用它拼（20 槽忽略）；不连=走 20 槽；都不连=回落 512 黑图占位
+        optional = {
             "batch_images": ("IMAGE", {
-                "tooltip": "批量图总输入（可选）：接 Agnes 三视图批量生成 / Agnes 分镜图批量生成 的 all_images 批量张量（(N,H,W,3)；也接受单张 (H,W,3)/(1,H,W,3)）。连上时优先用它拼（20 个 image_i 槽忽略，日志标注）；不连则照旧走 20 槽（旧图完全兼容）；内部自动跳全黑占位双保险",
+                "tooltip": "批量图总输入（可选，不连线=不红）：接 Agnes 三视图批量生成 / Agnes 分镜图批量生成 的 all_images 批量张量（(N,H,W,3)；也接受单张 (H,W,3)/(1,H,W,3)）。连上时优先用它拼（20 个 image_i 槽忽略，日志标注）；不连则照旧走 20 槽（旧图完全兼容）；内部自动跳全黑占位双保险",
             }),
         }
         for i in range(1, MAX_SLOTS + 1):
-            required[f"image_{i}"] = ("IMAGE",)
-        return {"required": required, "optional": {}}
+            optional[f"image_{i}"] = ("IMAGE", {
+                "tooltip": f"第 {i} 个图像槽（可选，不连线=该槽自动跳过不红）：连 三视图批量生成 的 image_i（或任意 IMAGE 输出）",
+            })
+        return {"required": {}, "optional": optional}
 
     def generate(self,
                  batch_images=None,
