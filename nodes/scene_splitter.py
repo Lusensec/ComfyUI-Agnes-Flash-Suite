@@ -80,12 +80,12 @@ class AgnesSceneSplitter:
         "场景 41", "场景 42", "场景 43", "场景 44", "场景 45",
         "场景 46", "场景 47", "场景 48", "场景 49", "场景 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
-        "场景全文（合并）",
+        "场景全文（JSON 数组）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（场景统计/响应元数据/空响应警示/错误详情）",) + (
         ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * 50
     ) + ("原始故事文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
-         "50 个场景段落按序合并（跳过空槽）；可直连 总导演 单路输入 / LLM 对话 / 存档")
+         "50 个场景段落按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -110,7 +110,7 @@ class AgnesSceneSplitter:
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
-        outputs["all_scenes"] = "50 个场景段落按序合并（跳过空槽）；可直连 总导演 单路输入 / LLM 对话 / 存档"
+        outputs["all_scenes"] = "50 个场景段落按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 / LLM 对话 / 存档"
         
         for key in outputs:
             if key in kwargs:
@@ -240,8 +240,9 @@ class AgnesSceneSplitter:
             result.append(api_key)
             result.append(base_url)
             result.append(model)
-            # all_scenes：50 个场景段落按序合并（跳过空槽），供直连 总导演 单路输入 / 存档
-            all_scenes = "\n".join(x for x in result[1:51] if x.strip())
+            # all_scenes：50 个场景段落按序合并为 JSON 数组（跳过空槽），
+            # 供直连「Agnes 分镜提示词批量生成」all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档
+            all_scenes = json.dumps([x for x in result[1:51] if x.strip()], ensure_ascii=False, indent=2)
             result.append(all_scenes)
 
             return tuple(result)

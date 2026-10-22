@@ -2,9 +2,10 @@
 Agnes 总导演节点
 生成完整编号分镜脚本
 输入：故事内容（小说章节或 漫剧剧本 均可），输出 5 秒/镜的编号分镜
-+ all_shots 全文合并槽（50 镜按序合并，可直连 LLM 对话/存档）
++ all_scenes 全文合并槽（50 镜按序合并为 JSON 数组，可直连 分镜提示词批量生成 / LLM 对话/存档）
 """
 import requests
+import json
 import re
 import os
 import time
@@ -66,8 +67,8 @@ class AgnesDirectorMaster:
         "scene_41", "scene_42", "scene_43", "scene_44", "scene_45",
         "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
-        "shot_count",
-        "all_shots",
+        "scene_count",
+        "all_scenes",
     )
     RETURN_LABELS = (
         "处理日志",
@@ -83,13 +84,13 @@ class AgnesDirectorMaster:
         "分镜 46", "分镜 47", "分镜 48", "分镜 49", "分镜 50",
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
         "分镜总数（超 50 标注）",
-        "分镜全文（合并）",
+        "分镜全文（JSON 数组）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（分镜统计/响应元数据/空响应警示/错误详情）",) + (
         ("编号分镜脚本（5秒/段，含画面/对白/运镜，连接提示词生成节点）",) * 50
     ) + ("故事原文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
          "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）",
-         "50 个分镜按序换行合并（跳过空槽）；可直连 LLM 对话 / 存档，整段审读")
+         "50 个分镜按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / LLM 对话 / 存档")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -114,8 +115,8 @@ class AgnesDirectorMaster:
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
-        outputs["shot_count"] = "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）"
-        outputs["all_shots"] = "50 个分镜按序换行合并（跳过空槽）；可直连 LLM 对话 / 存档"
+        outputs["scene_count"] = "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）"
+        outputs["all_scenes"] = "50 个分镜按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 / LLM 对话 / 存档"
         
         for key in outputs:
             if key in kwargs:
@@ -246,8 +247,9 @@ class AgnesDirectorMaster:
             total_shots = max(shots) if shots else 0
             shot_count = f"{total_shots}（仅显示前 50 个）" if total_shots > 50 else str(total_shots)
             result.append(shot_count)
-            # all_shots：50 个分镜按序合并（跳过空槽），供 直连 LLM 对话/存档
-            result.append("\n".join(x for x in result[1:51] if x.strip()))
+            # all_scenes：50 个分镜按序合并为 JSON 数组（跳过空槽），
+            # 供 直连「Agnes 分镜提示词批量生成」all_scenes 输入 / LLM 对话 / 存档
+            result.append(json.dumps([x for x in result[1:51] if x.strip()], ensure_ascii=False, indent=2))
 
             return tuple(result)
 

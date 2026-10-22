@@ -2,8 +2,9 @@
 """
 Agnes 分镜提示词批量生成节点
 ============================
-与「Agnes 总导演」50 路分镜输出一一对应的分镜提示词批量生成节点：
-50 个分镜文本输入槽（scene_1..50 ↔ 总导演 分镜_1..50 / 场景切分 场景_1..50），
+「Agnes 总导演 / Agnes 场景切分」合并槽 all_scenes（JSON 数组）驱动的
+分镜提示词批量生成节点：1 路 all_scenes 全文合并输入（↔ 总导演/场景切分
+all_scenes 输出，一根线直连；也接受单条分镜纯文本，视为 1 条），
 线程池并发生成英文生图提示词（max_concurrency 限制同时请求数，默认 10，
 超出排队执行），50 路 detailed_prompt + 1 路 status 输出（整批执行状态 JSON：
 {"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
@@ -11,19 +12,23 @@ Agnes 分镜提示词批量生成节点
 全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）。
 
 - 参数与单条「Agnes 分镜提示词生成」完全一致（style/base_url/api_key/model/
-  reasoning_effort），50 槽共用，另加 资产提取 5 路 JSON 注入槽
-  （characters/locations/costumes/props/weather，整批共用、非空才随每槽发送）
+  reasoning_effort），整批共用，另加 资产提取 5 路 JSON 注入槽
+  （characters/locations/costumes/props/weather，整批共用、非空才随每条发送）
   与 max_concurrency 速率限制
-- 空槽跳过：该槽不发请求，输出空字符串
-- 单槽失败不影响其他槽：失败槽输出空字符串或 [错误] 前缀文本，原因进 status
+- all_scenes 解析（从上到下）：JSON 数组=逐条处理（跳过空项，超 50 条截断并
+  日志标注）；JSON 字符串=1 条；非 JSON 纯文本（单条分镜直连/手动粘贴）=1 条；
+  空输入=整批跳过（零 API 调用）
+- 条目不足 50 时其余槽为空槽（status empty）；单条失败不影响其他条
 - 每个工作线程内部各建一个 AgnesClient（requests.Session 非线程安全，不复用）
 
 典型接法（分镜线）：
   Agnes 剧本生成/解说剧本生成（故事文本）
-      ├─▶ Agnes 总导演（分镜_1..50）─▶ Agnes 分镜提示词批量生成（scene_1..50）
+      ├─▶ Agnes 总导演（all_scenes 合并槽，JSON 数组）─▶ Agnes 分镜提示词批量生成（all_scenes）
       │      （+ Agnes 资产提取 角色/场景/服装/道具/天气 JSON 任选注入，整批共用）
       │      ─▶ detailed_prompt_1..50 ─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
       └─▶ Agnes 资产提取 ─▶ 资产线（资产提示词批量/三视图批量 → 参考图回流分镜线保一致性）
+  轻量替代：Agnes 场景切分（all_scenes 合并槽）直连本节点；
+  单镜处理：总导演 分镜_i / 场景切分 场景_i 单路纯文本直连 all_scenes 输入（视为 1 条）
 """
 
 import json
@@ -43,9 +48,9 @@ MAX_SLOTS = 50
 
 
 class AgnesScenePromptBatch(OutputDocsMixin):
-    """分镜提示词批量生成：50 路分镜文本并发生成英文提示词 + 1 路整批状态 JSON（线程池，速率可限）"""
+    """分镜提示词批量生成：all_scenes 合并输入（JSON 数组/纯文本）并发生成英文提示词 + 1 路整批状态 JSON（线程池，速率可限）"""
 
-    DESCRIPTION = "分镜提示词批量生成：50 个分镜输入对应 总导演/场景切分 50 路输出，线程池并发请求（max_concurrency 限制同时请求数，默认 10），可整批注入 资产提取 5 路 JSON 保跨镜一致性，输出 50 路 detailed_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单），单槽失败不影响其他槽"
+    DESCRIPTION = "分镜提示词批量生成：all_scenes 合并输入（总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理；单条分镜纯文本也接受）整批并发生成英文提示词（max_concurrency 限制同时请求数，默认 10），可整批注入 资产提取 5 路 JSON 保跨镜一致性，输出 50 路 detailed_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单），单条失败不影响其他条"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -57,12 +62,12 @@ class AgnesScenePromptBatch(OutputDocsMixin):
     RETURN_LABELS = tuple(f"英文分镜提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON",)
     OUTPUT_DOCS = {
         **{f"detailed_prompt_{i}": (
-            f"第 {i} 个分镜的英文生图提示词（风格化 + 角色/场景一致性描述 + 光线/色彩/质量词，"
-            f"可直接接 文生图/图生图 出关键帧；空输入=空字符串；单节点异常=空字符串（原因见 status）"
+            f"第 {i} 个分镜（all_scenes 第 {i} 条）的英文生图提示词（风格化 + 角色/场景一致性描述 + 光线/色彩/质量词，"
+            f"可直接接 文生图/图生图 出关键帧；空槽（条目不足 50）=空字符串；单条异常=空字符串（原因见 status）"
         ) for i in range(1, MAX_SLOTS + 1)},
         "status": (
             "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号，含空响应],\"empty\":[空输入跳过槽号]}；"
-            "全部请求失败时额外含 \"reason\" 字段（各槽同一原因=字符串，不同=槽号→原因映射）；"
+            "槽号=all_scenes 条目序号（1 起）；全部请求失败时额外含 \"reason\" 字段（各槽同一原因=字符串，不同=槽号→原因映射）；"
             "可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，"
             "或接 LLM 对话让模型解读哪些槽需要重试"
         ),
@@ -71,48 +76,45 @@ class AgnesScenePromptBatch(OutputDocsMixin):
     @classmethod
     def INPUT_TYPES(cls):
         required = {
-            f"scene_{i}": ("STRING", {
+            "all_scenes": ("STRING", {
                 "multiline": True,
                 "default": "",
-                "placeholder": f"第 {i} 个分镜（可连 总导演 分镜_{i} / 场景切分 场景_{i}）",
-                "tooltip": f"第 {i} 个分镜文本；留空=跳过该槽（不发请求，输出空字符串）",
-            })
-            for i in range(1, MAX_SLOTS + 1)
-        }
-        required.update({
+                "placeholder": "[\n  \"[SHOT 1] 角色: 苏尘 (男) 场景: 客栈大厅 ...\",\n  \"[SHOT 2] ...\"\n]\n可连 总导演/场景切分 all_scenes 输出（JSON 数组，从上到下逐条）；\n也接受单条分镜纯文本（连 分镜_i / 场景_i 或粘贴），视为 1 条",
+                "tooltip": "全文合并输入：① JSON 数组（总导演/场景切分 all_scenes 输出直连，条目从上到下逐条生成，最多 50 条，超出截断并日志标注；空项跳过）② 单条分镜纯文本（连任一 分镜_i / 场景_i 输出或手动粘贴，视为 1 条）③ 空=整批跳过（零 API 调用）",
+            }),
             "style": (list(STYLE_OPTIONS), {
                 "default": "cinematic",
-                "tooltip": "图像风格（50 槽共用）：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画",
+                "tooltip": "图像风格（整批共用）：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画",
             }),
             "characters_json": ("STRING", {
                 "multiline": True,
                 "default": "",
                 "placeholder": "[{\"name\":\"角色名\",\"gender\":\"男/女\",\"appearance\":\"外貌描述\"}]",
-                "tooltip": "角色信息 JSON（可连 Agnes 资产提取 角色JSON，50 槽共用）；留空=不注入该资产块",
+                "tooltip": "角色信息 JSON（可连 Agnes 资产提取 角色JSON，整批共用）；留空=不注入该资产块",
             }),
             "locations_json": ("STRING", {
                 "multiline": True,
                 "default": "",
                 "placeholder": "[{\"name\":\"场景名\",\"description\":\"环境描述\",\"era\":\"时代背景\"}]",
-                "tooltip": "场景信息 JSON（可连 Agnes 资产提取 场景JSON，50 槽共用）；留空=不注入该资产块",
+                "tooltip": "场景信息 JSON（可连 Agnes 资产提取 场景JSON，整批共用）；留空=不注入该资产块",
             }),
             "costumes_json": ("STRING", {
                 "multiline": True,
                 "default": "",
                 "placeholder": "[{\"character\":\"角色名\",\"description\":\"服装描述\"}]",
-                "tooltip": "服装信息 JSON（可连 Agnes 资产提取 服装JSON，50 槽共用）；留空=不注入该资产块",
+                "tooltip": "服装信息 JSON（可连 Agnes 资产提取 服装JSON，整批共用）；留空=不注入该资产块",
             }),
             "props_json": ("STRING", {
                 "multiline": True,
                 "default": "",
                 "placeholder": "[\"道具1\", \"道具2\"]",
-                "tooltip": "道具列表 JSON（可连 Agnes 资产提取 道具JSON，50 槽共用）；留空=不注入该资产块",
+                "tooltip": "道具列表 JSON（可连 Agnes 资产提取 道具JSON，整批共用）；留空=不注入该资产块",
             }),
             "weather_json": ("STRING", {
                 "multiline": True,
                 "default": "",
                 "placeholder": "[\"天气/氛围 1\", \"天气/氛围 2\"]",
-                "tooltip": "天气/氛围 JSON（可连 Agnes 资产提取 天气JSON，50 槽共用）；留空=不注入该资产块",
+                "tooltip": "天气/氛围 JSON（可连 Agnes 资产提取 天气JSON，整批共用）；留空=不注入该资产块",
             }),
             "base_url": ("STRING", {
                 "multiline": False,
@@ -139,36 +141,47 @@ class AgnesScenePromptBatch(OutputDocsMixin):
                 "min": 1,
                 "max": MAX_SLOTS,
                 "step": 1,
-                "tooltip": f"并发速率限制：线程池大小（同时请求数 1-{MAX_SLOTS}，默认 10）。非空分镜超过该值时排队执行；频繁 429/503 就调小",
+                "tooltip": f"并发速率限制：线程池大小（同时请求数 1-{MAX_SLOTS}，默认 10）。条目超过该值时排队执行；频繁 429/503 就调小",
             }),
-        })
+        }
         return {"required": required, "optional": {}}
 
-    def generate(self, scene_1="", scene_2="", scene_3="", scene_4="", scene_5="",
-                 scene_6="", scene_7="", scene_8="", scene_9="", scene_10="",
-                 scene_11="", scene_12="", scene_13="", scene_14="", scene_15="",
-                 scene_16="", scene_17="", scene_18="", scene_19="", scene_20="",
-                 scene_21="", scene_22="", scene_23="", scene_24="", scene_25="",
-                 scene_26="", scene_27="", scene_28="", scene_29="", scene_30="",
-                 scene_31="", scene_32="", scene_33="", scene_34="", scene_35="",
-                 scene_36="", scene_37="", scene_38="", scene_39="", scene_40="",
-                 scene_41="", scene_42="", scene_43="", scene_44="", scene_45="",
-                 scene_46="", scene_47="", scene_48="", scene_49="", scene_50="",
-                 style="cinematic",
+    @staticmethod
+    def _parse_all_scenes(raw):
+        """all_scenes 输入三档解析（从上到下）：
+        ① JSON 数组 → 逐条（str 化、去空白、跳过空项）；
+        ② JSON 字符串 → 1 条；
+        ③ 非 JSON 纯文本 / 其他 JSON 类型 → 整段 1 条。
+        返回 (items, source, truncated)；超出 MAX_SLOTS 截断。"""
+        raw = str(raw or "").strip()
+        if not raw:
+            return [], "空输入", False
+        items, source = [], ""
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                source = "JSON 数组"
+                items = [str(x).strip() for x in parsed]
+                items = [x for x in items if x]
+            elif isinstance(parsed, str):
+                source = "JSON 字符串"
+                items = [parsed.strip()] if parsed.strip() else []
+            else:
+                source = "非数组 JSON（按整段 1 条）"
+                items = [raw]
+        except json.JSONDecodeError:
+            source = "纯文本（1 条）"
+            items = [raw]
+        truncated = len(items) > MAX_SLOTS
+        if truncated:
+            items = items[:MAX_SLOTS]
+        return items, source, truncated
+
+    def generate(self, all_scenes="", style="cinematic",
                  characters_json="", locations_json="", costumes_json="", props_json="", weather_json="",
                  base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto",
                  max_concurrency=10):
-        scenes = [scene_1, scene_2, scene_3, scene_4, scene_5,
-                  scene_6, scene_7, scene_8, scene_9, scene_10,
-                  scene_11, scene_12, scene_13, scene_14, scene_15,
-                  scene_16, scene_17, scene_18, scene_19, scene_20,
-                  scene_21, scene_22, scene_23, scene_24, scene_25,
-                  scene_26, scene_27, scene_28, scene_29, scene_30,
-                  scene_31, scene_32, scene_33, scene_34, scene_35,
-                  scene_36, scene_37, scene_38, scene_39, scene_40,
-                  scene_41, scene_42, scene_43, scene_44, scene_45,
-                  scene_46, scene_47, scene_48, scene_49, scene_50]
-        s = [str(x or "").strip() for x in scenes]
+        items, source, truncated = self._parse_all_scenes(all_scenes)
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or 10)))
 
         # ── Key 解析 ──
@@ -191,16 +204,21 @@ class AgnesScenePromptBatch(OutputDocsMixin):
                 _status_json([], list(range(1, MAX_SLOTS + 1)), [], reason),
             )
 
-        # ── 全空跳过：一发请求都不发 ──
-        tasks = [(i, t) for i, t in enumerate(s, 1) if t]
-        if not tasks:
-            skip_msg = "[跳过] 输入全部为空：请连接 Agnes 总导演 的分镜_1..50 / Agnes 场景切分 的场景_1..50，或逐槽粘贴分镜文本"
+        # ── 空输入跳过：一发请求都不发 ──
+        if not items:
+            skip_msg = "[跳过] 输入为空：请连接 Agnes 总导演 / Agnes 场景切分 的 all_scenes 输出（JSON 数组），或连单条 分镜_i / 场景_i，或粘贴 JSON 数组/分镜文本"
             print(f"[Agnes 分镜提示词批量] {skip_msg}")
             return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))),)
 
+        # 条目占槽 1..N，其余槽为空槽
+        tasks = list(enumerate(items, 1))
+        empty = [i for i in range(1, MAX_SLOTS + 1) if i > len(items)]
+
         _injected = [name for name, val in (("角色", characters_json), ("场景", locations_json),
                                              ("服装", costumes_json), ("道具", props_json), ("天气", weather_json)) if (val or "").strip()]
-        print(f"\n[Agnes 分镜提示词批量] 共 {MAX_SLOTS} 槽，非空 {len(tasks)} 条，并发 {max_conc}")
+        print(f"\n[Agnes 分镜提示词批量] 输入={source}，条目 {len(tasks)}"
+              + ("（超 50 条已截断）" if truncated else "")
+              + f"，并发 {max_conc}")
         print(f"  模型: {model}, 风格: {style}, 资产注入: {'、'.join(_injected) if _injected else '无'}")
 
         # 复用单条节点的成熟逻辑（每线程内各建 AgnesClient，Session 非线程安全不复用）
@@ -224,7 +242,6 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         prompts = [""] * MAX_SLOTS
         success, error = [], []
         reasons = {}
-        empty = [i for i in range(1, MAX_SLOTS + 1) if i not in {k for k, _ in tasks}]
 
         ok = fail = 0
         with ThreadPoolExecutor(max_workers=max_conc) as ex:
