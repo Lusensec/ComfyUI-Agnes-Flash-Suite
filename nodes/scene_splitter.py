@@ -11,9 +11,12 @@ import traceback
 from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, VIDEO_MAX_WAIT, VIDEO_POLL_INTERVAL, format_chat_meta
 
 
+MAX_SLOTS = 60
+
+
 class AgnesSceneSplitter:
     """
-    Agnes 场景拆分 v32
+    Agnes 场景拆分 v33
     使用 agnes-2.5-flash 进行场景切分
     """
     
@@ -51,41 +54,19 @@ class AgnesSceneSplitter:
         }
         return inputs
 
-    RETURN_TYPES = ("STRING",) * 56
-    RETURN_NAMES = (
-        "log_text",
-        "scene_1", "scene_2", "scene_3", "scene_4", "scene_5",
-        "scene_6", "scene_7", "scene_8", "scene_9", "scene_10",
-        "scene_11", "scene_12", "scene_13", "scene_14", "scene_15",
-        "scene_16", "scene_17", "scene_18", "scene_19", "scene_20",
-        "scene_21", "scene_22", "scene_23", "scene_24", "scene_25",
-        "scene_26", "scene_27", "scene_28", "scene_29", "scene_30",
-        "scene_31", "scene_32", "scene_33", "scene_34", "scene_35",
-        "scene_36", "scene_37", "scene_38", "scene_39", "scene_40",
-        "scene_41", "scene_42", "scene_43", "scene_44", "scene_45",
-        "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 6)
+    RETURN_NAMES = ("log_text",) + tuple(f"scene_{i}" for i in range(1, MAX_SLOTS + 1)) + (
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
         "all_scenes",
     )
-    RETURN_LABELS = (
-        "处理日志",
-        "场景 1", "场景 2", "场景 3", "场景 4", "场景 5",
-        "场景 6", "场景 7", "场景 8", "场景 9", "场景 10",
-        "场景 11", "场景 12", "场景 13", "场景 14", "场景 15",
-        "场景 16", "场景 17", "场景 18", "场景 19", "场景 20",
-        "场景 21", "场景 22", "场景 23", "场景 24", "场景 25",
-        "场景 26", "场景 27", "场景 28", "场景 29", "场景 30",
-        "场景 31", "场景 32", "场景 33", "场景 34", "场景 35",
-        "场景 36", "场景 37", "场景 38", "场景 39", "场景 40",
-        "场景 41", "场景 42", "场景 43", "场景 44", "场景 45",
-        "场景 46", "场景 47", "场景 48", "场景 49", "场景 50",
+    RETURN_LABELS = ("处理日志",) + tuple(f"场景 {i}" for i in range(1, MAX_SLOTS + 1)) + (
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
         "场景全文（JSON 数组）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（场景统计/响应元数据/空响应警示/错误详情）",) + (
-        ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * 50
+        ("5 秒场景片段（原文切段，连接总导演或提示词节点）",) * MAX_SLOTS
     ) + ("原始故事文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
-         "50 个场景段落按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档")
+         f"{MAX_SLOTS} 个场景段落按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -104,13 +85,13 @@ class AgnesSceneSplitter:
             "scene_4": "第 4 个场景段落",
             "scene_5": "第 5 个场景段落",
         }
-        for i in range(1, 51):
+        for i in range(6, MAX_SLOTS + 1):
             outputs[f"scene_{i}"] = f"第 {i} 个场景段落（如果存在）"
         outputs["chapter_text_out"] = "原始故事文本（小说章节/剧本，透传）"
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
-        outputs["all_scenes"] = "50 个场景段落按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 / LLM 对话 / 存档"
+        outputs["all_scenes"] = f"{MAX_SLOTS} 个场景段落按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 / LLM 对话 / 存档"
         
         for key in outputs:
             if key in kwargs:
@@ -122,13 +103,13 @@ class AgnesSceneSplitter:
         if not chapter_text:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 / Agnes 解说剧本生成 的文本输出，或直接粘贴小说章节 / 剧本全文"
             print(f"[Agnes 场景拆分] {skip_msg}")
-            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model, ""]
+            result = [skip_msg] + [""] * MAX_SLOTS + ["", api_key, base_url, model, ""]
             return tuple(result)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             error_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
+            result = [error_msg] + [""] * MAX_SLOTS + [chapter_text, api_key, base_url, model, ""]
             return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes 场景拆分 - {model}]")
@@ -234,15 +215,15 @@ class AgnesSceneSplitter:
             print(log)
 
             result = [log]
-            for i in range(1, 51):
+            for i in range(1, MAX_SLOTS + 1):
                 result.append(scenes.get(i, ""))
             result.append(chapter_text)
             result.append(api_key)
             result.append(base_url)
             result.append(model)
-            # all_scenes：50 个场景段落按序合并为 JSON 数组（跳过空槽），
+            # all_scenes：60 个场景段落按序合并为 JSON 数组（跳过空槽），
             # 供直连「Agnes 分镜提示词批量生成」all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档
-            all_scenes = json.dumps([x for x in result[1:51] if x.strip()], ensure_ascii=False, indent=2)
+            all_scenes = json.dumps([x for x in result[1:MAX_SLOTS + 1] if x.strip()], ensure_ascii=False, indent=2)
             result.append(all_scenes)
 
             return tuple(result)
@@ -253,7 +234,7 @@ class AgnesSceneSplitter:
                          f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                          f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, ""]
+            result = [error_msg] + [""] * MAX_SLOTS + [chapter_text, api_key, base_url, model, ""]
             return tuple(result)
 
     def _parse_scenes(self, content):

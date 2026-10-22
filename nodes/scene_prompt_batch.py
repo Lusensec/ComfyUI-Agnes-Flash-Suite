@@ -6,7 +6,9 @@ Agnes 分镜提示词批量生成节点
 分镜提示词批量生成节点：1 路 all_scenes 全文合并输入（↔ 总导演/场景切分
 all_scenes 输出，一根线直连；也接受单条分镜纯文本，视为 1 条），
 线程池并发生成英文生图提示词（max_concurrency 限制同时请求数，默认 10，
-超出排队执行），50 路 detailed_prompt + 1 路 status + 1 路 all_prompts 全提示词 JSON 输出（整批执行状态 JSON：
+超出排队执行），60 路 detailed_prompt + 1 路 status + 1 路 all_prompts 全提示词
+JSON 输出 + 3 路分段 all_prompts_1_20 / _21_40 / _41_60（各段成功提示词 JSON 数组，
+分段喂 Agnes 分镜图批量生成 出图）（整批执行状态 JSON：
 {"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
 可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析；
 全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）。
@@ -15,10 +17,10 @@ all_scenes 输出，一根线直连；也接受单条分镜纯文本，视为 1 
   reasoning_effort），整批共用，另加 资产提取 5 路 JSON 注入槽
   （characters/locations/costumes/props/weather，整批共用、非空才随每条发送）
   与 max_concurrency 速率限制
-- all_scenes 解析（从上到下）：JSON 数组=逐条处理（跳过空项，超 50 条截断并
+- all_scenes 解析（从上到下）：JSON 数组=逐条处理（跳过空项，超 60 条截断并
   日志标注）；JSON 字符串=1 条；非 JSON 纯文本（单条分镜直连/手动粘贴）=1 条；
   空输入=整批跳过（零 API 调用）
-- 条目不足 50 时其余槽为空槽（status empty）；单条失败不影响其他条
+- 条目不足 60 时其余槽为空槽（status empty）；单条失败不影响其他条
 - 每个工作线程内部各建一个 AgnesClient（requests.Session 非线程安全，不复用）
 
 典型接法（分镜线）：
@@ -26,7 +28,10 @@ all_scenes 输出，一根线直连；也接受单条分镜纯文本，视为 1 
       ├─▶ Agnes 总导演（all_scenes 合并槽，JSON 数组）─▶ Agnes 分镜提示词批量生成（all_scenes）
       │      （+ Agnes 资产提取 角色/场景/服装/道具/天气 JSON 任选注入，整批共用）
       │      ─▶ all_prompts（全部提示词 JSON）─▶ Agnes 分镜图批量生成（all_prompts，批量出关键帧）
-       │      ─▶ detailed_prompt_1..50（单镜）─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
+      │      ─▶ all_prompts_1_20 / _21_40 / _41_60（分段 JSON）
+      │         ─▶ Agnes 分镜图批量生成 ×3（batch/all_prompts，分波出图）
+      │            ─▶ all_images ─▶ Agnes 图像拼图（batch_images，分段总览拼图）
+       │      ─▶ detailed_prompt_1..60（单镜）─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
       └─▶ Agnes 资产提取 ─▶ 资产线（资产提示词批量/三视图批量 → 参考图回流分镜线保一致性）
   轻量替代：Agnes 场景切分（all_scenes 合并槽）直连本节点；
   单镜处理：总导演 分镜_i / 场景切分 场景_i 单路纯文本直连 all_scenes 输入（视为 1 条）
@@ -45,26 +50,31 @@ from .prompt_generator import AgnesScenePromptGenerator, STYLE_OPTIONS
 from ._output_docs import OutputDocsMixin
 
 
-MAX_SLOTS = 50
+MAX_SLOTS = 60
 
 
 class AgnesScenePromptBatch(OutputDocsMixin):
     """分镜提示词批量生成：all_scenes 合并输入（JSON 数组/纯文本）并发生成英文提示词 + 1 路整批状态 JSON（线程池，速率可限）"""
 
-    DESCRIPTION = "分镜提示词批量生成：all_scenes 合并输入（总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理；单条分镜纯文本也接受）整批并发生成英文提示词（max_concurrency 限制同时请求数，默认 10），可整批注入 资产提取 5 路 JSON 保跨镜一致性，输出 50 路 detailed_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单）+ 1 路 all_prompts 全部提示词 JSON 数组（可直连 Agnes 分镜图批量生成 all_prompts 输入），单条失败不影响其他条"
+    DESCRIPTION = "分镜提示词批量生成：all_scenes 合并输入（总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理，最多 60 条；单条分镜纯文本也接受）整批并发生成英文提示词（max_concurrency 限制同时请求数，默认 10），可整批注入 资产提取 5 路 JSON 保跨镜一致性，输出 60 路 detailed_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单）+ 1 路 all_prompts 全部提示词 JSON 数组 + 3 路分段 all_prompts_1_20/_21_40/_41_60（各段成功提示词 JSON，可分段直连 Agnes 分镜图批量生成 出关键帧），单条失败不影响其他条"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
     OUTPUT_NODE = True
 
-    # ── 输出：detailed_prompt_1..50 + status + all_prompts（共 52 槽）──
-    RETURN_NAMES = tuple(f"detailed_prompt_{i}" for i in range(1, MAX_SLOTS + 1)) + ("status", "all_prompts")
-    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 2)
-    RETURN_LABELS = tuple(f"英文分镜提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON", "全部提示词 JSON")
+    # ── 输出：detailed_prompt_1..60 + status + all_prompts + 3 路分段（共 65 槽）──
+    RETURN_NAMES = tuple(f"detailed_prompt_{i}" for i in range(1, MAX_SLOTS + 1)) + (
+        "status", "all_prompts", "all_prompts_1_20", "all_prompts_21_40", "all_prompts_41_60",
+    )
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 5)
+    RETURN_LABELS = tuple(f"英文分镜提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + (
+        "执行状态 JSON", "全部提示词 JSON",
+        "全部提示词 JSON（1-20）", "全部提示词 JSON（21-40）", "全部提示词 JSON（41-60）",
+    )
     OUTPUT_DOCS = {
         **{f"detailed_prompt_{i}": (
             f"第 {i} 个分镜（all_scenes 第 {i} 条）的英文生图提示词（风格化 + 角色/场景一致性描述 + 光线/色彩/质量词，"
-            f"可直接接 文生图/图生图 出关键帧；空槽（条目不足 50）=空字符串；单条异常=空字符串（原因见 status）"
+            f"可直接接 文生图/图生图 出关键帧；空槽（条目不足 60）=空字符串；单条异常=空字符串（原因见 status）"
         ) for i in range(1, MAX_SLOTS + 1)},
         "status": (
             "整批执行状态 JSON：{\"success\":[成功槽号],\"error\":[失败槽号，含空响应],\"empty\":[空输入跳过槽号]}；"
@@ -77,6 +87,18 @@ class AgnesScenePromptBatch(OutputDocsMixin):
             "全空/缺 Key/零成功=空字符串）；可直连 Agnes 分镜图批量生成 all_prompts 输入（一根线批量出关键帧），"
             "或连 LLM 对话整批审改 / 存档"
         ),
+        "all_prompts_1_20": (
+            "槽 1-20 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"
+            "可直连 Agnes 分镜图批量生成 batch/all_prompts 输入（第一波 ≤20 张关键帧）"
+        ),
+        "all_prompts_21_40": (
+            "槽 21-40 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"
+            "可直连 Agnes 分镜图批量生成 batch/all_prompts 输入（第二波 ≤20 张关键帧）"
+        ),
+        "all_prompts_41_60": (
+            "槽 41-60 段成功提示词 JSON 数组（段内按槽号升序，跳过失败/空槽；该段零成功=空字符串）；"
+            "可直连 Agnes 分镜图批量生成 batch/all_prompts 输入（第三波 ≤20 张关键帧）"
+        ),
     }
 
     @classmethod
@@ -86,7 +108,7 @@ class AgnesScenePromptBatch(OutputDocsMixin):
                 "multiline": True,
                 "default": "",
                 "placeholder": "[\n  \"[SHOT 1] 角色: 苏尘 (男) 场景: 客栈大厅 ...\",\n  \"[SHOT 2] ...\"\n]\n可连 总导演/场景切分 all_scenes 输出（JSON 数组，从上到下逐条）；\n也接受单条分镜纯文本（连 分镜_i / 场景_i 或粘贴），视为 1 条",
-                "tooltip": "全文合并输入：① JSON 数组（总导演/场景切分 all_scenes 输出直连，条目从上到下逐条生成，最多 50 条，超出截断并日志标注；空项跳过）② 单条分镜纯文本（连任一 分镜_i / 场景_i 输出或手动粘贴，视为 1 条）③ 空=整批跳过（零 API 调用）",
+                "tooltip": "全文合并输入：① JSON 数组（总导演/场景切分 all_scenes 输出直连，条目从上到下逐条生成，最多 60 条，超出截断并日志标注；空项跳过）② 单条分镜纯文本（连任一 分镜_i / 场景_i 输出或手动粘贴，视为 1 条）③ 空=整批跳过（零 API 调用）",
             }),
             "style": (list(STYLE_OPTIONS), {
                 "default": "cinematic",
@@ -208,14 +230,14 @@ class AgnesScenePromptBatch(OutputDocsMixin):
             print(f"[Agnes 分镜提示词批量] {msg}")
             return tuple(msg for _ in range(MAX_SLOTS)) + (
                 _status_json([], list(range(1, MAX_SLOTS + 1)), [], reason),
-                "",
+                "", "", "", "",
             )
 
         # ── 空输入跳过：一发请求都不发 ──
         if not items:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 总导演 / Agnes 场景切分 的 all_scenes 输出（JSON 数组），或连单条 分镜_i / 场景_i，或粘贴 JSON 数组/分镜文本"
             print(f"[Agnes 分镜提示词批量] {skip_msg}")
-            return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))), "")
+            return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))), "", "", "", "")
 
         # 条目占槽 1..N，其余槽为空槽
         tasks = list(enumerate(items, 1))
@@ -224,7 +246,7 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         _injected = [name for name, val in (("角色", characters_json), ("场景", locations_json),
                                              ("服装", costumes_json), ("道具", props_json), ("天气", weather_json)) if (val or "").strip()]
         print(f"\n[Agnes 分镜提示词批量] 输入={source}，条目 {len(tasks)}"
-              + ("（超 50 条已截断）" if truncated else "")
+              + (f"（超 {MAX_SLOTS} 条已截断）" if truncated else "")
               + f"，并发 {max_conc}")
         print(f"  模型: {model}, 风格: {style}, 资产注入: {'、'.join(_injected) if _injected else '无'}")
 
@@ -296,7 +318,23 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         all_prompts = json.dumps(_ok_prompts, ensure_ascii=False, indent=2) if _ok_prompts else ""
         print(f"[Agnes 分镜提示词批量] all_prompts: {len(_ok_prompts)} 条成功提示词 → JSON 输出（可连 Agnes 分镜图批量生成）")
 
-        return tuple(prompts) + (_status_json(success, error, empty, reason), all_prompts)
+        # 3 路分段 JSON：槽 1-20 / 21-40 / 41-60 各自的成功提示词（段内升序、跳失败/空槽）
+        # 分段零成功=空串；供 分镜图批量生成 batch/all_prompts 输入分波出图（每波 ≤20 张，控 RPM）
+        _succ = set(success)
+
+        def _slice_json(lo, hi):
+            """该槽段内的成功提示词（升序）→ (JSON 或 空串, 条数)"""
+            chunk = [prompts[i - 1] for i in range(lo, min(hi, MAX_SLOTS) + 1) if i in _succ]
+            return (json.dumps(chunk, ensure_ascii=False, indent=2) if chunk else ""), len(chunk)
+
+        (s_1_20, n1), (s_21_40, n2), (s_41_60, n3) = _slice_json(1, 20), _slice_json(21, 40), _slice_json(41, 60)
+        print(f"[Agnes 分镜提示词批量] 分段: 1-20 段 {n1} 条 / 21-40 段 {n2} 条 / 41-60 段 {n3} 条"
+              f"（可分波连 Agnes 分镜图批量生成 batch/all_prompts 出图）")
+
+        return tuple(prompts) + (
+            _status_json(success, error, empty, reason),
+            all_prompts, s_1_20, s_21_40, s_41_60,
+        )
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScenePromptBatch": AgnesScenePromptBatch}

@@ -135,8 +135,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 **输出：**
 - log_text: 处理日志（成功=段落数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
-- scene_1 ~ scene_50: 最多 50 个场景片段
-- all_scenes: 50 个场景段落按序合并为 **JSON 数组**（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档；失败/无 Key/输入为空时为空串
+- scene_1 ~ scene_60: 最多 60 个场景片段
+- all_scenes: 60 个场景段落按序合并为 **JSON 数组**（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / 总导演 单路输入 / LLM 对话 / 存档；失败/无 Key/输入为空时为空串
 - chapter_text_out: 原文本（透传）
 - api_key_out / base_url_out / model_out: 配置透传
 
@@ -158,18 +158,18 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 **输出：**
 - log_text: 处理日志（成功=分镜数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
-- scene_1 ~ scene_50: 分镜脚本
+- scene_1 ~ scene_60: 分镜脚本
 - chapter_text_out / api_key_out / base_url_out / model_out: 透传
-- scene_count: 分镜总数（统计实际解析出的分镜数；超过 50 时标注「N（仅显示前 50 个）」；失败/无 Key/输入为空时为空）
-- all_scenes: 50 个分镜按序合并为 **JSON 数组**（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / LLM 对话整段审读 / 存档；失败/无 Key/输入为空时为空串
+- scene_count: 分镜总数（统计实际解析出的分镜数；超过 60 时标注「N（仅显示前 60 个）」；失败/无 Key/输入为空时为空）
+- all_scenes: 60 个分镜按序合并为 **JSON 数组**（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / LLM 对话整段审读 / 存档；失败/无 Key/输入为空时为空串
 
 > 输入为空（chapter_text 留空/上游未连）时直接跳过、不调 API：log_text 显示「[跳过] 输入为空…」，各槽为空。
 
 > 两种接法：
 > - 小说线：章节原文 → 总导演（章→镜一步到位）
 > - 漫剧线：大纲 → Agnes 剧本生成（漫剧，场级 5–15 秒）→ 总导演（场→镜精化，每场拆 2–4 镜）→ 分镜提示词生成 → 生图/生视频
-> - 分镜量大（>50 或想全量出图提示词）：总导演 all_scenes（JSON 数组）→ Agnes 分镜提示词批量生成（一根线一次出全）；整段审读连 all_scenes；单镜处理连 分镜_i / 场景_i
-> - 注意：漫剧线 快节奏（5–8 秒/场）× 180 秒 ≈ 30 场 → 60+ 镜，会超出 scene_50 上限；建议漫剧线用 中速/慢热 或缩短 target_duration
+> - 分镜量大（>60 或想全量出图提示词）：总导演 all_scenes（JSON 数组）→ Agnes 分镜提示词批量生成（一根线一次出全）；整段审读连 all_scenes；单镜处理连 分镜_i / 场景_i
+> - 注意：漫剧线 快节奏（5–8 秒/场）× 180 秒 ≈ 30 场 → 60+ 镜，会超出 scene_60 上限；建议漫剧线用 中速/慢热 或缩短 target_duration
 
 ---
 
@@ -230,7 +230,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 资产注入（跨镜一致性）：5 路资产 JSON 来自「Agnes 资产提取」（与总导演同源的剧本/章节），
 > 任一非空即随提示词发送、模型被要求沿用其中的角色/服装/场景描述；全空时提示词中显式标注
 > 「未连接资产信息，不自行脑补」——避免模型对着空标题块自由发挥。
-> 全量出图（50 镜）请用下方「Agnes 分镜提示词批量生成」（其 all_prompts 全部提示词 JSON 可直连「Agnes 分镜图批量生成」一次出全关键帧）。
+> 全量出图（60 镜）请用下方「Agnes 分镜提示词批量生成」（其 all_prompts 全部提示词 JSON 可直连「Agnes 分镜图批量生成」一次出全关键帧；3 路分段输出可分波出图控 RPM）。
 
 ---
 
@@ -240,28 +240,30 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| all_scenes | STRING | "" | 全文合并输入（一根线直连 总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理，最多 50 条、超出截断并在日志标注，空项跳过）；也接受**单条分镜纯文本**（连任一 分镜_i / 场景_i 或手动粘贴，视为 1 条）；空=整批跳过（零 API 调用） |
+| all_scenes | STRING | "" | 全文合并输入（一根线直连 总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理，最多 60 条、超出截断并在日志标注，空项跳过）；也接受**单条分镜纯文本**（连任一 分镜_i / 场景_i 或手动粘贴，视为 1 条）；空=整批跳过（零 API 调用） |
 | style | COMBO | cinematic | 图像风格（整批共用） |
 | characters_json / locations_json / costumes_json / props_json / weather_json | STRING | "" | 资产提取 5 路 JSON（整批共用，非空才随每条发送；留空=不注入该资产块） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（auto/none/low/medium/high/max；2.0 旧模型不生效） |
-| max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-50，默认 10）；非空分镜超过该值时排队执行，频繁 429/503 就调小 |
+| max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-60，默认 10）；非空分镜超过该值时排队执行，频繁 429/503 就调小 |
 
 **输出：**
-- detailed_prompt_1 ~ detailed_prompt_50: 每个分镜（all_scenes 条目序号）的英文生图提示词（可逐个连 Agnes 文生图/图生图 出关键帧）
-- status: 整批执行状态 JSON `{"success":[…],"error":[…],"empty":[…]}`（**槽号=all_scenes 条目序号**，1 起；条目不足 50 时其余槽号进 empty；全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）；可直连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析
-- all_prompts: 本批**成功生成**的英文提示词 JSON 数组（按槽号升序，失败/空槽不含；全空/缺 Key=空串）；可直连 **Agnes 分镜图批量生成** all_prompts 输入（一根线批量出关键帧），或连 LLM 对话整批审改 / 存档
+- detailed_prompt_1 ~ detailed_prompt_60: 每个分镜（all_scenes 条目序号）的英文生图提示词（可逐个连 Agnes 文生图/图生图 出关键帧）
+- status: 整批执行状态 JSON `{"success":[…],"error":[…],"empty":[…]}`（**槽号=all_scenes 条目序号**，1 起；条目不足 60 时其余槽号进 empty；全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）；可直连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析
+- all_prompts: 本批**成功生成**的英文提示词 JSON 数组（按槽号升序，失败/空槽不含；全空/缺 Key=空串）；可直连 **Agnes 分镜图批量生成** all_prompts 输入（一根线一次全出关键帧），或连 LLM 对话整批审改 / 存档
+- all_prompts_1_20 / all_prompts_21_40 / all_prompts_41_60: 3 路**分段**成功提示词 JSON 数组（各段按槽号升序、跳过失败/空槽；该段零成功=空串）；分段直连 **Agnes 分镜图批量生成** batch/all_prompts 输入，每波 ≤20 张分波出图控 RPM（3 波 × 20 = 60 镜全量）
 
 > 典型接法（分镜线全量出图，一根线到底）：
 > 剧本/章节 → 总导演（all_scenes 合并槽，JSON 数组）+ 资产提取（5 路 JSON 任选）→ 分镜提示词批量生成
-> （all_scenes 一根线 + 资产注入）→ all_prompts（全部提示词 JSON）→ 分镜图批量生成（all_prompts）→ image_1..50 关键帧 → SaveImage / 关键帧生视频；
+> （all_scenes 一根线 + 资产注入）→ all_prompts（全部提示词 JSON）→ 分镜图批量生成（all_prompts 一次全出，或 3 路分段 all_prompts_1_20/_21_40/_41_60 → batch 分波出图）→ image_1..60 关键帧 → SaveImage / 关键帧生视频；
+> 分波出图每波 all_images（批量图张量）→ Agnes 图像拼图 batch_images 出一张分段总览拼图；
 > 轻量替代：场景切分 all_scenes 直连本节点；单镜处理/单条重试：连任一 分镜_i / 场景_i 纯文本（视为 1 条）；
 > 资产线的参考图（三视图批量产物）可回流 图生图/关键帧生视频 保跨镜一致性（分镜图批量生成为纯文生图，不接参考图）。
 
-> 缺 Key：50 路全输出「[错误] 缺少 API Key…」，status error=全槽、reason=缺 Key 原因（零 API 调用）；
-> 全空：all_scenes 留空/条目为空 → 50 路全空串，status empty=全槽（零 API 调用）；单条失败不影响其他条。
+> 缺 Key：60 路全输出「[错误] 缺少 API Key…」，status error=全槽、reason=缺 Key 原因（零 API 调用）；
+> 全空：all_scenes 留空/条目为空 → 60 路全空串，status empty=全槽（零 API 调用）；单条失败不影响其他条。
 
 > 旧工作流自愈：输入结构升级前（50 槽 scene_1..50 版）保存过的工作流实例，载入/排队时自动把 widget 值重映射到新 12 槽结构
 > （web/js/agnes-migrate.js，旧 style/资产×5/base_url/api_key/model/reasoning_effort/max_concurrency 11 项设置原样保留）；
@@ -299,26 +301,31 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 🎞️ Agnes 分镜图批量生成 (AgnesSceneImageBatch)
 
-**功能：** 将「Agnes 分镜提示词批量生成」的 all_prompts 全部提示词（JSON 数组）并发生成分镜关键帧（线程池，速率可限）
+**功能：** 将「Agnes 分镜提示词批量生成」的 all_prompts 全部提示词（JSON 数组）或 3 路分段输出（batch 一根线输入，分波出图控 RPM）并发生成分镜关键帧（线程池，速率可限）
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| all_prompts | STRING | "" | 全提示词合并输入（一根线直连 分镜提示词批量生成 all_prompts 输出，JSON 数组从上到下逐条出图，最多 50 条、超出截断并在日志标注，空项跳过）；也接受**单条英文提示词纯文本**（连任一 detailed_prompt_i 或手动粘贴，视为 1 条）；空=整批跳过（零 API 调用） |
+| all_prompts | STRING | "" | 全提示词合并输入（一根线直连 分镜提示词批量生成 all_prompts 输出，JSON 数组从上到下逐条出图，最多 60 条、超出截断并在日志标注，空项跳过）；也接受**单条英文提示词纯文本**（连任一 detailed_prompt_i 或手动粘贴，视为 1 条）；空=回落 batch 规则 |
 | quality | COMBO | 2K | 画质档位（整批共用）：2K 关键帧性价比最高；试跑用 1K 更省，4K 细节最清晰（仅新接口 2.5-flash 生效） |
 | aspect_ratio | COMBO | 16:9 | 画面比例（整批共用）：关键帧默认 16:9 电影画幅；漫剧竖屏选 9:16；旧接口 2.1/2.0 按宽幅 1920x1080 / 其他 1024x1024 出图 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
-| max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-50，默认 10）；非空提示词超过该值时排队执行，频繁 429/503 就调小 |
+| max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-60，默认 10）；非空提示词超过该值时排队执行，频繁 429/503 就调小 |
+| batch | STRING | "" | **分段/批量一根线输入**（优先级高于 all_prompts）：直连 分镜提示词批量生成 任一分段输出 all_prompts_1_20/_21_40/_41_60（JSON 数组，每波 ≤20 张分波出图控 RPM）；嵌套 3 段数组 [[..],[..],[..]] 也自动展平 ≤60 条；单条纯文本=1 条；空=回落 all_prompts 解析 |
 
 **输出：**
-- image_1 ~ image_50: 每个分镜（all_prompts 条目序号）的关键帧张量（可接 SaveImage 存档，或逐镜连 Agnes 关键帧生视频）
-- status: 整批执行状态 JSON `{"success":[…],"error":[…],"empty":[…]}`（**槽号=all_prompts 条目序号**，1 起；条目不足 50 时其余槽号进 empty；全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）；成功槽实际分辨率 WxH 见控制台日志；可直连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析
+- image_1 ~ image_60: 每个分镜（all_prompts/batch 条目序号）的关键帧张量（可接 SaveImage 存档，或逐镜连 Agnes 关键帧生视频）
+- status: 整批执行状态 JSON `{"success":[…],"error":[…],"empty":[…]}`（**槽号=all_prompts/batch 条目序号**，1 起；条目不足 60 时其余槽号进 empty；全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）；成功槽实际分辨率 WxH 见控制台日志；可直连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析
+- all_images: 成功槽按槽号升序堆叠的**批量图张量 (N,H,W,3)**（N=success 条数，同档位+比例 WxH 天然一致；失败/跳过槽不含，其黑图占位仍在 image_i 槽；零成功=空批次 (0,512,512,3)）；可直连 **Agnes 图像拼图** batch_images 总输入（一根线出总览拼图，拼图内部自动跳黑图双保险）
 
 > 典型接法（分镜线全量出图，一根线到底）：
-> 总导演/场景切分（all_scenes JSON 数组）→ 分镜提示词批量生成（+ 资产提取 5 路 JSON 任选注入）
-> → all_prompts（全部提示词 JSON）→ 分镜图批量生成（all_prompts 一根线）→ image_1..50 关键帧
-> → SaveImage 存档 / 关键帧生视频（逐镜）；整批图想拼一张总览可用 图像拼图（20 路/组）。
+> 总导演/场景切分（all_scenes JSON 数组，≤60 条）→ 分镜提示词批量生成（+ 资产提取 5 路 JSON 任选注入）
+> → all_prompts（全部提示词 JSON）→ 分镜图批量生成（all_prompts 一根线，一次全出）→ image_1..60 关键帧
+> → SaveImage 存档 / 关键帧生视频（逐镜）；
+> 分波控 RPM 接法：分镜提示词批量 3 路分段 all_prompts_1_20/_21_40/_41_60 → 分镜图批量 ×3（batch 一根线，每波 ≤20 张）
+> → 每波 all_images → Agnes 图像拼图 batch_images（每波一张总览拼图，3 波 = 60 镜全量）；
+> 或 全量 all_prompts 一次出图后，all_images 直连 图像拼图 出一张总览。
 
 > 黑图占位勿流入视频线：跳过/失败/条目不足槽输出 512×512 黑图且本节点是输出节点，
 > 接 关键帧生视频 前请先用 status JSON 核对（连 文本拆分 JSON 数组模式拆 3 条名单，或 LLM 对话解读），
@@ -327,8 +334,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 跨镜一致性：本节点是**纯文生图**（不接参考图）——同一角色跨分镜长相一致性靠 资产提取 → 三视图批量 产物
 > 回流 图生图/关键帧生视频 节点做参考图约束；角色/场景描述词的一致性由 分镜提示词批量 的资产 JSON 注入保证。
 
-> 缺 Key：50 路全输出黑图占位，status error=全槽、reason=缺 Key 原因（零 API 调用）；
-> 全空：all_prompts 留空/条目为空 → 50 路全黑图，status empty=全槽（零 API 调用）；单条失败不影响其他条。
+> 缺 Key：60 路全输出黑图占位，status error=全槽、reason=缺 Key 原因（零 API 调用）；
+> 全空：all_prompts/batch 均留空/条目为空 → 60 路全黑图，status empty=全槽（零 API 调用）；单条失败不影响其他条。
 
 ---
 

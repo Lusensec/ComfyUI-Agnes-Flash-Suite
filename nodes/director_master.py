@@ -2,7 +2,7 @@
 Agnes 总导演节点
 生成完整编号分镜脚本
 输入：故事内容（小说章节或 漫剧剧本 均可），输出 5 秒/镜的编号分镜
-+ all_scenes 全文合并槽（50 镜按序合并为 JSON 数组，可直连 分镜提示词批量生成 / LLM 对话/存档）
++ all_scenes 全文合并槽（60 镜按序合并为 JSON 数组，可直连 分镜提示词批量生成 / LLM 对话/存档）
 """
 import requests
 import json
@@ -13,9 +13,12 @@ import traceback
 from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
 
 
+MAX_SLOTS = 60
+
+
 class AgnesDirectorMaster:
     """
-    Agnes 总导演 v1
+    Agnes 总导演 v2
     使用 agnes-2.5-flash 生成完整分镜脚本
     """
     
@@ -53,44 +56,22 @@ class AgnesDirectorMaster:
         }
         return inputs
 
-    RETURN_TYPES = ("STRING",) * 57
-    RETURN_NAMES = (
-        "log_text",
-        "scene_1", "scene_2", "scene_3", "scene_4", "scene_5",
-        "scene_6", "scene_7", "scene_8", "scene_9", "scene_10",
-        "scene_11", "scene_12", "scene_13", "scene_14", "scene_15",
-        "scene_16", "scene_17", "scene_18", "scene_19", "scene_20",
-        "scene_21", "scene_22", "scene_23", "scene_24", "scene_25",
-        "scene_26", "scene_27", "scene_28", "scene_29", "scene_30",
-        "scene_31", "scene_32", "scene_33", "scene_34", "scene_35",
-        "scene_36", "scene_37", "scene_38", "scene_39", "scene_40",
-        "scene_41", "scene_42", "scene_43", "scene_44", "scene_45",
-        "scene_46", "scene_47", "scene_48", "scene_49", "scene_50",
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 7)
+    RETURN_NAMES = ("log_text",) + tuple(f"scene_{i}" for i in range(1, MAX_SLOTS + 1)) + (
         "chapter_text_out", "api_key_out", "base_url_out", "model_out",
         "scene_count",
         "all_scenes",
     )
-    RETURN_LABELS = (
-        "处理日志",
-        "分镜 1", "分镜 2", "分镜 3", "分镜 4", "分镜 5",
-        "分镜 6", "分镜 7", "分镜 8", "分镜 9", "分镜 10",
-        "分镜 11", "分镜 12", "分镜 13", "分镜 14", "分镜 15",
-        "分镜 16", "分镜 17", "分镜 18", "分镜 19", "分镜 20",
-        "分镜 21", "分镜 22", "分镜 23", "分镜 24", "分镜 25",
-        "分镜 26", "分镜 27", "分镜 28", "分镜 29", "分镜 30",
-        "分镜 31", "分镜 32", "分镜 33", "分镜 34", "分镜 35",
-        "分镜 36", "分镜 37", "分镜 38", "分镜 39", "分镜 40",
-        "分镜 41", "分镜 42", "分镜 43", "分镜 44", "分镜 45",
-        "分镜 46", "分镜 47", "分镜 48", "分镜 49", "分镜 50",
+    RETURN_LABELS = ("处理日志",) + tuple(f"分镜 {i}" for i in range(1, MAX_SLOTS + 1)) + (
         "原文本（透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
-        "分镜总数（超 50 标注）",
+        "分镜总数（超 60 标注）",
         "分镜全文（JSON 数组）",
     )
     OUTPUT_TOOLTIPS = ("处理日志（分镜统计/响应元数据/空响应警示/错误详情）",) + (
-        ("编号分镜脚本（5秒/段，含画面/对白/运镜，连接提示词生成节点）",) * 50
+        ("编号分镜脚本（5秒/段，含画面/对白/运镜，连接提示词生成节点）",) * MAX_SLOTS
     ) + ("故事原文本（小说章节/剧本，透传）", "API Key（透传）", "Base URL（透传）", "模型（透传）",
-         "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）",
-         "50 个分镜按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / LLM 对话 / 存档")
+         "实际解析出的分镜总数（超过 60 时标注「N（仅显示前 60 个）」）",
+         "60 个分镜按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 all_scenes 输入 / LLM 对话 / 存档")
     FUNCTION = "split_scenes"
     CATEGORY = "Agnes Novel"
     OUTPUT_NODE = True
@@ -109,14 +90,14 @@ class AgnesDirectorMaster:
             "scene_4": "第 4 个分镜脚本",
             "scene_5": "第 5 个分镜脚本",
         }
-        for i in range(1, 51):
+        for i in range(6, MAX_SLOTS + 1):
             outputs[f"scene_{i}"] = f"第 {i} 个分镜脚本（如果存在）"
         outputs["chapter_text_out"] = "原始故事文本（小说章节/剧本，透传）"
         outputs["api_key_out"] = "API Key（透传）"
         outputs["base_url_out"] = "API 地址（透传）"
         outputs["model_out"] = "使用的模型名称（透传）"
-        outputs["scene_count"] = "实际解析出的分镜总数（超过 50 时标注「N（仅显示前 50 个）」）"
-        outputs["all_scenes"] = "50 个分镜按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 / LLM 对话 / 存档"
+        outputs["scene_count"] = "实际解析出的分镜总数（超过 60 时标注「N（仅显示前 60 个）」）"
+        outputs["all_scenes"] = "60 个分镜按序合并为 JSON 数组（跳过空槽）；可直连 分镜提示词批量生成 / LLM 对话 / 存档"
         
         for key in outputs:
             if key in kwargs:
@@ -128,13 +109,13 @@ class AgnesDirectorMaster:
         if not chapter_text:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 文本输入 / Agnes 剧本生成 的文本输出，或直接粘贴故事章节"
             print(f"[Agnes 总导演] {skip_msg}")
-            result = [skip_msg] + [""] * 50 + ["", api_key, base_url, model, "", ""]
+            result = [skip_msg] + [""] * MAX_SLOTS + ["", api_key, base_url, model, "", ""]
             return tuple(result)
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
             error_msg = "[错误] 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）"
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, "", ""]
+            result = [error_msg] + [""] * MAX_SLOTS + [chapter_text, api_key, base_url, model, "", ""]
             return tuple(result)
         print(f"\n{'='*60}")
         print(f"[Agnes 总导演 - {model}]")
@@ -238,18 +219,18 @@ class AgnesDirectorMaster:
             print(log)
 
             result = [log]
-            for i in range(1, 51):
+            for i in range(1, MAX_SLOTS + 1):
                 result.append(shots.get(i, ""))
             result.append(chapter_text)
             result.append(api_key)
             result.append(base_url)
             result.append(model)
             total_shots = max(shots) if shots else 0
-            shot_count = f"{total_shots}（仅显示前 50 个）" if total_shots > 50 else str(total_shots)
+            shot_count = f"{total_shots}（仅显示前 60 个）" if total_shots > MAX_SLOTS else str(total_shots)
             result.append(shot_count)
-            # all_scenes：50 个分镜按序合并为 JSON 数组（跳过空槽），
+            # all_scenes：60 个分镜按序合并为 JSON 数组（跳过空槽），
             # 供 直连「Agnes 分镜提示词批量生成」all_scenes 输入 / LLM 对话 / 存档
-            result.append(json.dumps([x for x in result[1:51] if x.strip()], ensure_ascii=False, indent=2))
+            result.append(json.dumps([x for x in result[1:MAX_SLOTS + 1] if x.strip()], ensure_ascii=False, indent=2))
 
             return tuple(result)
 
@@ -259,7 +240,7 @@ class AgnesDirectorMaster:
                          f"· 请求参数: model={model}；reasoning_effort={reasoning_effort}\n"
                          f"── 完整堆栈 ──\n{tb}")
             print(error_msg)
-            result = [error_msg] + [""] * 50 + [chapter_text, api_key, base_url, model, "", ""]
+            result = [error_msg] + [""] * MAX_SLOTS + [chapter_text, api_key, base_url, model, "", ""]
             return tuple(result)
 
     def _parse_shots(self, content):
