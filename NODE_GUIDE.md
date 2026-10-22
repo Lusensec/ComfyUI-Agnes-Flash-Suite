@@ -262,6 +262,10 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 缺 Key：50 路全输出「[错误] 缺少 API Key…」，status error=全槽、reason=缺 Key 原因（零 API 调用）；
 > 全空：all_scenes 留空/条目为空 → 50 路全空串，status empty=全槽（零 API 调用）；单条失败不影响其他条。
 
+> 旧工作流自愈：输入结构升级前（50 槽 scene_1..50 版）保存过的工作流实例，载入/排队时自动把 widget 值重映射到新 12 槽结构
+> （web/js/agnes-migrate.js，旧 style/资产×5/base_url/api_key/model/reasoning_effort/max_concurrency 11 项设置原样保留）；
+> 若仍见「Value not in list: style: ''」校验报错，删节点重加（右键 Agnes Novel → Agnes 分镜提示词批量生成）后重连 all_scenes 连线。
+
 ---
 
 ### 🎨 Agnes 图像生成 (AgnesImageGen)

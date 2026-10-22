@@ -14,9 +14,9 @@ import os
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
 # Web directory for frontend extensions
-# web/js/ 下的前端扩展（节点配色等）会被 ComfyUI 自动加载：
-#  - 服务端 /extensions 列表包含 web/js/agnes-node-colors.js
-#  - 前端启动时 import 并注册，Agnes* 节点自动获得 Agnes 蓝配色
+# web/js/ 下的前端扩展会被 ComfyUI 自动加载：
+#  - agnes-node-colors.js：Agnes* 节点按功能分类配色（配置琥珀/文本绿/图片蓝/视频紫）
+#  - agnes-migrate.js：分镜提示词批量节点旧实例（61 输入版）widget 值 61→12 槽自动迁移
 WEB_DIRECTORY = "web"
 
 print("[AgnesNovel] 已加载所有节点")
