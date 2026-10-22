@@ -6,7 +6,7 @@ Agnes 分镜提示词批量生成节点
 分镜提示词批量生成节点：1 路 all_scenes 全文合并输入（↔ 总导演/场景切分
 all_scenes 输出，一根线直连；也接受单条分镜纯文本，视为 1 条），
 线程池并发生成英文生图提示词（max_concurrency 限制同时请求数，默认 10，
-超出排队执行），50 路 detailed_prompt + 1 路 status 输出（整批执行状态 JSON：
+超出排队执行），50 路 detailed_prompt + 1 路 status + 1 路 all_prompts 全提示词 JSON 输出（整批执行状态 JSON：
 {"success": [成功槽号], "error": [失败槽号], "empty": [空输入槽号]}，
 可连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析；
 全部请求失败时额外含 "reason" 字段：各槽同一原因=字符串，不同=槽号→原因映射）。
@@ -25,7 +25,8 @@ all_scenes 输出，一根线直连；也接受单条分镜纯文本，视为 1 
   Agnes 剧本生成/解说剧本生成（故事文本）
       ├─▶ Agnes 总导演（all_scenes 合并槽，JSON 数组）─▶ Agnes 分镜提示词批量生成（all_scenes）
       │      （+ Agnes 资产提取 角色/场景/服装/道具/天气 JSON 任选注入，整批共用）
-      │      ─▶ detailed_prompt_1..50 ─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
+      │      ─▶ all_prompts（全部提示词 JSON）─▶ Agnes 分镜图批量生成（all_prompts，批量出关键帧）
+       │      ─▶ detailed_prompt_1..50（单镜）─▶ Agnes 文生图（逐镜关键帧）→ 关键帧生视频
       └─▶ Agnes 资产提取 ─▶ 资产线（资产提示词批量/三视图批量 → 参考图回流分镜线保一致性）
   轻量替代：Agnes 场景切分（all_scenes 合并槽）直连本节点；
   单镜处理：总导演 分镜_i / 场景切分 场景_i 单路纯文本直连 all_scenes 输入（视为 1 条）
@@ -50,16 +51,16 @@ MAX_SLOTS = 50
 class AgnesScenePromptBatch(OutputDocsMixin):
     """分镜提示词批量生成：all_scenes 合并输入（JSON 数组/纯文本）并发生成英文提示词 + 1 路整批状态 JSON（线程池，速率可限）"""
 
-    DESCRIPTION = "分镜提示词批量生成：all_scenes 合并输入（总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理；单条分镜纯文本也接受）整批并发生成英文提示词（max_concurrency 限制同时请求数，默认 10），可整批注入 资产提取 5 路 JSON 保跨镜一致性，输出 50 路 detailed_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单），单条失败不影响其他条"
+    DESCRIPTION = "分镜提示词批量生成：all_scenes 合并输入（总导演/场景切分 all_scenes 输出，JSON 数组从上到下逐条处理；单条分镜纯文本也接受）整批并发生成英文提示词（max_concurrency 限制同时请求数，默认 10），可整批注入 资产提取 5 路 JSON 保跨镜一致性，输出 50 路 detailed_prompt + 1 路 status 整批状态 JSON（success/error/empty 槽号清单）+ 1 路 all_prompts 全部提示词 JSON 数组（可直连 Agnes 分镜图批量生成 all_prompts 输入），单条失败不影响其他条"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
     OUTPUT_NODE = True
 
-    # ── 输出：detailed_prompt_1..50 + status（共 51 槽）──
-    RETURN_NAMES = tuple(f"detailed_prompt_{i}" for i in range(1, MAX_SLOTS + 1)) + ("status",)
-    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 1)
-    RETURN_LABELS = tuple(f"英文分镜提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON",)
+    # ── 输出：detailed_prompt_1..50 + status + all_prompts（共 52 槽）──
+    RETURN_NAMES = tuple(f"detailed_prompt_{i}" for i in range(1, MAX_SLOTS + 1)) + ("status", "all_prompts")
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 2)
+    RETURN_LABELS = tuple(f"英文分镜提示词 {i}" for i in range(1, MAX_SLOTS + 1)) + ("执行状态 JSON", "全部提示词 JSON")
     OUTPUT_DOCS = {
         **{f"detailed_prompt_{i}": (
             f"第 {i} 个分镜（all_scenes 第 {i} 条）的英文生图提示词（风格化 + 角色/场景一致性描述 + 光线/色彩/质量词，"
@@ -70,6 +71,11 @@ class AgnesScenePromptBatch(OutputDocsMixin):
             "槽号=all_scenes 条目序号（1 起）；全部请求失败时额外含 \"reason\" 字段（各槽同一原因=字符串，不同=槽号→原因映射）；"
             "可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，"
             "或接 LLM 对话让模型解读哪些槽需要重试"
+        ),
+        "all_prompts": (
+            "本批成功生成的英文生图提示词 JSON 数组（json.dumps ensure_ascii=False indent=2，按槽号升序；失败/空槽不含；"
+            "全空/缺 Key/零成功=空字符串）；可直连 Agnes 分镜图批量生成 all_prompts 输入（一根线批量出关键帧），"
+            "或连 LLM 对话整批审改 / 存档"
         ),
     }
 
@@ -202,13 +208,14 @@ class AgnesScenePromptBatch(OutputDocsMixin):
             print(f"[Agnes 分镜提示词批量] {msg}")
             return tuple(msg for _ in range(MAX_SLOTS)) + (
                 _status_json([], list(range(1, MAX_SLOTS + 1)), [], reason),
+                "",
             )
 
         # ── 空输入跳过：一发请求都不发 ──
         if not items:
             skip_msg = "[跳过] 输入为空：请连接 Agnes 总导演 / Agnes 场景切分 的 all_scenes 输出（JSON 数组），或连单条 分镜_i / 场景_i，或粘贴 JSON 数组/分镜文本"
             print(f"[Agnes 分镜提示词批量] {skip_msg}")
-            return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))),)
+            return ("",) * MAX_SLOTS + (_status_json([], [], list(range(1, MAX_SLOTS + 1))), "")
 
         # 条目占槽 1..N，其余槽为空槽
         tasks = list(enumerate(items, 1))
@@ -284,7 +291,12 @@ class AgnesScenePromptBatch(OutputDocsMixin):
         print(f"[Agnes 分镜提示词批量] 状态: success={success} error={error} empty={empty}"
               + (f" reason={reason}" if reason is not None else ""))
 
-        return tuple(prompts) + (_status_json(success, error, empty, reason),)
+        # 全提示词 JSON：success 槽（升序）的成功提示词，失败/空槽不含；零成功=空串；可直连 分镜图批量生成
+        _ok_prompts = [prompts[i - 1] for i in success]
+        all_prompts = json.dumps(_ok_prompts, ensure_ascii=False, indent=2) if _ok_prompts else ""
+        print(f"[Agnes 分镜提示词批量] all_prompts: {len(_ok_prompts)} 条成功提示词 → JSON 输出（可连 Agnes 分镜图批量生成）")
+
+        return tuple(prompts) + (_status_json(success, error, empty, reason), all_prompts)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesScenePromptBatch": AgnesScenePromptBatch}

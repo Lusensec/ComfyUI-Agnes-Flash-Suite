@@ -4,7 +4,7 @@
 # 注册顺序 = 前端节点库（Agnes Novel 菜单）默认显示顺序（前端"原始顺序"排序模式）：
 #   ① 文本类节点（配置：API Key/风格选择 → 文本输入 → LLM 对话/字符串合并（通用文本工具，紧随文本输入）
 #      → 剧本（解说/漫剧）→ 分镜管线：拆分/导演/提取 → 资产·三视图·分镜 提示词批量）
-#   ② 图片类节点（图像反推提示词 置顶 → 文生图 → 图生图 → 三视图 → 三视图批量 → 图像拼图）
+#   ② 图片类节点（图像反推提示词 置顶 → 文生图 → 图生图 → 三视图 → 三视图批量 → 分镜图批量 → 图像拼图）
 #   ③ 视频类节点（文生视频 → 关键帧生视频 → 参考视频生成）
 
 # ── 文本类节点 ─────────────────────────────────────────────
@@ -32,6 +32,7 @@ from .image_gen import AgnesImageGen
 from .img2img import AgnesNovelImageToImage
 from .character_turnaround import AgnesSubjectTurnaround
 from .turnaround_batch import AgnesTurnaroundBatch
+from .scene_image_batch import AgnesSceneImageBatch
 from .image_mosaic import AgnesImageMosaic
 
 # ── 视频类节点 ─────────────────────────────────────────────
@@ -48,7 +49,7 @@ from . import api_key_config, style_selector, text_input, llm_chat, string_merge
 from . import script_generator, screenplay_generator, scene_splitter, director_master
 from . import asset_extractor, text_split, asset_prompt, asset_prompt_batch
 from . import turnaround_prompt, turnaround_prompt_batch, prompt_generator, scene_prompt_batch
-from . import image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, image_mosaic
+from . import image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, scene_image_batch, image_mosaic
 from . import text2video, img2video, video_reference
 
 # 文本类：API Key 配置 → 风格选择（配置信息，紧随 API Key）→ 文本输入（文本起点，替代灰色 PrimitiveNode）
@@ -58,7 +59,8 @@ from . import text2video, img2video, video_reference
 #        → 文本拆分 → 资产提示词生成 → 资产提示词批量生成 → 三视图提示词生成 → 三视图提示词批量生成
 #        → 分镜提示词生成 → 分镜提示词批量生成（分镜管线末端，接 总导演/场景切分 all_scenes 合并输出，JSON 数组）
 # 图片类：图像反推提示词（位于 图像生成 上方）→ 图像生成 → 图生图 → 三视图生成 → 三视图批量生成
-#        → 图像拼图（位于 三视图批量生成 下方，批量图 20 路 → 1 路拼图）
+#        → 分镜图批量生成（分镜线全量出图：接 分镜提示词批量 all_prompts 全部提示词 JSON，50 路并发出关键帧）
+#        → 图像拼图（位于 分镜图批量 之后，批量图 20 路 → 1 路拼图）
 # 视频类：文生视频 → 关键帧生视频 → 参考视频生成
 for _mod in [
     # 文本类
@@ -68,7 +70,8 @@ for _mod in [
     asset_extractor, text_split, asset_prompt, asset_prompt_batch,
     turnaround_prompt, turnaround_prompt_batch, prompt_generator, scene_prompt_batch,
     # 图片类
-    image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, image_mosaic,
+    image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, scene_image_batch,
+    image_mosaic,
     # 视频类
     text2video, img2video, video_reference,
 ]:
