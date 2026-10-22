@@ -2,18 +2,24 @@
 """
 Agnes 图像拼图节点
 ==================
-把批量节点的 20 路 IMAGE 输出（Agnes 三视图批量生成 的 image_1..20）
+把批量节点的 20 路 IMAGE 输出（Agnes 三视图批量生成 的 image_1..20）或
+1 路批量图总输入（all_images 批量张量 (N,H,W,3)，一根线直连）
 汇聚成 1 路拼图，动态数量展示：
 
+- batch_images 总输入（新增）：接 三视图批量/分镜图批量 all_images 批量张量
+  （(N,H,W,3) 或单张 (H,W,3)/(1,H,W,3)）；连上时优先用它（20 个 image_i 槽
+  忽略，日志标注），未连接时走 20 槽（旧图完全兼容）
 - 20 个图像输入槽，未连接的空槽自动跳过
 - 全黑占位张量（批量节点跳过/失败槽的 512×512 黑图）自动过滤，不占用格子
 - PIL 合成 2 列 × ⌈N/2⌉ 行网格：单元格等宽（以最大图宽为准，上限 1600px）、
-  深灰背景 + 8px 间距、每格左上角标槽号
+  深灰背景 + 8px 间距、每格左上角标条目号
 - 有效图数 N 决定网格行数（动态），全无效时回落 1 张 512×512 黑图占位
 - 纯本地合成，不调 API；mosaic 可连 预览图像 / SaveImage 一次看全批/存全批
 
-典型链路：
-  Agnes 三视图批量生成.image_1..20 ─▶ Agnes 图像拼图 ─▶ 预览图像 / SaveImage
+典型链路（资产线，一根线到底）：
+  Agnes 三视图批量生成.all_images (N,H,W,3) ─▶ Agnes 图像拼图.batch_images
+      ─▶ 总览拼图 ─▶ 预览图像 / SaveImage
+  （旧接法 20 路 image_1..20 手接仍然可用）
 """
 
 import numpy as np
@@ -37,9 +43,9 @@ def _black_placeholder():
 
 
 class AgnesImageMosaic(OutputDocsMixin):
-    """图像拼图：20 路图像合成 2 列网格，自动跳过空槽与全黑占位，N 动态定行数"""
+    """图像拼图：20 路图像或 1 路批量张量总输入（batch_images）合成 2 列网格，自动跳过空槽与全黑占位，N 动态定行数"""
 
-    DESCRIPTION = "图像拼图：20 个图像输入（对应 三视图批量生成 等批量节点 image_1..20），合成 1 张 2 列网格拼图，自动跳过未连接槽与全黑占位图，有效图数 N 动态决定行数；全无效回落 1 张黑图占位；纯本地不调 API"
+    DESCRIPTION = "图像拼图：batch_images 总输入（三视图批量/分镜图批量 all_images 批量张量 (N,H,W,3) 一根线直连，连上时优先）或 20 个图像输入（对应批量节点 image_1..20，旧接法兼容），合成 1 张 2 列网格拼图，自动跳过未连接槽与全黑占位图，有效图数 N 动态决定行数；全无效回落 1 张黑图占位；纯本地不调 API"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -54,17 +60,22 @@ class AgnesImageMosaic(OutputDocsMixin):
             "2 列 × ⌈N/2⌉ 行网格拼图（单元格等宽、深灰背景 + 8px 间距、每格标槽号）；"
             "自动跳过未连接槽与全黑占位；全无效=1 张 512×512 黑图占位；可连 预览图像 / SaveImage"
         ),
-        "count": "有效图数「N/20」（未连接槽与全黑占位不计）",
+        "count": "有效图数「N/分母」（分母=20 槽模式为 20、batch_images 模式为其条目数；未连接槽与全黑占位不计）",
     }
 
     @classmethod
     def INPUT_TYPES(cls):
-        required = {}
+        required = {
+            "batch_images": ("IMAGE", {
+                "tooltip": "批量图总输入（可选）：接 Agnes 三视图批量生成 / Agnes 分镜图批量生成 的 all_images 批量张量（(N,H,W,3)；也接受单张 (H,W,3)/(1,H,W,3)）。连上时优先用它拼（20 个 image_i 槽忽略，日志标注）；不连则照旧走 20 槽（旧图完全兼容）；内部自动跳全黑占位双保险",
+            }),
+        }
         for i in range(1, MAX_SLOTS + 1):
             required[f"image_{i}"] = ("IMAGE",)
         return {"required": required, "optional": {}}
 
     def generate(self,
+                 batch_images=None,
                  image_1=None, image_2=None, image_3=None, image_4=None,
                  image_5=None, image_6=None, image_7=None, image_8=None,
                  image_9=None, image_10=None, image_11=None, image_12=None,
@@ -72,14 +83,25 @@ class AgnesImageMosaic(OutputDocsMixin):
                  image_17=None, image_18=None, image_19=None, image_20=None):
         from PIL import Image as PILImage, ImageDraw
 
-        slots = [image_1, image_2, image_3, image_4, image_5,
-                 image_6, image_7, image_8, image_9, image_10,
-                 image_11, image_12, image_13, image_14, image_15,
-                 image_16, image_17, image_18, image_19, image_20]
+        # ── 数据源优先级：连上 batch_images 总输入（批量张量）→ 拆条用之；未连 → 20 槽（旧接法）──
+        if batch_images is not None:
+            t = batch_images
+            if t.dim() == 3:          # 单张 (H,W,3) → 1 条
+                imgs = [t]
+            else:                     # (N,H,W,3) → N 条（N=0=全空批次）
+                imgs = [t[i] for i in range(int(t.shape[0]))]
+            source = f"batch_images 批量张量（{len(imgs)} 条，image_1..20 槽忽略）"
+        else:
+            imgs = [image_1, image_2, image_3, image_4, image_5,
+                    image_6, image_7, image_8, image_9, image_10,
+                    image_11, image_12, image_13, image_14, image_15,
+                    image_16, image_17, image_18, image_19, image_20]
+            source = f"image_1..{MAX_SLOTS} 槽"
+        total = len(imgs)
 
         # ── 过滤：未连接=None；全黑占位（全零张量）跳过 ──
         valid = []
-        for i, img in enumerate(slots, 1):
+        for i, img in enumerate(imgs, 1):
             if img is None:
                 continue
             t = img if img.dim() == 4 else img.unsqueeze(0)
@@ -88,8 +110,8 @@ class AgnesImageMosaic(OutputDocsMixin):
                 valid.append((i, t))
 
         if not valid:
-            print(f"[Agnes 图像拼图] 无有效图（{MAX_SLOTS} 槽均未连接或全为黑图占位），返回 512 黑图占位")
-            return _black_placeholder(), f"0/{MAX_SLOTS}"
+            print(f"[Agnes 图像拼图] 无有效图（{source} 均未连接或全为黑图占位），返回 512 黑图占位")
+            return _black_placeholder(), f"0/{total}"
 
         # ── 单元格等宽：以最大图宽为准（上限 CELL_CAP），等比缩高 ──
         target_w = min(max(int(t.shape[1]) for _, t in valid), CELL_CAP)
@@ -129,8 +151,8 @@ class AgnesImageMosaic(OutputDocsMixin):
         mosaic = torch.from_numpy(arr).unsqueeze(0)  # [1,H,W,3]（ComfyUI IMAGE 约定）
 
         n = len(valid)
-        print(f"[Agnes 图像拼图] 有效 {n}/{MAX_SLOTS} 张 → 拼图 {canvas_w}×{canvas_h}（{len(rows)} 行 × {CELLS} 列，槽位 {[i for i, _ in valid]}）")
-        return mosaic, f"{n}/{MAX_SLOTS}"
+        print(f"[Agnes 图像拼图] 有效 {n}/{total} 张（来源: {source}）→ 拼图 {canvas_w}×{canvas_h}（{len(rows)} 行 × {CELLS} 列，条目 {[i for i, _ in valid]}）")
+        return mosaic, f"{n}/{total}"
 
 
 NODE_CLASS_MAPPINGS = {"AgnesImageMosaic": AgnesImageMosaic}

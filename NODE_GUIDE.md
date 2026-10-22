@@ -505,14 +505,16 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 📐 Agnes 三视图批量生成 (AgnesTurnaroundBatch)
 
-**功能：** 与「Agnes 文本拆分」20 路输出一一对应的批量三视图出图节点：
-20 个提示词输入槽（prompt_1..20 ↔ 文本拆分 item_1..20），线程池并发请求图像 API，
+**功能：** 三视图提示词合并输入驱动的批量三视图出图节点：
+1 路 all_prompts 全文合并输入（↔ 三视图提示词批量 all_turnaround_prompts 输出，
+一根线直连；也接受单条三视图提示词纯文本，视为 1 条），线程池并发请求图像 API，
 `max_concurrency` 限制同时请求数（默认 10，超出排队执行）。
-空槽跳过（不发请求，输出黑图占位）；单槽失败不影响其他槽，失败槽同样黑图占位。
+all_prompts 空项=跳过该槽（不发请求，输出黑图占位，槽号保位）；
+单槽失败不影响其他槽，失败槽同样黑图占位。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| prompt_1..prompt_20 | STRING(多行) ×20 | "" | 第 i 条三视图提示词：连 文本拆分 item_i，或 三视图提示词生成 / LLM 批量扩写后逐槽填入；留空=跳过该槽 |
+| all_prompts | STRING(多行) | "" | 三视图提示词合并输入：① JSON 数组（三视图提示词批量 all_turnaround_prompts 输出直连，条目从上到下逐条出图，最多 20 条超出截断，空项=跳过该槽槽号保位）② 单条三视图提示词纯文本（连 three_view_prompt_i 或粘贴，视为 1 条）③ 空=整批跳过（零 API 调用） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖 |
 | api_key | STRING | 留空自动加载 | Agnes AI API Key |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
@@ -520,17 +522,20 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | aspect_ratio | COMBO | 21:9 | 三视图推荐宽幅（21:9 / 16:9） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空提示词超过该值时排队；频繁 429/503 就调小，配额充足可拉满 |
 
-**输出（21 路）：**
-- image_1..image_20：各槽三视图张量（成功=真实图；跳过/失败=512×512 黑图占位），可接 SaveImage 存档或作参考图
-- status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号],"empty":[空输入槽号]}`（成功槽的实际分辨率 WxH 见控制台日志）；
+**输出（22 路）：**
+- image_1..image_20：各槽（all_prompts 第 i 条）三视图张量（成功=真实图；跳过/失败=512×512 黑图占位），可接 SaveImage 存档或作参考图
+- status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号],"empty":[空输入槽号]}`（**槽号=all_prompts 条目序号，1 起保位**；成功槽的实际分辨率 WxH 见控制台日志）；
   全部请求失败（success 为空且 error 非空）时额外含 `"reason"` 字段——各槽同一原因=字符串，不同=槽号→原因映射；
   可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，或接 LLM 对话让模型解读哪些槽需要重试
+- all_images：成功槽按槽号升序堆叠的批量图张量 **(N,H,W,3)**（N=success 条数，同档位+比例出图 WxH 一致；失败/跳过槽不含；零成功=空批次 (0,512,512,3)），
+  可一根线直连 Agnes 图像拼图 batch_images 总输入出总览拼图（拼图内部跳黑图双保险；N=0 时拼图回落 512 黑图 count=0/0）
 
-> 典型接法（资产线）：
-> `资产提取.角色JSON → 文本拆分(JSON 数组) → LLM 对话(一次批量扩写成 20 条【】块三视图提示词) → 文本拆分(【】块模式) → 三视图批量生成(prompt_1..20) → SaveImage`
-> 也可 20 个 三视图提示词生成 实例逐条输出后分别接入各槽（可人工逐条审核改词）。
-> 日志：`[Agnes 三视图批量] 共 20 槽，非空 N 条，并发 M`，每槽完成打印 `#i 成功 WxH` / `#i 失败 原因`，收尾打印 `完成：成功 X/N` + `状态: success=[…] error=[…] empty=[…]`。
-> 想看全批不用 20 个 预览图像：`image_1..20 → 🧩 图像拼图 → 预览图像/SaveImage`（1 张拼图同框看 N 张，黑图占位自动过滤）。
+> 典型接法（资产线，一根线到底）：
+> `资产提取.角色JSON → 资产提示词批量(all_items) → all_prompts → 三视图提示词批量(all_prompts) → all_turnaround_prompts → 三视图批量(all_prompts) → all_images → 图像拼图(batch_images) → 总览拼图`
+> 轻量单槽：`三视图提示词批量 three_view_prompt_i 单条纯文本 → all_prompts`（视为 1 条）。
+> 日志：`[Agnes 三视图批量] 输入=JSON 数组，条目 N（超 20 条已截断），非空 M 条，并发 K`，每槽完成打印 `#i 成功 WxH` / `#i 失败 原因`，收尾打印 `完成：成功 X/N` + `状态: success=[…] error=[…] empty=[…]` + `all_images: N 张成功图 → (N,H,W,3) 批量张量`。
+> 想看全批不用 20 个 预览图像：`all_images → 🧩 图像拼图(batch_images) → 预览图像/SaveImage`（旧接法 image_1..20 手接仍可用）。
+> 旧实例（26 槽结构）载入时 web/js/agnes-migrate.js 自动迁移 widget 值（26→7），无需手工重建。
 
 ---
 
@@ -566,60 +571,67 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### ✍️ Agnes 三视图提示词批量生成 (AgnesTurnaroundPromptBatch)
 
-**功能：** 与「Agnes 文本拆分」20 路输出一一对应的批量三视图提示词生成节点：
-20 个资产提示词输入槽（prompt_1..20 ↔ 资产提示词批量 english_prompt_1..20），
-线程池并发生成三视图英文提示词，`max_concurrency` 限制同时请求数（默认 10，超出排队执行），
-20 路 three_view_prompt 输出。除 20 个输入槽外参数与单条「Agnes 三视图提示词生成」
-完全一致，20 槽共用。空槽跳过（不发请求，输出空字符串）；单槽失败不影响其他槽。
+**功能：** 资产提示词合并输入驱动的批量三视图提示词生成节点：
+1 路 all_prompts 全文合并输入（↔ 资产提示词批量 all_prompts 输出，一根线直连；
+也接受单条资产提示词纯文本，视为 1 条），线程池并发生成三视图英文提示词，
+`max_concurrency` 限制同时请求数（默认 10，超出排队执行），
+20 路 three_view_prompt + status + all_turnaround_prompts 输出。
+参数与单条「Agnes 三视图提示词生成」完全一致，整批共用。
+all_prompts 空项=跳过该槽（槽号保位）；单槽失败不影响其他槽。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| prompt_1..prompt_20 | STRING(多行) ×20 | "" | 第 i 条资产提示词：连 资产提示词批量 english_prompt_i（或 资产提示词生成 输出），或逐槽粘贴；留空=跳过该槽 |
-| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（20 槽共用，决定分栏布局指令） |
+| all_prompts | STRING(多行) | "" | 资产提示词合并输入：① JSON 数组（资产提示词批量 all_prompts 输出直连，条目从上到下逐条生成，最多 20 条超出截断，空项=跳过该槽槽号保位）② 单条资产提示词纯文本（连 english_prompt_i 或粘贴，视为 1 条）③ 空=整批跳过（零 API 调用） |
+| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（整批共用，决定分栏布局指令） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖 |
 | api_key | STRING | 留空自动加载 | Agnes AI API Key |
-| model | COMBO | agnes-2.5-flash | 文本生成模型（20 槽共用） |
-| reasoning_effort | COMBO | auto | 思考等级（20 槽共用） |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（整批共用） |
+| reasoning_effort | COMBO | auto | 思考等级（整批共用） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空提示词超过该值时排队；频繁 429/503 就调小 |
 
-**输出（21 路）：**
-- three_view_prompt_1..three_view_prompt_20：各槽完整三视图英文提示词（主体全部细节 + 分栏布局「左 1/3 特写 + 右 2/3 三视图」
+**输出（22 路）：**
+- three_view_prompt_1..three_view_prompt_20：各槽（all_prompts 第 i 条）完整三视图英文提示词（主体全部细节 + 分栏布局「左 1/3 特写 + 右 2/3 三视图」
   + 虚幻引擎渲染/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词），可直接接 三视图生成(subject_desc)；
   空输入=空字符串；失败=`[Error]` 前缀文本
-- status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号，含空响应],"empty":[空输入槽号]}`；
+- status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号，含空响应],"empty":[空输入槽号]}`（**槽号=all_prompts 条目序号，1 起保位**）；
   全部请求失败（success 为空且 error 非空）时额外含 `"reason"` 字段——各槽同一原因=字符串，不同=槽号→原因映射；
   可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，
   或接 LLM 对话让模型解读哪些槽需要重试（空响应=API 200 但正文为空，常见为思考预算耗尽：降 reasoning_effort / 换 agnes-2.5-flash）
+- all_turnaround_prompts：本批成功生成的三视图英文提示词 JSON 数组（ensure_ascii=False，按槽号升序；失败/空槽不含；全空/缺 Key/零成功=空串），
+  可一根线直连 Agnes 三视图批量生成 all_prompts 输入（批量出三视图参考图）
 
-> 典型接法（资产线批量）：
-> `资产提取.角色JSON → 文本拆分(JSON 数组) → 资产提示词批量生成(english_prompt_1..20) → 三视图提示词批量生成(prompt_1..20) → three_view_prompt_1..20 → 三视图批量生成 / 三视图生成 × N`
-> 也可 20 个 三视图提示词生成 实例逐条输出后分别接各槽（可人工逐条审核改词）。
-> 日志：`[Agnes 三视图提示词批量] 共 20 槽，非空 N 条，并发 M`，每槽完成打印 `#i 成功 N 字 预览...` / `#i 失败 原因`，收尾打印 `完成：成功 X/N` + `状态: success=[…] error=[…] empty=[…]`。
+> 典型接法（资产线批量，一根线到底）：
+> `资产提取.角色JSON → 资产提示词批量生成(all_items) → all_prompts → 三视图提示词批量生成(all_prompts) → all_turnaround_prompts → 三视图批量生成(all_prompts)`
+> 轻量单槽：`资产提示词批量 english_prompt_i 单条纯文本 → all_prompts`（视为 1 条）；也可 20 个 三视图提示词生成 实例逐条输出后手工拼 JSON 数组填入。
+> 日志：`[Agnes 三视图提示词批量] 输入=JSON 数组，条目 N（超 20 条已截断），非空 M 条，并发 K`，每槽完成打印 `#i 成功 N 字 预览...` / `#i 失败 原因`，收尾打印 `完成：成功 X/N` + `状态: success=[…] error=[…] empty=[…]` + `all_turnaround_prompts: N 条成功提示词 → JSON 输出`。
+> 旧实例（26 槽结构）载入时 web/js/agnes-migrate.js 自动迁移 widget 值（26→7），无需手工重建。
 
 ---
 
 ### 🧩 Agnes 图像拼图 (AgnesImageMosaic)
 
-**功能：** 批量节点的 20 路 IMAGE 输出「动态数量展示」：汇聚成 1 张拼图，
-一个 预览图像 节点看全批（替代 20 个 预览图像 竖排），黑图占位自动过滤，
-有效图数 N 动态决定网格行数。
+**功能：** 批量节点的 1 路批量图总输入（batch_images，(N,H,W,3) 批量张量）或
+20 路 IMAGE 输出「动态数量展示」：汇聚成 1 张拼图，一个 预览图像 节点看全批，
+黑图占位自动过滤（双保险），有效图数 N 动态决定网格行数。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
+| batch_images | IMAGE | （不连=走 20 槽） | 批量图总输入：连 三视图批量/分镜图批量 的 all_images 批量张量（(N,H,W,3)；也接受单张 (H,W,3)/(1,H,W,3)）；**连上时优先用它拼（20 槽忽略，日志标注）**；不连则照旧走 20 槽（旧图完全兼容） |
 | image_1..image_20 | IMAGE ×20 | （不连线=跳过） | 第 i 个图像槽：连 三视图批量生成 的 image_i（或任意 IMAGE 输出）；未连接=该槽不参与拼图 |
 
 **输出：**
-- mosaic: 2 列 × ⌈N/2⌉ 行网格拼图张量（单元格等宽、深灰底 + 8px 间距、每格左上角标槽号 #i；
+- mosaic: 2 列 × ⌈N/2⌉ 行网格拼图张量（单元格等宽、深灰底 + 8px 间距、每格左上角标条目号 #i；
   全黑占位与未连接槽被过滤；全无效时回落 1 张 512×512 黑图占位，可连 预览图像 / SaveImage）
-- count: 有效图数「N/20」
+- count: 有效图数「N/分母」（分母=20 槽模式为 20、batch_images 模式为其条目数 N；N=0 时 count=0/0）
 
 > 规则细节：未连接槽（None）与全零张量（批量节点跳过/失败的 512×512 黑图占位）不计入 N；
+> batch_images 拆条后每张再走同一套黑图过滤（三视图批量黑图占位若混入也会被跳过）；
 > 单元格宽度 = min(所有有效图最大图宽, 1600px)，各图等比缩放；
 > 纯本地 PIL 合成，不调 API、无需 API Key；拼图为缩略级总览，看细节仍接单路 image_i。
 >
-> 典型接法：`三视图批量生成.image_1..20 → 图像拼图 → 预览图像`（或 SaveImage 一次存全批），
-> 配合 status JSON（全部失败时含 reason）核对哪些槽没出图。
-> 日志：`[Agnes 图像拼图] 有效 N/20 张 → 拼图 W×H（行数 × 2 列，槽位 […]）`。
+> 典型接法（一根线）：`三视图批量生成.all_images (N,H,W,3) → 图像拼图.batch_images → 预览图像/SaveImage`（资产线全链路收尾）；
+> 旧接法 `image_1..20 → 图像拼图` 仍可用；配合 status JSON（全部失败时含 reason）核对哪些槽没出图。
+> 日志：`[Agnes 图像拼图] 有效 N/分母 张（来源: batch_images 批量张量（N 条…） / image_1..20 槽）→ 拼图 W×H（行数 × 2 列，条目 […]）`。
 
 ### 🔗 Agnes 字符串合并 (AgnesStringMerge)
 
@@ -677,6 +689,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 - 第 1 条 ~ 第 20 条: 拆分出的独立文本（不足 20 条的槽位为空）
 - 条数: 实际条目总数（超过 20 条时显示「N（仅显示前 20 条）」）
 - 原文透传: 原始输入（并联其他节点或存档）
+- all_items: 全部条目 JSON 数组（json.dumps，取前 20 条、与 item 槽同源；空文本/解析失败=空串），
+  可一根线直连 资产提示词批量生成 / 三视图提示词批量生成 的合并输入（免去 20 路手接），
+  或连 LLM 对话整批审改 / 存档
 
 > **资产线完整接法（角色/场景/道具/服装 三视图）：**
 > ① `Agnes 资产提取.角色JSON` →（可选）`LLM 对话`（提示词写死：把 JSON 逐条扩写成
@@ -755,35 +770,40 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 ### 🖌️ Agnes 资产提示词批量生成 (AgnesAssetPromptBatch)
 
-**功能：** 与「Agnes 文本拆分」20 路输出一一对应的批量资产提示词生成节点：
-20 个资产 JSON 输入槽（asset_1..20 ↔ 文本拆分 item_1..20），线程池并发生成
-英文生图提示词，`max_concurrency` 限制同时请求数（默认 10，超出排队执行），
-20 路 english_prompt 输出。除 20 个输入槽外参数与单条「Agnes 资产提示词生成」
-完全一致，20 槽共用。空槽跳过（不发请求，输出空字符串）；单槽失败不影响其他槽。
+**功能：** 资产 JSON 合并输入驱动的批量资产提示词生成节点：
+1 路 all_items 全文合并输入（↔ 文本拆分 all_items 输出 / 资产提取 5 路 JSON，
+JSON 数组可一根线直连，免 20 路手接；也接受单条资产 JSON 纯文本，视为 1 条），
+线程池并发生成英文生图提示词，`max_concurrency` 限制同时请求数（默认 10，
+超出排队执行），20 路 english_prompt + status + all_prompts 输出。
+参数与单条「Agnes 资产提示词生成」完全一致，整批共用。
+all_items 空项=跳过该槽（槽号保位，与旧 20 槽行为一致）；单槽失败不影响其他槽。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| asset_1..asset_20 | STRING(多行) ×20 | "" | 第 i 条资产 JSON：连 文本拆分 item_i（或 资产提取 输出），或逐槽粘贴；留空=跳过该槽 |
-| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（20 槽共用，决定构图指令） |
-| style | COMBO | cinematic | 生图风格尾词（20 槽共用）：cinematic/anime/realistic/watercolor/oil_painting |
+| all_items | STRING(多行) | "" | 资产 JSON 合并输入：① JSON 数组（资产提取 5 路 JSON / 文本拆分 all_items 直连，条目从上到下逐条生成，最多 20 条超出截断，空项=跳过该槽槽号保位）② 单条资产 JSON 纯文本（连 文本拆分 item_i 或粘贴，视为 1 条）③ 空=整批跳过（零 API 调用） |
+| subject_type | COMBO | 角色 | 角色/物品道具/服装/场景/载具/通用（整批共用，决定构图指令） |
+| style | COMBO | cinematic | 生图风格尾词（整批共用）：cinematic/anime/realistic/watercolor/oil_painting |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖 |
 | api_key | STRING | 留空自动加载 | Agnes AI API Key |
-| model | COMBO | agnes-2.5-flash | 文本生成模型（20 槽共用） |
-| reasoning_effort | COMBO | auto | 思考等级（20 槽共用） |
+| model | COMBO | agnes-2.5-flash | 文本生成模型（整批共用） |
+| reasoning_effort | COMBO | auto | 思考等级（整批共用） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空资产 JSON 超过该值时排队；频繁 429/503 就调小 |
 
-**输出（21 路）：**
-- english_prompt_1..english_prompt_20：各槽英文资产生图提示词（保留 JSON 全部描述字段 + 构图指令 + 风格/质量尾词），
+**输出（22 路）：**
+- english_prompt_1..english_prompt_20：各槽（all_items 第 i 条）英文资产生图提示词（保留 JSON 全部描述字段 + 构图指令 + 风格/质量尾词），
   可直接接 图像生成 / 三视图生成(subject_desc)；空输入=空字符串；失败=`[Error]` 前缀文本
-- status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号，含空响应],"empty":[空输入槽号]}`；
+- status：整批执行状态 JSON `{"success":[成功槽号],"error":[失败槽号，含空响应],"empty":[空输入槽号]}`（**槽号=all_items 条目序号，1 起保位**）；
   全部请求失败（success 为空且 error 非空）时额外含 `"reason"` 字段——各槽同一原因=字符串，不同=槽号→原因映射；
   可直接连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单（成功/失败/空输入）做对接分析，
   或接 LLM 对话让模型解读哪些槽需要重试（空响应=API 200 但正文为空，常见为思考预算耗尽：降 reasoning_effort / 换 agnes-2.5-flash）
+- all_prompts：本批成功生成的英文提示词 JSON 数组（ensure_ascii=False，按槽号升序；失败/空槽不含；全空/缺 Key/零成功=空串），
+  可一根线直连 Agnes 三视图提示词批量生成 all_prompts 输入（批量出三视图提示词）
 
-> 典型接法（资产线批量）：
-> `资产提取.角色JSON → 文本拆分(JSON 数组) → 资产提示词批量生成(asset_1..20) → english_prompt_1..20 → 图像生成 × N`
-> 也可 20 个 资产提示词生成 实例逐条输出后分别接各槽（可人工逐条审核改词）。
-> 日志：`[Agnes 资产提示词批量] 共 20 槽，非空 N 条，并发 M`，每槽完成打印 `#i 成功 N 字 预览...` / `#i 失败 原因`，收尾打印 `完成：成功 X/N` + `状态: success=[…] error=[…] empty=[…]`。
+> 典型接法（资产线批量，一根线到底）：
+> `资产提取.角色JSON（JSON 数组，直连）→ 资产提示词批量生成(all_items) → all_prompts → 三视图提示词批量生成(all_prompts) → all_turnaround_prompts → 三视图批量生成(all_prompts) → all_images → 图像拼图(batch_images)`
+> 或 `文本拆分.all_items（LLM 扩写后的条目）→ 本节点`；轻量单槽：`文本拆分 item_i 单条纯文本 → all_items`（视为 1 条）。
+> 日志：`[Agnes 资产提示词批量] 输入=JSON 数组，条目 N（超 20 条已截断），非空 M 条，并发 K`，每槽完成打印 `#i 成功 N 字 预览...` / `#i 失败 原因`，收尾打印 `完成：成功 X/N` + `状态: success=[…] error=[…] empty=[…]` + `all_prompts: N 条成功提示词 → JSON 输出`。
+> 旧实例（27 槽结构）载入时 web/js/agnes-migrate.js 自动迁移 widget 值（27→8），无需手工重建。
 
 ---
 

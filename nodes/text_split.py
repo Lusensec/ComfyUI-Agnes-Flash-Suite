@@ -3,12 +3,15 @@ Agnes 文本拆分节点
 ============
 把一段文本（资产 JSON 列表 / LLM 输出的【名】分块 / 编号列表 / 多段文本）
 拆成最多 20 路独立字符串，方便逐条喂给 三视图生成、文生图、LLM 对话 等节点，
-实现「一个角色/道具/场景 = 一张图」的批量资产出图。
+实现「一个角色/道具/场景 = 一张图」的批量资产出图；
+另加 1 路 all_items 全部条目 JSON 数组输出（与 item 槽同源，一根线直连
+资产提示词批量生成/三视图提示词批量生成 的合并输入，免去 20 路手接）。
 
 典型链路（资产线）：
   Agnes 资产提取.角色JSON ──▶ [可选] LLM 对话（把 JSON 逐条扩写成定妆描述）
       ──▶ Agnes 文本拆分（选「JSON 数组」或「【】括号块」模式）
-      ──▶ 拆分 1~12 ──▶ Agnes 三视图生成（subject_type=角色，可再接 reference_image 保一致）
+      ├─▶ 拆分 1~20（逐条）──▶ Agnes 三视图生成（subject_type=角色，可再接 reference_image 保一致）
+      └─▶ all_items（全部条目 JSON）──▶ Agnes 资产提示词批量生成（all_items 单输入）
 纯文本处理节点，不需要 API Key。
 """
 
@@ -27,11 +30,11 @@ class AgnesTextSplitter(OutputDocsMixin):
     SPLIT_MODES = ("JSON 数组", "JSON 对象", "【】括号块", "编号列表", "空行段落")
     MAX_SLOTS = 20
 
-    RETURN_NAMES = tuple(f"item_{i}" for i in range(1, MAX_SLOTS + 1)) + ("count", "text_out",)
-    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 2)
+    RETURN_NAMES = tuple(f"item_{i}" for i in range(1, MAX_SLOTS + 1)) + ("count", "text_out", "all_items")
+    RETURN_TYPES = ("STRING",) * (MAX_SLOTS + 3)
     RETURN_LABELS = (
         tuple(f"第 {i} 条" for i in range(1, MAX_SLOTS + 1))
-        + ("条数（超过 12 会标注）", "原文透传",)
+        + ("条数（超过 20 会标注）", "原文透传", "全部条目 JSON")
     )
 
     OUTPUT_DOCS = {
@@ -39,6 +42,11 @@ class AgnesTextSplitter(OutputDocsMixin):
            for i in range(1, MAX_SLOTS + 1)},
         "count": "实际拆分出的条目总数（超过 20 条时显示为「N（仅显示前 20 条）」）",
         "text_out": "原始输入文本透传（方便并联其他节点或存档）",
+        "all_items": (
+            "全部条目 JSON 数组（json.dumps ensure_ascii=False indent=2，取前 20 条、与 item_1..20 槽同源；"
+            "空文本/解析失败=空串）；可一根线直连 Agnes 资产提示词批量生成 / Agnes 三视图提示词批量生成 的 "
+            "all_items 合并输入（免去 20 路手接），或连 LLM 对话整批审改 / 存档"
+        ),
     }
 
     FUNCTION = "split"
@@ -131,7 +139,9 @@ class AgnesTextSplitter(OutputDocsMixin):
         total = len(items)
         count = f"{total}（仅显示前 {self.MAX_SLOTS} 条）" if total > self.MAX_SLOTS else str(total)
         print(f"[Agnes Text Split] {mode} 模式：拆出 {total} 条")
-        return tuple(slots) + (count, text)
+        # 全部条目 JSON：前 20 条（与 item 槽同源）；可直连 批量节点 all_items 合并输入
+        all_items = json.dumps(items[: self.MAX_SLOTS], ensure_ascii=False, indent=2) if items else ""
+        return tuple(slots) + (count, text, all_items)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesTextSplitter": AgnesTextSplitter}
