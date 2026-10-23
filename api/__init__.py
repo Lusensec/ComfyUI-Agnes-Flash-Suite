@@ -304,6 +304,42 @@ def download_url_to_bytes(url: str, timeout: int = 120) -> Optional[bytes]:
     return None
 
 
+# 视频结果下载重试：3 次尝试，中间等待 2/5/10 秒（短退避，任务结果已在服务端、可安全重下）
+_DOWNLOAD_MAX_RETRIES = 3
+_DOWNLOAD_DELAYS = [2, 5, 10]
+
+
+def download_url_with_retry(url: str, timeout: int = 120,
+                            max_retries: int = _DOWNLOAD_MAX_RETRIES,
+                            delays: Optional[List[int]] = None) -> Tuple[Optional[bytes], str]:
+    """带重试下载 URL 文件。
+
+    返回 (bytes, 诊断信息)：
+      - 成功：(bytes, "")
+      - 失败：(None, 诊断)——最后一次失败的异常类型/原因或 HTTP 状态，供报错定位
+    重试策略：max_retries 次尝试，中间按 delays（默认 2/5/10 秒）退避。
+    空 URL / 非 200 / 0 字节 / 网络与解析异常均不吞掉，全部计入诊断。
+    """
+    if not url:
+        return None, "video_url 为空（服务端未返回下载地址）"
+    if delays is None:
+        delays = _DOWNLOAD_DELAYS
+    last_diag = "未知错误"
+    for attempt in range(1, max(1, max_retries) + 1):
+        try:
+            resp = requests.get(url, timeout=timeout)
+            if resp.status_code == 200 and resp.content:
+                return resp.content, ""
+            last_diag = f"HTTP {resp.status_code}（{'空文件' if resp.status_code == 200 else '非 200'}）"
+        except requests.exceptions.RequestException as e:
+            last_diag = f"{type(e).__name__}: {str(e)[:200]}"
+        except Exception as e:  # URL 非法（None/空串/协议缺失）等也进诊断
+            last_diag = f"{type(e).__name__}: {str(e)[:200]}"
+        if attempt < max_retries:
+            time.sleep(delays[min(attempt - 1, len(delays) - 1)])
+    return None, last_diag
+
+
 # ---------------------------------------------------------------------------
 # API Client
 # ---------------------------------------------------------------------------
@@ -826,10 +862,16 @@ class AgnesClient:
                         f"API 原始响应: {resp_dump}"
                     )
 
-                # Download and save
-                video_bytes = download_url_to_bytes(video_url, timeout=120)
+                # Download and save（自动 3 次重试 2/5/10 秒；失败时附 URL 与诊断，
+                # 任务结果仍在服务端，URL 有效期内可手动抢救）
+                video_bytes, dl_diag = download_url_with_retry(video_url, timeout=120)
                 if not video_bytes:
-                    raise RuntimeError("[Video 错误] 视频文件下载失败。")
+                    raise RuntimeError(
+                        f"[Video 错误] 视频文件下载失败（已自动重试 {_DOWNLOAD_MAX_RETRIES} 次，{dl_diag}）。\n"
+                        f"video_url: {video_url}\n"
+                        f"task_id: {task_id}，video_id: {video_id}\n"
+                        f"建议：若上方链接仍在有效期内，可用浏览器（可换直连/代理）手动下载；否则重跑本节点。"
+                    )
 
                 save_dir = output_dir if output_dir else tempfile.gettempdir()
                 os.makedirs(save_dir, exist_ok=True)
