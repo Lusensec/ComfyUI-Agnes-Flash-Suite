@@ -260,6 +260,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > （all_scenes 一根线 + 资产注入）→ 3 路分段 all_prompts_1_20/_21_40/_41_60 → 分镜图批量 实例①②③（all_prompts 一根线各连一段）
 > → 各实例 image_1..20 关键帧 → SaveImage / 关键帧生视频；
 > 各实例 all_images（批量图张量）→ Agnes 图像拼图 batch_images（每波一张 20 图分段总览，3 波 = 60 镜全量）；
+> 视频线：3 路分段 all_prompts_1_20/_21_40/_41_60 亦可直连 Agnes 视频提示词批量 实例①②③ 的 all_prompts（每实例 20 条/波）
+> → 各实例 video_prompt_1..20 一对一连 关键帧生视频 prompt 输入（image 连同波 分镜图批量 image_N，槽号对齐）= 60 镜全量视频提示词；
 > ≤20 条单波场景：all_prompts（全部提示词 JSON）直连分镜图批量单实例一次出全；
 > 轻量替代：场景切分 all_scenes 直连本节点；单镜处理/单条重试：连任一 分镜_i / 场景_i 纯文本（视为 1 条）；
 > 资产线的参考图（三视图批量产物）可回流 图生图/关键帧生视频 保跨镜一致性（分镜图批量生成为纯文生图，不接参考图）。
@@ -270,6 +272,74 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 旧工作流自愈：输入结构升级前（50 槽 scene_1..50 版）保存过的工作流实例，载入/排队时自动把 widget 值重映射到新 12 槽结构
 > （web/js/agnes-migrate.js，旧 style/资产×5/base_url/api_key/model/reasoning_effort/max_concurrency 11 项设置原样保留）；
 > 若仍见「Value not in list: style: ''」校验报错，删节点重加（右键 Agnes Novel → Agnes 分镜提示词批量生成）后重连 all_scenes 连线。
+
+---
+
+### 🎞️ Agnes 视频提示词生成 (AgnesVideoPromptGenerator)
+
+**功能：** 把单条分镜（画面描述 + 可选台词/旁白）转成 Agnes 视频模型可用的英文视频提示词（运动+运镜+时序一致性+风格+质量词），LLM 一次调用
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| shot_text | STRING | "" | 分镜画面描述（连 Agnes 分镜提示词批量生成 detailed_prompt_N / all_prompts 单条，或粘贴中文分镜原文；LLM 理解后扩写为视频提示词） |
+| dialogue | STRING | "" | 台词/旁白/音乐提示（可连 剧本生成 对白行）；非空才注入（视频含对白/口播/氛围音乐），空槽不占提示词篇幅 |
+| style | COMBO | cinematic | 画面风格（与图像线同一套 5 档） |
+| mode | COMBO | keyframe | 视频节点素材形态：keyframe=关键帧生视频（首帧已定，只描述帧后运动）/ text=文生视频（无参考，完整描述）/ reference=参考视频生成（<Picture N>/<Audio N> 标记指代） |
+| duration | INT | 5 | 视频时长（秒，4-12）：动作量与运镜节奏按此时长设计，需与下游视频节点设置一致 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-2.5-flash | 文本生成模型 |
+| reasoning_effort | COMBO | auto | 思考等级（可选输入；2.0 旧模型不生效） |
+
+**输出：**
+- video_prompt: 英文视频提示词（80-150 词：主体运动/运镜/运动节奏/时序一致性/光线氛围/风格/质量尾词）；直连 **Agnes 关键帧生视频 / 文生视频 / 参考视频生成** 的 prompt 输入；失败=[Error] 前缀（原因见 log_text）
+- log_text: 处理日志（成功=提示词预览+响应元数据；空响应=⚠️警示；失败=异常详情+堆栈）
+
+> 典型接法（视频线）：
+> 总导演/场景切分 all_scenes → 分镜提示词批量生成 detailed_prompt_N（英文分镜提示词）
+> → Agnes 视频提示词生成（shot_text，mode=keyframe，duration 与视频节点一致）
+> → video_prompt → Agnes 关键帧生视频（image 连同波 分镜图批量 image_N，prompt 连 video_prompt）
+> 单镜补一条视频提示词用本节点；整批 20 条/波用「Agnes 视频提示词批量生成」。
+
+> 空输入：shot_text 留空/上游未连 → 不调 API，video_prompt=[跳过] 前缀；
+> 缺 Key：video_prompt=[错误] 缺少 API Key…，日志提示三处配置入口（零 API 调用）。
+
+---
+
+### 🎞️ Agnes 视频提示词批量生成 (AgnesVideoPromptBatch)
+
+**功能：** 将「Agnes 分镜提示词批量生成」任一分段输出（all_prompts 一根线输入，3 实例各连一段分波控 RPM，3 波 = 60 镜全量视频提示词）并发生成英文视频提示词（线程池，速率可限；单实例 20 槽/波）
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| all_prompts | STRING | "" | **视频提示词一根线输入**（直连 分镜提示词批量生成 任一分段 all_prompts_1_20/_21_40/_41_60，各段 JSON 数组 ≤20 条，本实例出该波；3 实例各连一段=60 镜全量分波控 RPM，与 分镜图批量 ×3 实例节拍对称；也接受 ≤20 条 all_prompts 全量输出，JSON 数组从上到下逐条生成、超出 20 条截断并在日志标注，空项跳过）；也接受**单条英文提示词纯文本**（连任一 detailed_prompt_N 或手动粘贴，视为 1 条）；空=整批跳过（零 API 调用） |
+| style | COMBO | cinematic | 画面风格（整批共用） |
+| mode | COMBO | keyframe | 视频节点素材形态（整批共用）：keyframe=关键帧生视频（默认）/ text=文生视频 / reference=参考视频生成 |
+| duration | INT | 5 | 视频时长（秒，4-12，整批共用）：动作量与运镜节奏按此时长设计，需与下游视频节点设置一致 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-2.5-flash | 文本生成模型 |
+| reasoning_effort | COMBO | auto | 思考等级（2.0 旧模型不生效） |
+| max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-20，默认 10）；非空提示词超过该值时排队执行，频繁 429/503 就调小 |
+
+**输出：**
+- video_prompt_1 ~ video_prompt_20: 每条（all_prompts 条目序号）的英文视频提示词（槽号与同波 分镜图批量 image_N 天然对齐）；一对一连 **Agnes 关键帧生视频** prompt 输入；空槽（条目不足 20）=空字符串；单条异常=[Error] 前缀（原因见 status）
+- status: 整批执行状态 JSON `{"success":[…],"error":[…],"empty":[…]}`（**槽号=all_prompts 条目序号**，1 起；全部请求失败时额外含 "reason" 字段）；可直连 Agnes 文本拆分（JSON 数组模式）拆成 3 条名单做对接分析
+- all_video_prompts: 本批**成功生成**的英文视频提示词 JSON 数组（按槽号升序，失败/空槽不含；全空/缺 Key=空串）；喂视频节点请用 20 路 video_prompt_N 一对一接法，all_video_prompts 可连 LLM 对话整批审改/存档
+
+> 典型接法（视频线 3 波出 60 镜全量，与 分镜图批量 ×3 实例分波对称）：
+> 分镜提示词批量生成 → all_prompts_1_20 → 视频提示词批量 实例①（all_prompts，波 1）
+> → all_prompts_21_40 → 视频提示词批量 实例②（all_prompts，波 2）
+> → all_prompts_41_60 → 视频提示词批量 实例③（all_prompts，波 3）
+> 各实例 video_prompt_1..20 一对一连 关键帧生视频 prompt 输入
+> （image 输入连同波 分镜图批量 image_1..20，槽号=条目序号对齐）；
+> ≤20 条单波场景：分镜提示词批量 all_prompts（≤20 条）直连单实例。
+
+> 缺 Key：20 路全输出「[错误] 缺少 API Key…」，status error=全槽、reason=缺 Key 原因（零 API 调用）；
+> 全空：all_prompts 留空/条目为空 → 20 路全空串，status empty=全槽（零 API 调用）；单条失败不影响其他条。
+
+> 视频节点是逐条生成（每节点出 1 条视频）：20 路 video_prompt_N 需 20 个 关键帧生视频 实例；
+> 生成前先用 status JSON 核对成功槽（连 文本拆分 拆 3 条名单或 LLM 对话解读），避免漏槽/错槽。
 
 ---
 
@@ -376,8 +446,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| image | IMAGE | 必接 | 关键帧·首帧（first_frame） |
-| prompt | STRING | "" | 视频描述（可选） |
+| image | IMAGE | 必接 | 关键帧·首帧（first_frame）；可直连 Agnes 分镜图批量 image_N |
+| prompt | STRING | "" | 视频描述（强烈建议接）；可直连 Agnes 视频提示词生成/批量 的 video_prompt 输出，免手写运镜 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-video-2.5-flash | 视频生成模型（2.5-flash keyframe 模式 / 旧 v2.0 帧数模式） |
@@ -405,7 +475,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| prompt | STRING | "" | 视频描述；`<Picture 1>~5` / `<Audio 1>~3` 指代参考素材 |
+| prompt | STRING | "" | 视频描述；`<Picture 1>~5` / `<Audio 1>~3` 指代参考素材（可直连 Agnes 视频提示词生成 mode=reference 的输出） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-video-2.5-flash | 2.5-flash（支持图片+音频参考）/ 旧 v2.0（仅多图，音频忽略） |

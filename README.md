@@ -1,11 +1,11 @@
 # ComfyUI Agnes Flash Suite
 ===========================
 
-Agnes AI 全能力 ComfyUI 节点套件 — 27 个节点：LLM 文本管线（小说/分镜/剧本/解说/漫剧，分镜提示词 60 路批量）、文生图/图生图/三视图（单张+20 路批量）/分镜图 20 路批量生成（3 实例分波出 60 镜全量），以及文生视频/关键帧生视频/参考视频生成。批量节点全部支持 JSON 合并输入/输出（文本拆分 all_items → 资产提示词批量 all_items→all_prompts → 三视图提示词批量 all_prompts→all_turnaround_prompts → 三视图批量 all_prompts→all_images → 图像拼图 batch_images；分镜线 总导演/场景切分 all_scenes → 分镜提示词批量 3 路分段 all_prompts_1_20/_21_40/_41_60 → 分镜图批量 ×3 all_prompts/all_images → 图像拼图 batch_images），全链路一根线到底，免逐槽手接。
+Agnes AI 全能力 ComfyUI 节点套件 — 29 个节点：LLM 文本管线（小说/分镜/剧本/解说/漫剧，分镜提示词 60 路批量）、视频提示词（单条+20 路批量，喂 3 个视频节点）、文生图/图生图/三视图（单张+20 路批量）/分镜图 20 路批量生成（3 实例分波出 60 镜全量），以及文生视频/关键帧生视频/参考视频生成。批量节点全部支持 JSON 合并输入/输出（文本拆分 all_items → 资产提示词批量 all_items→all_prompts → 三视图提示词批量 all_prompts→all_turnaround_prompts → 三视图批量 all_prompts→all_images → 图像拼图 batch_images；分镜线 总导演/场景切分 all_scenes → 分镜提示词批量 3 路分段 all_prompts_1_20/_21_40/_41_60 → 分镜图批量 ×3 all_prompts/all_images → 图像拼图 batch_images；视频线 分镜提示词批量 3 路分段 → 视频提示词批量 ×3 all_prompts/all_video_prompts → 关键帧生视频 逐镜一对一），全链路一根线到底，免逐槽手接。
 
 ## 功能
 
-文本类（17 个）：
+文本类（19 个）：
 
 - 🔑 Agnes API Key 配置
 - 🪄 Agnes 风格选择（视觉风格 × 导演风格双轴，纯本地组合）
@@ -21,7 +21,9 @@ Agnes AI 全能力 ComfyUI 节点套件 — 27 个节点：LLM 文本管线（�
 - ✍️ Agnes 三视图提示词生成（左 1/3 特写 + 右 2/3 三视图分栏布局）
 - ✍️ Agnes 三视图提示词批量生成（all_prompts 合并输入（JSON 数组，直连 资产提示词批量 all_prompts 输出，免 20 路手接）并发生成三视图提示词，输出 20 路提示词 + 整批执行状态 JSON + all_turnaround_prompts 全部三视图提示词 JSON 数组（可直连 三视图批量生成），线程池速率可限，默认 10）
 - 🎨 Agnes 分镜提示词生成（单帧画面提示词，可注入 资产提取 角色/场景/服装/道具/天气 5 路 JSON）
-- 🎨 Agnes 分镜提示词批量生成（all_scenes 合并输入（JSON 数组，最多 60 条）并发生成英文提示词，对应 总导演/场景切分 all_scenes 输出，单条分镜纯文本也接受，可整批注入资产 5 路 JSON，输出 60 路提示词 + 整批执行状态 JSON + all_prompts 全部提示词 JSON 数组 + 3 路分段 all_prompts_1_20/_21_40/_41_60（3 个分段直连 分镜图批量 ×3 实例 all_prompts 分波出图控 RPM），线程池速率可限，默认 10）
+- 🎨 Agnes 分镜提示词批量生成（all_scenes 合并输入（JSON 数组，最多 60 条）并发生成英文提示词，对应 总导演/场景切分 all_scenes 输出，单条分镜纯文本也接受，可整批注入资产 5 路 JSON，输出 60 路提示词 + 整批执行状态 JSON + all_prompts 全部提示词 JSON 数组 + 3 路分段 all_prompts_1_20/_21_40/_41_60（3 个分段直连 分镜图批量 ×3 实例 all_prompts 分波出图控 RPM；亦为 视频提示词批量 ×3 实例 all_prompts 分波出视频提示词），线程池速率可限，默认 10）
+- 🎞️ Agnes 视频提示词生成（单条分镜 → 视频模型英文提示词：mode 对应 3 个视频节点素材形态 keyframe=关键帧生视频（首帧已定只描述帧后运动）/ text=文生视频 / reference=参考视频生成（<Picture N>/<Audio N> 标记），台词/旁白非空才注入，输出直连视频节点 prompt 输入）
+- 🎞️ Agnes 视频提示词批量生成（all_prompts 一根线输入（直连 分镜提示词批量 任一分段 all_prompts_1_20/_21_40/_41_60，各段 JSON 数组 ≤20 条，3 实例分波控 RPM 出 60 镜全量视频提示词；单条英文提示词纯文本也接受）并发生成英文视频提示词，输出 20 路 video_prompt + 整批执行状态 JSON + all_video_prompts 全部视频提示词 JSON 数组（20 路 video_prompt 一对一连 关键帧生视频 prompt，槽号与同波 分镜图批量 image_N 对齐），线程池速率可限，默认 10）
 - 🔗 Agnes 字符串合并
 - 💬 Agnes LLM 对话（3.0/2.5 思考档位可切）
 
@@ -38,7 +40,7 @@ Agnes AI 全能力 ComfyUI 节点套件 — 27 个节点：LLM 文本管线（�
 视频类（3 个）：
 
 - 🎞️ Agnes 文生视频
-- 🎬 Agnes 关键帧生视频（首尾帧）
+- 🎬 Agnes 关键帧生视频（首尾帧；prompt 输入可直连 Agnes 视频提示词生成/批量 输出的英文视频提示词，免手写运镜描述）
 - 🎞️ Agnes 参考视频生成
 
 前端特性：

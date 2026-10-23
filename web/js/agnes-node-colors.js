@@ -65,6 +65,8 @@
         "AgnesAssetPromptBatch": "text",
         "AgnesTurnaroundPromptGenerator": "text",
         "AgnesTurnaroundPromptBatch": "text",
+        "AgnesVideoPromptGenerator": "text",
+        "AgnesVideoPromptBatch": "text",
         "AgnesStringMerge": "text",
         "AgnesNovelLLMChat": "text",
         // 图片类
@@ -98,6 +100,8 @@
         "AgnesAssetPromptBatch": "deep",
         "AgnesTurnaroundPromptGenerator": "deep",
         "AgnesTurnaroundPromptBatch": "deep",
+        "AgnesVideoPromptGenerator": "deep",
+        "AgnesVideoPromptBatch": "deep",
         "AgnesStringMerge": "deep",
         // 图片类：蓝
         "AgnesImageGen": "main",
