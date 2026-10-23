@@ -191,7 +191,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                     "max": 30,
                     "step": 1,
                     "control_after_generate": False,
-                    "tooltip": "提交任务遇 503 队列满/429 限流时的自动重试次数：0=只提交一次，默认 5。重试间隔 10/30/60 秒，第 4 次起每次 120 秒（默认 5 次累计 340 秒/约 5.7 分钟）",
+                    "tooltip": "提交任务遇 503 队列满/429 限流时的自动重试次数：0=只提交一次，默认 5。重试间隔 10/30/60 秒，第 4 次起每次 60 秒（默认 5 次累计 220 秒/约 3.7 分钟）",
                 }),
             },
             "optional": {

@@ -356,17 +356,17 @@ class AgnesClient:
     _MAX_RETRIES_QUEUE = 5  # 队列满/限流专用：最多等 ~3.75 分钟
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
     # 视频 503 队列满/限流退避：重试次数可由节点「重试次数」参数动态调整（默认 5、上限 30）
-    _VIDEO_DEFAULT_RETRIES = 5   # 默认 5 次：10/30/60/120/120 秒（累计 340 秒 ≈ 5.7 分钟）
-    _VIDEO_MAX_RETRIES = 30     # 上限（第 4 次起每次 120 秒，30 次累计约 55 分钟）
-    _VIDEO_QUEUE_DELAYS = [10, 30, 60, 120, 120]  # 默认 5 次的退避表
+    _VIDEO_DEFAULT_RETRIES = 5   # 默认 5 次：10/30/60/60/60 秒（累计 220 秒 ≈ 3.7 分钟）
+    _VIDEO_MAX_RETRIES = 30     # 上限（第 4 次起每次 60 秒，30 次累计 1720 秒 ≈ 28.7 分钟）
+    _VIDEO_QUEUE_DELAYS = [10, 30, 60, 60, 60]  # 默认 5 次的退避表
 
     @classmethod
     def _video_queue_delays(cls, retries: int) -> List[int]:
-        """视频 503/429 退避表：前 3 次 10/30/60 秒，第 4 次起每次 120 秒。"""
+        """视频 503/429 退避表：前 3 次 10/30/60 秒，第 4 次起每次 60 秒。"""
         r = max(0, int(retries))
         delays = [10, 30, 60][:r]
         if r > 3:
-            delays += [120] * (r - 3)
+            delays += [60] * (r - 3)
         return delays
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
@@ -458,7 +458,7 @@ class AgnesClient:
 
         队列满/限流（429/503）默认采用分钟级退避（15/30/60/120 秒，最多
         _MAX_RETRIES_QUEUE 次）；传入 queue_delays 则按指定秒数序列退避
-        （视频提交用 10/30/60，第 4 次起每次 120 秒，次数由节点「重试次数」参数控制）；
+        （视频提交用 10/30/60，第 4 次起每次 60 秒，次数由节点「重试次数」参数控制）；
         queue_hint 覆盖队列满建议文案。其他可重试状态维持 3/6/12 秒短退避（120 秒封顶）。
         """
         max_retries = max_retries or self._MAX_RETRIES
@@ -714,7 +714,7 @@ class AgnesClient:
                     本地文件自动转 Base64 Data URI，单段 <15MB）。
             return_ids: True 时返回 (save_path, task_id, video_id) 三元组。
             retries: 提交遇 503 队列满/429 限流的自动重试次数（None=默认 5；
-                    退避 10/30/60 秒，第 4 次起每次 120 秒；上限 30）。
+                    退避 10/30/60 秒，第 4 次起每次 60 秒；上限 30）。
         """
         new_model = model in NEW_VIDEO_MODELS
 
@@ -796,7 +796,7 @@ class AgnesClient:
 
         # --- Submit task ---
         # 视频队列满/限流（429/503）：按「重试次数」参数动态退避
-        # （默认 5 次 10/30/60/120/120 秒，累计 340 秒；第 4 次起每次 120 秒）
+        # （默认 5 次 10/30/60/60/60 秒，累计 220 秒；第 4 次起每次 60 秒）
         n_retries = (self._VIDEO_DEFAULT_RETRIES if retries is None
                      else max(0, min(int(retries), self._VIDEO_MAX_RETRIES)))
         q_delays = self._video_queue_delays(n_retries)
