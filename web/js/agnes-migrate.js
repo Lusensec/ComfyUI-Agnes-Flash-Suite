@@ -1,10 +1,10 @@
 /**
- * Agnes Flash Suite —— 批量节点旧实例 widget 值一次性迁移（输入结构「N 槽→单输入」升级）
+ * Agnes Flash Suite —— 旧实例 widget 值一次性迁移（结构升级后自动重映射）
  *
- * 背景：Agnes 套件的批量节点输入结构由「N 路手接槽 + 配置项」升级为
- * 「1 路 JSON 合并输入 + 配置项」。旧工作流里已保存的节点 widgets_values
- * 仍按旧结构序列化，载入后前端按索引映射到新 widget：第 1 槽（新 STRING
- * 输入）取到旧第 2 槽的空串 → 队列校验报 "Value not in list" / 值错乱。
+ * 背景：Agnes 套件的节点输入结构多次升级（批量节点「N 槽→单输入」、
+ * 视频节点移除 1K/2K 档位、视频节点 帧数/帧率 改 秒数 直控 + 加 720P 分辨率项），
+ * 旧工作流里已保存的节点 widgets_values 仍按旧结构序列化，载入后前端按索引
+ * 映射到新 widget：取值错位 → 队列校验报 "Value not in list" / 值错乱。
  *
  * 迁移表（widgets_values 长度=旧结构指纹 → 重映射到新结构）：
  *   AgnesScenePromptBatch       分镜提示词批量    61 → 12 （旧 [50..60] 配置尾部 → 新 [1..11]）
@@ -13,52 +13,143 @@
  *   AgnesTurnaroundBatch       三视图批量生成    26 → 7  （旧 [20..25] 6 配置 → 新 [1..6]）
  * 规则：新 [0]=""（新合并输入槽留空，输入链接优先），新 [1..K]=旧配置项尾部原样保留。
  *
- * 视频节点 quality（1K/2K）档位下拉移除（新接口 2.5-flash 固定 720P 无 size 参数；
- * 旧接口 v2.0 固定 1K 档位）——widget 位置删除属中位截断，按 dropIdx 丢格重排：
- *   AgnesNovelTextToVideo     文生视频          10 → 9  （丢 1K/2K 档位，旧索引 4）
- *   AgnesNovelImageToVideo   关键帧生视频      10 → 9  （丢 1K/2K 档位，旧索引 4）
- *   AgnesVideoReference      参考视频生成      13 → 12 （丢 1K/2K 档位，旧索引 6）
- * 幂等：迁移后长度为新长度，重复执行不再命中。
+ * 视频节点三段演进（按数组顺序逐段应用，一个节点可连续命中多段）：
+ * ① quality（1K/2K）档位移除 —— 中位截断，按 dropIdx 丢格重排：
+ *    AgnesNovelTextToVideo  10 → 9（丢档位，旧索引 4）
+ *    AgnesNovelImageToVideo 10 → 9（丢档位，旧索引 4）
+ *    AgnesVideoReference    13 → 12（丢档位，旧索引 6）
+ * ② 帧数/帧率 改 秒数直控 + 模型单项化 + 加 720P 分辨率项 —— 按 map 重排：
+ *    新文生视频/关键帧 9 项：[提示词,base_url,key,模型,720P,宽高比,秒数,种子,超时]
+ *    新参考视频 12 项：同上前 9 项 + [音频1,音频2,音频3]
+ *    秒数由旧 帧数/帧率 推导（round，4-12 钳位），模型固定 Agnes Video 2.5-flash
+ * 指纹：长度匹配 + 位置值特征（旧 [4]=含":"的宽高比串 / 旧参考视频 [4]=数值帧数；
+ * 新结构 [4]="720P" 无冒号 → 不再命中，幂等）。
+ * flex：折叠态实例 widgets_values 末尾可能多 1 个隐藏值（长度 oldLen+1），
+ * 自动剥离并原样保留在迁移结果末尾。
  * 仍报错的兜底：删节点重加（右键 Agnes Novel → 对应节点）后重连。
  */
 (function () {
     "use strict";
 
+    var NEW_MODEL = "agnes-video-2.5-flash";
+    var NEW_RES = "720P";
+
+    // 由旧 帧数/帧率 推导 秒数（4-12 钳位；缺省 5）
+    function deriveSecs(nf, fr) {
+        var s = 5;
+        if (nf && fr) s = Math.round(nf / fr);
+        if (s < 4) s = 4;
+        if (s > 12) s = 12;
+        return s;
+    }
+
+    // 旧 9 项文生/关键帧 [提示词,base_url,key,模型,宽高比,帧数,帧率,种子,超时]
+    // → 新 9 项 [提示词,base_url,key,模型,720P,宽高比,秒数,种子,超时]
+    function mapT2vI2v(wv) {
+        return [
+            wv[0], wv[1], wv[2], NEW_MODEL, NEW_RES,
+            wv[4], deriveSecs(wv[5], wv[6]), wv[7], wv[8]
+        ];
+    }
+
+    // 旧 12 项参考视频 [提示词,base_url,key,模型,帧数,帧率,宽高比,种子,超时,音频x3]
+    // → 新 12 项 [提示词,base_url,key,模型,720P,宽高比,秒数,种子,超时,音频x3]
+    function mapVref(wv) {
+        return [
+            wv[0], wv[1], wv[2], NEW_MODEL, NEW_RES,
+            wv[6], deriveSecs(wv[4], wv[5]), wv[7], wv[8],
+            wv[9], wv[10], wv[11]
+        ];
+    }
+
     var MIGRATIONS = [
+        // —— 批量节点：N 槽 → 单输入（尾部配置项重排）——
         { cls: "AgnesScenePromptBatch", oldLen: 61, newLen: 12, tailStart: 50 },
         { cls: "AgnesAssetPromptBatch", oldLen: 27, newLen: 8, tailStart: 20 },
         { cls: "AgnesTurnaroundPromptBatch", oldLen: 26, newLen: 7, tailStart: 20 },
         { cls: "AgnesTurnaroundBatch", oldLen: 26, newLen: 7, tailStart: 20 },
-        { cls: "AgnesNovelTextToVideo", oldLen: 10, newLen: 9, dropIdx: 4 },
-        { cls: "AgnesNovelImageToVideo", oldLen: 10, newLen: 9, dropIdx: 4 },
-        { cls: "AgnesVideoReference", oldLen: 13, newLen: 12, dropIdx: 6 },
+        // —— 视频 ①：1K/2K 档位移除（中位丢格）——
+        { cls: "AgnesNovelTextToVideo", oldLen: 10, newLen: 9, dropIdx: 4, flex: true },
+        { cls: "AgnesNovelImageToVideo", oldLen: 10, newLen: 9, dropIdx: 4, flex: true },
+        { cls: "AgnesVideoReference", oldLen: 13, newLen: 12, dropIdx: 6, flex: true },
+        // —— 视频 ②：帧数/帧率 → 秒数直控 + 模型单项 + 720P 分辨率项（值指纹重排）——
+        {
+            cls: "AgnesNovelTextToVideo", oldLen: 9, newLen: 9, flex: true,
+            fingerprint: function (wv) {
+                return typeof wv[4] === "string" && wv[4].indexOf(":") !== -1;
+            },
+            map: mapT2vI2v
+        },
+        {
+            cls: "AgnesNovelImageToVideo", oldLen: 9, newLen: 9, flex: true,
+            fingerprint: function (wv) {
+                return typeof wv[4] === "string" && wv[4].indexOf(":") !== -1;
+            },
+            map: mapT2vI2v
+        },
+        {
+            cls: "AgnesVideoReference", oldLen: 12, newLen: 12, flex: true,
+            fingerprint: function (wv) {
+                return typeof wv[4] === "number";
+            },
+            map: mapVref
+        }
     ];
+
+    function applyOne(node, conf, body, extra) {
+        var migrated;
+        if (typeof conf.map === "function") {
+            migrated = conf.map(body);
+        } else if (conf.dropIdx !== undefined) {
+            // 中位删格（视频 1K/2K 档位移除）：丢 dropIdx，其余原样前移
+            migrated = body.filter(function (_, i) { return i !== conf.dropIdx; });
+        } else {
+            migrated = [""];
+            for (var i = conf.tailStart; i < conf.oldLen; i++) migrated.push(body[i]);
+        }
+        if (extra !== null) migrated.push(extra);
+        node.widgets_values = migrated;
+        // 同步已创建的 widget 对象（Vue/旧版前端序列化可能读 widget.value）
+        if (node.widgets) {
+            for (var w = 0; w < node.widgets.length; w++) {
+                if (w < migrated.length && node.widgets[w]) node.widgets[w].value = migrated[w];
+            }
+        }
+        return true;
+    }
 
     function migrate(node) {
         if (!node || !node.comfyClass) return;
-        for (var m = 0; m < MIGRATIONS.length; m++) {
-            var conf = MIGRATIONS[m];
-            if (node.comfyClass !== conf.cls) continue;
-            var wv = node.widgets_values;
-            if (!Array.isArray(wv) || wv.length !== conf.oldLen) return; // 非旧结构，不动
-            var migrated;
-            if (conf.dropIdx !== undefined) {
-                // 中位删格（视频节点 quality 档位移除）：丢 dropIdx，其余原样前移
-                migrated = wv.filter(function (_, i) { return i !== conf.dropIdx; });
-            } else {
-                migrated = [""];
-                for (var i = conf.tailStart; i < conf.oldLen; i++) migrated.push(wv[i]);
-            }
-            node.widgets_values = migrated;
-            // 同步已创建的 widget 对象（Vue/旧版前端序列化可能读 widget.value）
-            if (node.widgets) {
-                for (var w = 0; w < node.widgets.length; w++) {
-                    if (w < migrated.length && node.widgets[w]) node.widgets[w].value = migrated[w];
+        var applied = false;
+        var used = {}; // 每条迁移每节点最多应用一次（防 flex 折叠值尾部长度=oldLen 导致同段误重命中）
+        // 一个节点可能连续命中多段（① 10→9 后 ② 9→9），重扫直到无命中（上限 4 段防死循环）
+        for (var pass = 0; pass < 4; pass++) {
+            var hit = false;
+            for (var m = 0; m < MIGRATIONS.length; m++) {
+                var conf = MIGRATIONS[m];
+                if (node.comfyClass !== conf.cls || used[m]) continue;
+                var wv = node.widgets_values;
+                if (!Array.isArray(wv)) return;
+                var extra = null;
+                var body = wv;
+                if (conf.flex && wv.length === conf.oldLen + 1) {
+                    extra = wv[wv.length - 1]; // 折叠态末尾隐藏值：剥离并保留
+                    body = wv.slice(0, conf.oldLen);
+                }
+                if (body.length !== conf.oldLen) continue;
+                if (conf.fingerprint && !conf.fingerprint(body)) continue;
+                used[m] = true;
+                if (applyOne(node, conf, body, extra)) {
+                    hit = true;
+                    break; // 重扫（后面可能还有同类的下一段）
                 }
             }
+            if (!hit) break;
+            applied = true;
+        }
+        if (applied) {
             if (node.setDirtyWidgets) node.setDirtyWidgets(true, true);
             if (node.setSize) node.setSize();
-            return;
         }
     }
 
@@ -104,7 +195,7 @@
                     return origQueuePrompt.apply(this, arguments);
                 };
             }
-            console.log("[AgnesFlashSuite] Agnes 批量节点旧实例 widget 值迁移扩展已注册（分镜批量 61→12；资产批量 27→8；三视图提示词批量/三视图批量 26→7；视频节点移除 1K/2K 档位：文生视频 10→9、关键帧生视频 10→9、参考视频 13→12）");
+            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 迁移扩展注册失败（不影响节点功能）:", e);
         }

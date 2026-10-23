@@ -1,11 +1,10 @@
+# -*- coding: utf-8 -*-
 """
 Agnes 文生视频节点
-==================
-使用 Agnes AI 视频生成模型，根据文本描述生成视频。
+=================
+使用 Agnes 视频生成模型（Agnes Video 2.5-flash），根据文本描述生成视频。
+4-12 秒时长直控（seconds 参数，完整体验）+ 固定 720P + 宽高比选择。
 异步接口 + 轮询，耗时可达数分钟。
-
-新接口 2.5-flash 固定 720P（API 无 size 参数，分辨率输出按 720P 标注）；
-旧接口 v2.0 固定 1K 档位映射 WxH。支持宽高比选择。
 
 输出：MP4 保存到 ComfyUI 的 output/agnes_videos/ 目录，
 用户可在 Web UI 中预览和下载。
@@ -18,18 +17,8 @@ from ..api import (
     AgnesClient,
     get_api_key,
     VIDEO_MODEL,
-    AVAILABLE_VIDEO_MODELS,
-    DEFAULT_VIDEO_FRAMES,
-    DEFAULT_VIDEO_FPS,
-    NEW_VIDEO_MODELS,
 )
 from ._output_docs import OutputDocsMixin
-
-# 画质档位 → 短边像素
-QUALITY_MAP = {
-    "1K": 1024,
-    "2K": 2048,
-}
 
 # 支持的宽高比（宽:高）
 ASPECT_RATIOS = [
@@ -46,33 +35,20 @@ ASPECT_RATIOS = [
     "21:9",
 ]
 
+# 输出分辨率（Agnes 视频接口固定 720P；参数保留在节点上供展示与选择）
+RESOLUTIONS = ["720P"]
+
+# 视频时长（秒）
+SECONDS_MIN = 4
+SECONDS_MAX = 12
+SECONDS_DEFAULT = 5
+
 # 尝试获取 ComfyUI 的输出目录（ComfyUI 运行环境内可用）
 _COMFYUI_OUTPUT_DIR = None
 
 
-def compute_size(quality: str, aspect_ratio: str) -> str:
-    """
-    根据画质档位与宽高比计算 WxH 像素尺寸字符串。
-    """
-    base = QUALITY_MAP.get(quality, 1024)
-    w_ratio, h_ratio = map(int, aspect_ratio.split(":"))
-
-    if w_ratio >= h_ratio:
-        height = base
-        width = base * w_ratio // h_ratio
-    else:
-        width = base
-        height = base * h_ratio // w_ratio
-
-    width = max(64, (width // 8) * 8)
-    height = max(64, (height // 8) * 8)
-
-    return f"{width}x{height}"
-
-
-def new_model_size_label(aspect_ratio: str) -> str:
-    """新接口 2.5-flash：API 无 size 参数，固定 720P。
-    按 API 文档 aspect_ratio 两档给出像素（16:9=1280×720，9:16=720×1280）；
+def video_size_label(aspect_ratio: str) -> str:
+    """720P 分辨率标注：按 aspect_ratio 给出像素（16:9=1280×720，9:16=720×1280）；
     其他比例由服务端自动映射，只标 720P。"""
     if aspect_ratio == "16:9":
         return "1280x720 (720P)"
@@ -123,7 +99,7 @@ if _VIDEO_MODE == "string":
 
 
 class AgnesNovelTextToVideo(OutputDocsMixin):
-    """Agnes AI 文生视频节点：按文本描述直接生成视频。"""
+    """Agnes 文生视频节点：按文本描述直接生成 4-12 秒 720P 视频。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = (_VIDEO_OUTPUT_TYPE, "STRING",)
@@ -131,7 +107,7 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
     RETURN_LABELS = ('视频', '分辨率')
     OUTPUT_DOCS = {
         "video": "生成的视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览",
-        "resolution": "视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280，其他比例服务端自动映射，标注 720P）；旧接口 v2.0 固定 1K 档位映射 WxH",
+        "resolution": "视频分辨率标注：固定 720P（16:9=1280×720，9:16=720×1280，其他比例服务端自动映射，标注 720P）",
     }
     FUNCTION = "generate"
 
@@ -140,58 +116,64 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
         return {
             "required": {
                 "prompt": ("STRING", {
+                    "label": "提示词",
                     "multiline": True,
                     "default": "",
                     "placeholder": "输入视频描述（建议英文），例如：A cinematic drone shot flying over a misty forest at sunrise...",
-                    "tooltip": "要生成视频的文本描述（建议英文提示词）",
+                    "tooltip": "要生成视频的文本描述（建议英文提示词，可连 Agnes 视频提示词生成 的 video_prompt 输出）",
                 }),
                 "base_url": ("STRING", {
+                    "label": "请求地址",
                     "multiline": False,
                     "default": "",
                     "placeholder": "https://api.agnes-ai.cn/v1",
                     "tooltip": "请求地址 Base URL：留空=跟随全局（API Key 配置节点/环境变量 AGNES_API_BASE_URL/config.yaml），可动态调整",
                 }),
                 "api_key": ("STRING", {
+                    "label": "API Key",
                     "multiline": False,
                     "default": "",
                     "placeholder": "sk-...",
                     "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）",
                 }),
-                "model": (AVAILABLE_VIDEO_MODELS, {
+                "model": ([VIDEO_MODEL], {
+                    "label": "模型",
                     "default": VIDEO_MODEL,
-                    "tooltip": "视频生成模型：agnes-video-2.5-flash（4-12s/720P，API 无 size 参数）/ agnes-video-v2.0（帧数模式，固定 1K 档位映射 WxH）",
+                    "tooltip": "视频生成模型：Agnes Video 2.5-flash（4-12 秒 / 720P）",
+                }),
+                "resolution": (RESOLUTIONS, {
+                    "label": "分辨率",
+                    "default": "720P",
+                    "tooltip": "输出分辨率：Agnes 视频接口固定 720P（参数保留供展示与选择，目前仅此一项）",
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
+                    "label": "宽高比",
                     "default": "16:9",
-                    "tooltip": "输出宽高比（宽:高）：如 16:9 宽屏、9:16 竖屏；新接口 2.5-flash 不支持的比例自动就近映射",
+                    "tooltip": "画面宽高比（宽:高）：16:9 横屏 / 9:16 竖屏；API 文档列 16:9/9:16（可选，缺省服务端自动处理），其他比例自动就近映射",
                 }),
-                "num_frames": ("INT", {
-                    "default": DEFAULT_VIDEO_FRAMES,
-                    "min": 9,
-                    "max": 441,
-                    "step": 8,
-                    "tooltip": "帧数（旧接口必须 8n+1，121≈5s@24fps，241≈10s）；新接口 2.5-flash 按 帧数/帧率 换算成 4-12 秒时长",
-                }),
-                "frame_rate": ("INT", {
-                    "default": DEFAULT_VIDEO_FPS,
-                    "min": 8,
-                    "max": 60,
+                "seconds": ("INT", {
+                    "label": "时长（秒）",
+                    "default": SECONDS_DEFAULT,
+                    "min": SECONDS_MIN,
+                    "max": SECONDS_MAX,
                     "step": 1,
-                    "tooltip": "帧率：旧接口传给 API；新接口 agnes-video-2.5-flash 无 frame_rate 参数，仅用于把帧数换算成 4-12 秒时长",
+                    "tooltip": "视频时长（秒，4-12 直控）：一镜一主动作，时长内不换场景不切镜；与 Agnes 视频提示词生成 的 duration 保持一致",
                 }),
                 "seed": ("INT", {
+                    "label": "随机种子",
                     "default": 0,
                     "min": 0,
                     "max": 2147483647,
                     "step": 1,
-                    "tooltip": "随机种子（Agnes 视频 API 支持 seed；0=每次随机，固定值可复现结果）",
+                    "tooltip": "随机种子（0=每次随机，固定值可复现结果）",
                 }),
                 "max_wait_seconds": ("INT", {
+                    "label": "轮询超时",
                     "default": 600,
                     "min": 60,
                     "max": 3600,
                     "step": 30,
-                    "tooltip": "视频生成轮询最长等待时间（秒）",
+                    "tooltip": "视频生成轮询最长等待时间（秒，生成耗时可达数分钟）",
                 }),
             },
         }
@@ -202,9 +184,9 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
         base_url: str = "",
         api_key: str = "",
         model: str = VIDEO_MODEL,
+        resolution: str = "720P",
         aspect_ratio: str = "16:9",
-        num_frames: int = DEFAULT_VIDEO_FRAMES,
-        frame_rate: int = DEFAULT_VIDEO_FPS,
+        seconds: int = SECONDS_DEFAULT,
         seed: int = 0,
         max_wait_seconds: int = 600,
     ) -> Tuple:
@@ -217,42 +199,22 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
         if not api_key.strip():
             return _error("缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置")
 
-        if model in NEW_VIDEO_MODELS:
-            # 新接口 2.5-flash：API 无 size 参数，固定 720P（分辨率输出按 720P 标注，不再按画质档位瞎算）
-            size = new_model_size_label(aspect_ratio)
-        else:
-            # 旧接口 v2.0：quality 档位下拉已移除，固定 1K 档位映射 WxH
-            size = compute_size("1K", aspect_ratio)
+        # 分辨率固定 720P（widget 展示用）；输出标注按宽高比给出像素
+        size = video_size_label(aspect_ratio)
         output_dir = _get_output_dir()
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
-            if model in NEW_VIDEO_MODELS:
-                # 新接口：seconds(4-12) + aspect_ratio，固定 720P
-                seconds = int(round(num_frames / frame_rate)) if frame_rate else 5
-                video_path = client.generate_video(
-                    prompt=prompt.strip(),
-                    mode="text",
-                    model=model,
-                    seconds=seconds,
-                    aspect_ratio=aspect_ratio,
-                    seed=seed if seed > 0 else None,
-                    max_wait=max_wait_seconds,
-                    output_dir=output_dir,
-                )
-            else:
-                # 旧接口：num_frames/frame_rate/size(WxH)
-                video_path = client.generate_video(
-                    prompt=prompt.strip(),
-                    mode="text2video",
-                    model=model,
-                    num_frames=num_frames,
-                    frame_rate=frame_rate,
-                    seed=seed if seed > 0 else None,
-                    size=size,
-                    max_wait=max_wait_seconds,
-                    output_dir=output_dir,
-                )
+            video_path = client.generate_video(
+                prompt=prompt.strip(),
+                mode="text",
+                model=model,
+                seconds=seconds,
+                aspect_ratio=aspect_ratio,
+                seed=seed if seed > 0 else None,
+                max_wait=max_wait_seconds,
+                output_dir=output_dir,
+            )
 
             if video_path:
                 return _make_result(video_path, size)
