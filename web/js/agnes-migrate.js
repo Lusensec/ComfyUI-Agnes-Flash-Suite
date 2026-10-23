@@ -26,6 +26,9 @@
  * 新结构 [4]="720P" 无冒号 → 不再命中，幂等）。
  * flex：折叠态实例 widgets_values 末尾可能多 1 个隐藏值（长度 oldLen+1），
  * 自动剥离并原样保留在迁移结果末尾。
+ * ① dropIdx 条目限定旧档位值指纹（[4]/[6] = "1K"/"2K"）：新增「重试次数」尾参后，
+ * 新结构文生/关键帧 10 项、参考视频 13 项与旧档位实例同长度，靠该指纹避免误删；
+ * 「重试次数」为纯尾部新增 widget，旧实例载入时自动补默认值 5，无需迁移条目。
  * 仍报错的兜底：删节点重加（右键 Agnes Novel → 对应节点）后重连。
  */
 (function () {
@@ -68,10 +71,20 @@
         { cls: "AgnesAssetPromptBatch", oldLen: 27, newLen: 8, tailStart: 20 },
         { cls: "AgnesTurnaroundPromptBatch", oldLen: 26, newLen: 7, tailStart: 20 },
         { cls: "AgnesTurnaroundBatch", oldLen: 26, newLen: 7, tailStart: 20 },
-        // —— 视频 ①：1K/2K 档位移除（中位丢格）——
-        { cls: "AgnesNovelTextToVideo", oldLen: 10, newLen: 9, dropIdx: 4, flex: true },
-        { cls: "AgnesNovelImageToVideo", oldLen: 10, newLen: 9, dropIdx: 4, flex: true },
-        { cls: "AgnesVideoReference", oldLen: 13, newLen: 12, dropIdx: 6, flex: true },
+        // —— 视频 ①：1K/2K 档位移除（中位丢格；指纹限定旧档位值，避免误伤
+        //    新结构同长度实例：文生/关键帧 10 项[idx4=720P]、参考视频 13 项[idx6=秒数]）——
+        {
+            cls: "AgnesNovelTextToVideo", oldLen: 10, newLen: 9, dropIdx: 4, flex: true,
+            fingerprint: function (wv) { return wv[4] === "1K" || wv[4] === "2K"; }
+        },
+        {
+            cls: "AgnesNovelImageToVideo", oldLen: 10, newLen: 9, dropIdx: 4, flex: true,
+            fingerprint: function (wv) { return wv[4] === "1K" || wv[4] === "2K"; }
+        },
+        {
+            cls: "AgnesVideoReference", oldLen: 13, newLen: 12, dropIdx: 6, flex: true,
+            fingerprint: function (wv) { return wv[6] === "1K" || wv[6] === "2K"; }
+        },
         // —— 视频 ②：帧数/帧率 → 秒数直控 + 模型单项 + 720P 分辨率项（值指纹重排）——
         {
             cls: "AgnesNovelTextToVideo", oldLen: 9, newLen: 9, flex: true,

@@ -355,9 +355,19 @@ class AgnesClient:
     _MAX_RETRIES = 3
     _MAX_RETRIES_QUEUE = 5  # 队列满/限流专用：最多等 ~3.75 分钟
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
-    # 视频队列满/限流（429/503）专用指数退避：10/30/60/120/180 秒，
-    # 首次请求 + 5 次退避重试（累计等待约 400 秒 ≈ 6.7 分钟，覆盖视频排队高峰）
-    _VIDEO_QUEUE_DELAYS = [10, 30, 60, 120, 180]
+    # 视频 503 队列满/限流退避：重试次数可由节点「重试次数」参数动态调整（默认 5、上限 30）
+    _VIDEO_DEFAULT_RETRIES = 5   # 默认 5 次：10/30/60/120/120 秒（累计 340 秒 ≈ 5.7 分钟）
+    _VIDEO_MAX_RETRIES = 30     # 上限（第 4 次起每次 120 秒，30 次累计约 55 分钟）
+    _VIDEO_QUEUE_DELAYS = [10, 30, 60, 120, 120]  # 默认 5 次的退避表
+
+    @classmethod
+    def _video_queue_delays(cls, retries: int) -> List[int]:
+        """视频 503/429 退避表：前 3 次 10/30/60 秒，第 4 次起每次 120 秒。"""
+        r = max(0, int(retries))
+        delays = [10, 30, 60][:r]
+        if r > 3:
+            delays += [120] * (r - 3)
+        return delays
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
         self.api_key = api_key
@@ -448,8 +458,8 @@ class AgnesClient:
 
         队列满/限流（429/503）默认采用分钟级退避（15/30/60/120 秒，最多
         _MAX_RETRIES_QUEUE 次）；传入 queue_delays 则按指定秒数序列退避
-        （视频提交用 10/30/60/120/180 秒）；queue_hint 覆盖队列满建议文案。
-        其他可重试状态维持 3/6/12 秒短退避。
+        （视频提交用 10/30/60，第 4 次起每次 120 秒，次数由节点「重试次数」参数控制）；
+        queue_hint 覆盖队列满建议文案。其他可重试状态维持 3/6/12 秒短退避（120 秒封顶）。
         """
         max_retries = max_retries or self._MAX_RETRIES
         last_error = None
@@ -471,7 +481,7 @@ class AgnesClient:
                         else:
                             delay = self._QUEUE_BASE_DELAY * (2 ** (attempt - 1))
                     else:
-                        delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                        delay = min(self._RETRY_BASE_DELAY * (2 ** (attempt - 1)), 120)
                     last_error = (resp.status_code, resp.text)
                     time.sleep(delay)
                     total_waited += delay
@@ -482,13 +492,13 @@ class AgnesClient:
                     hint = (queue_hint or "建议：生图队列繁忙（文生图与图生图队列相互独立），"
                             "请等 5-10 分钟后再运行本节点。")
                     raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name) +
-                                       f"\n（已自动重试 {attempt} 次、累计等待约 {total_waited} 秒）"
+                                       f"\n（已自动重试 {attempt - 1} 次、累计等待约 {total_waited} 秒）"
                                        f"\n{hint}")
                 raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name))
 
             except requests.exceptions.Timeout:
                 if attempt < max_retries:
-                    delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    delay = min(self._RETRY_BASE_DELAY * (2 ** (attempt - 1)), 120)
                     time.sleep(delay)
                     total_waited += delay
                     continue
@@ -498,7 +508,7 @@ class AgnesClient:
                 )
             except requests.exceptions.ConnectionError:
                 if attempt < max_retries:
-                    delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    delay = min(self._RETRY_BASE_DELAY * (2 ** (attempt - 1)), 120)
                     time.sleep(delay)
                     continue
                 raise RuntimeError(
@@ -674,6 +684,7 @@ class AgnesClient:
         last_frame=None,
         audio_refs: Optional[List] = None,
         return_ids: bool = False,
+        retries: Optional[int] = None,
     ) -> Optional[str]:
         """
         Generate a video via the Agnes video generation API.
@@ -702,6 +713,8 @@ class AgnesClient:
             audio_refs: 新接口音频参考（公开 URL / 本地文件路径 / bytes，最多 3 个；
                     本地文件自动转 Base64 Data URI，单段 <15MB）。
             return_ids: True 时返回 (save_path, task_id, video_id) 三元组。
+            retries: 提交遇 503 队列满/429 限流的自动重试次数（None=默认 5；
+                    退避 10/30/60 秒，第 4 次起每次 120 秒；上限 30）。
         """
         new_model = model in NEW_VIDEO_MODELS
 
@@ -782,12 +795,15 @@ class AgnesClient:
                     }
 
         # --- Submit task ---
-        # 视频队列满/限流（429/503）：指数退避 10/30/60/120/180 秒（首次 + 5 次重试，
-        # 累计等待约 400 秒）
+        # 视频队列满/限流（429/503）：按「重试次数」参数动态退避
+        # （默认 5 次 10/30/60/120/120 秒，累计 340 秒；第 4 次起每次 120 秒）
+        n_retries = (self._VIDEO_DEFAULT_RETRIES if retries is None
+                     else max(0, min(int(retries), self._VIDEO_MAX_RETRIES)))
+        q_delays = self._video_queue_delays(n_retries)
         resp = self._request_with_retry(
             "POST", url, "Video", json_payload=payload, timeout=60,
-            max_retries=len(self._VIDEO_QUEUE_DELAYS) + 1,
-            queue_delays=self._VIDEO_QUEUE_DELAYS,
+            max_retries=n_retries + 1,
+            queue_delays=q_delays,
             queue_hint="建议：视频生成队列繁忙（视频与生图队列相互独立），"
                        "请等 5-10 分钟后再运行本节点。")
         data = resp.json()

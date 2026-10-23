@@ -184,6 +184,15 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                     "step": 30,
                     "tooltip": "视频生成轮询最长等待时间（秒，生成耗时可达数分钟）",
                 }),
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 5,
+                    "min": 0,
+                    "max": 30,
+                    "step": 1,
+                    "control_after_generate": False,
+                    "tooltip": "提交任务遇 503 队列满/429 限流时的自动重试次数：0=只提交一次，默认 5。重试间隔 10/30/60 秒，第 4 次起每次 120 秒（默认 5 次累计 340 秒/约 5.7 分钟）",
+                }),
             },
             "optional": {
                 "end_frame_image": ("IMAGE", {
@@ -206,6 +215,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         seconds: int = SECONDS_DEFAULT,
         seed: int = 0,
         max_wait_seconds: int = 600,
+        retries: int = 5,
         end_frame_image=None,
     ) -> Tuple:
         if image is None:
@@ -238,6 +248,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                 seed=seed if seed > 0 else None,
                 max_wait=max_wait_seconds,
                 output_dir=output_dir,
+                retries=retries,
             )
 
             if video_path:
