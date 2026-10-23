@@ -106,7 +106,8 @@ class AgnesVideoReference(OutputDocsMixin):
                     "min": 0,
                     "max": 2147483647,
                     "step": 1,
-                    "tooltip": "随机种子（0=每次随机，固定值可复现结果）",
+                    "control_after_generate": False,
+                    "tooltip": "随机种子（0=每次随机，固定值可复现结果）；随机请用输入框旁的骰子按钮（本节点已禁用前端自动附加的「生成后控制」英文下拉）",
                 }),
                 "max_wait_seconds": ("INT", {
                     "label": "轮询超时",

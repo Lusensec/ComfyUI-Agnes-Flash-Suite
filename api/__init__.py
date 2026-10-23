@@ -319,6 +319,9 @@ class AgnesClient:
     _MAX_RETRIES = 3
     _MAX_RETRIES_QUEUE = 5  # 队列满/限流专用：最多等 ~3.75 分钟
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
+    # 视频队列满/限流（429/503）专用指数退避：10/30/60/120/180 秒，
+    # 首次请求 + 5 次退避重试（累计等待约 400 秒 ≈ 6.7 分钟，覆盖视频排队高峰）
+    _VIDEO_QUEUE_DELAYS = [10, 30, 60, 120, 180]
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
         self.api_key = api_key
@@ -370,16 +373,30 @@ class AgnesClient:
             )
 
         # JSON error response
+        error_data = None
         try:
             if text:
                 error_data = json.loads(text)
-                error_msg = error_data.get("error", {}).get("message", "")
-                if not error_msg and isinstance(error_data.get("error"), str):
-                    error_msg = error_data["error"]
-                if error_msg:
-                    return f"[{api_name} 错误] {error_msg} (HTTP {status_code})"
-        except (json.JSONDecodeError, AttributeError):
+        except (json.JSONDecodeError, TypeError):
             pass
+        if isinstance(error_data, dict):
+            error_field = error_data.get("error")
+            if isinstance(error_field, dict):
+                error_msg = error_field.get("message", "")
+            elif isinstance(error_field, str):
+                error_msg = error_field
+            else:
+                error_msg = ""
+            if error_msg:
+                return f"[{api_name} 错误] {error_msg} (HTTP {status_code})"
+            # 顶层 code/message 结构（如 {"code":"video_queue_full","message":"..."}）
+            top_code = str(error_data.get("code", ""))
+            top_msg = str(error_data.get("message", ""))
+            if top_code == "video_queue_full":
+                return (f"[{api_name} 错误] 视频队列已满，请稍后重试（HTTP {status_code}）。"
+                        f"{top_msg}")
+            if top_code or top_msg:
+                return f"[{api_name} 错误] {top_code + ': ' if top_code else ''}{top_msg} (HTTP {status_code})"
 
         # Fallback: truncate long responses
         if len(text) > 300:
@@ -388,14 +405,19 @@ class AgnesClient:
 
     def _request_with_retry(self, method: str, url: str, api_name: str,
                             json_payload: dict = None, timeout: int = 300,
-                            max_retries: Optional[int] = None) -> requests.Response:
+                            max_retries: Optional[int] = None,
+                            queue_delays: Optional[List[int]] = None,
+                            queue_hint: Optional[str] = None) -> requests.Response:
         """Make an HTTP request with automatic retry on transient server errors.
 
-        队列满/限流（429/503）采用分钟级退避（15/30/60/120 秒，最多
-        _MAX_RETRIES_QUEUE 次）；其他可重试状态维持 3/6/12 秒短退避。
+        队列满/限流（429/503）默认采用分钟级退避（15/30/60/120 秒，最多
+        _MAX_RETRIES_QUEUE 次）；传入 queue_delays 则按指定秒数序列退避
+        （视频提交用 10/30/60/120/180 秒）；queue_hint 覆盖队列满建议文案。
+        其他可重试状态维持 3/6/12 秒短退避。
         """
         max_retries = max_retries or self._MAX_RETRIES
         last_error = None
+        total_waited = 0
         for attempt in range(1, max_retries + 1):
             try:
                 if method == "POST":
@@ -408,26 +430,31 @@ class AgnesClient:
 
                 if resp.status_code in self._RETRY_STATUSES and attempt < max_retries:
                     if resp.status_code in self._QUEUE_STATUSES:
-                        delay = self._QUEUE_BASE_DELAY * (2 ** (attempt - 1))
+                        if queue_delays:
+                            delay = queue_delays[min(attempt - 1, len(queue_delays) - 1)]
+                        else:
+                            delay = self._QUEUE_BASE_DELAY * (2 ** (attempt - 1))
                     else:
                         delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
                     last_error = (resp.status_code, resp.text)
                     time.sleep(delay)
+                    total_waited += delay
                     continue
 
                 # Not retryable or last attempt → raise
                 if resp.status_code in self._QUEUE_STATUSES:
+                    hint = (queue_hint or "建议：生图队列繁忙（文生图与图生图队列相互独立），"
+                            "请等 5-10 分钟后再运行本节点。")
                     raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name) +
-                                       f"\n（已自动重试 {attempt} 次、累计等待约 "
-                                       f"{sum(self._QUEUE_BASE_DELAY * (2 ** i) for i in range(attempt - 1))} 秒）"
-                                       f"\n建议：生图队列繁忙（文生图与图生图队列相互独立），"
-                                       f"请等 5-10 分钟后再运行本节点。")
+                                       f"\n（已自动重试 {attempt} 次、累计等待约 {total_waited} 秒）"
+                                       f"\n{hint}")
                 raise RuntimeError(self._clean_error(resp.status_code, resp.text, api_name))
 
             except requests.exceptions.Timeout:
                 if attempt < max_retries:
                     delay = self._RETRY_BASE_DELAY * (2 ** (attempt - 1))
                     time.sleep(delay)
+                    total_waited += delay
                     continue
                 raise RuntimeError(
                     f"[{api_name} 错误] 请求超时 (>{timeout}秒)。\n"
@@ -719,7 +746,14 @@ class AgnesClient:
                     }
 
         # --- Submit task ---
-        resp = self._request_with_retry("POST", url, "Video", json_payload=payload, timeout=60)
+        # 视频队列满/限流（429/503）：指数退避 10/30/60/120/180 秒（首次 + 5 次重试，
+        # 累计等待约 400 秒）
+        resp = self._request_with_retry(
+            "POST", url, "Video", json_payload=payload, timeout=60,
+            max_retries=len(self._VIDEO_QUEUE_DELAYS) + 1,
+            queue_delays=self._VIDEO_QUEUE_DELAYS,
+            queue_hint="建议：视频生成队列繁忙（视频与生图队列相互独立），"
+                       "请等 5-10 分钟后再运行本节点。")
         data = resp.json()
 
         task_id = data.get("id")
@@ -819,14 +853,14 @@ class AgnesClient:
                 hint = ""
                 error_lower = str(error_msg).lower()
                 if "cuda out of memory" in error_lower or "oom" in error_lower:
-                    hint = "\n原因：Agnes 服务器 GPU 显存不足，当前排队人数较多。\n建议：降低画质（1K）或减少帧数后重试。"
+                    hint = "\n原因：Agnes 服务器 GPU 显存不足，当前排队人数较多。\n建议：调低时长（seconds）或稍后重试。"
                 elif "no available channel" in error_lower or "503" in error_lower:
                     hint = "\n原因：Agnes 视频模型无可用计算节点。\n建议：稍等 2-5 分钟后重试。"
                 raise RuntimeError(f"[Video 错误] 视频生成失败: {error_msg}{hint}")
 
         raise TimeoutError(
             f"[Video 错误] 视频生成超时（已等待 {max_wait} 秒，任务ID: {task_id}，video_id: {video_id}）。\n"
-            f"建议：减少时长（新接口）或帧数（旧接口），或稍后重试。"
+            f"建议：调低时长（seconds）或调大 max_wait_seconds，或稍后重试。"
         )
 
     # ------------------------------------------------------------------
