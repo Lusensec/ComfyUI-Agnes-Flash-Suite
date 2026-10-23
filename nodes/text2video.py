@@ -4,7 +4,8 @@ Agnes 文生视频节点
 使用 Agnes AI 视频生成模型，根据文本描述生成视频。
 异步接口 + 轮询，耗时可达数分钟。
 
-支持画质档位（1K/2K）与宽高比选择。
+新接口 2.5-flash 固定 720P（API 无 size 参数，分辨率输出按 720P 标注）；
+旧接口 v2.0 固定 1K 档位映射 WxH。支持宽高比选择。
 
 输出：MP4 保存到 ComfyUI 的 output/agnes_videos/ 目录，
 用户可在 Web UI 中预览和下载。
@@ -69,6 +70,17 @@ def compute_size(quality: str, aspect_ratio: str) -> str:
     return f"{width}x{height}"
 
 
+def new_model_size_label(aspect_ratio: str) -> str:
+    """新接口 2.5-flash：API 无 size 参数，固定 720P。
+    按 API 文档 aspect_ratio 两档给出像素（16:9=1280×720，9:16=720×1280）；
+    其他比例由服务端自动映射，只标 720P。"""
+    if aspect_ratio == "16:9":
+        return "1280x720 (720P)"
+    if aspect_ratio == "9:16":
+        return "720x1280 (720P)"
+    return "720P（服务端自动映射）"
+
+
 def _get_output_dir() -> str:
     """获取 ComfyUI 的视频输出目录（保存视频文件用）。"""
     global _COMFYUI_OUTPUT_DIR
@@ -119,7 +131,7 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
     RETURN_LABELS = ('视频', '分辨率')
     OUTPUT_DOCS = {
         "video": "生成的视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览",
-        "resolution": "视频目标尺寸（WxH）；新接口 2.5-flash 固定 720P，实际像素随 aspect_ratio 变化",
+        "resolution": "视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280，其他比例服务端自动映射，标注 720P）；旧接口 v2.0 固定 1K 档位映射 WxH",
     }
     FUNCTION = "generate"
 
@@ -147,11 +159,7 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
                 }),
                 "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
-                    "tooltip": "视频生成模型：agnes-video-2.5-flash（4-12s/720P）/ agnes-video-v2.0（帧数模式）",
-                }),
-                "quality": (["1K", "2K"], {
-                    "default": "1K",
-                    "tooltip": "画质档位：仅旧接口 agnes-video-v2.0 生效（映射 WxH 像素）；新接口 2.5-flash 固定 720P，无此参数",
+                    "tooltip": "视频生成模型：agnes-video-2.5-flash（4-12s/720P，API 无 size 参数）/ agnes-video-v2.0（帧数模式，固定 1K 档位映射 WxH）",
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "16:9",
@@ -194,7 +202,6 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
         base_url: str = "",
         api_key: str = "",
         model: str = VIDEO_MODEL,
-        quality: str = "1K",
         aspect_ratio: str = "16:9",
         num_frames: int = DEFAULT_VIDEO_FRAMES,
         frame_rate: int = DEFAULT_VIDEO_FPS,
@@ -210,7 +217,12 @@ class AgnesNovelTextToVideo(OutputDocsMixin):
         if not api_key.strip():
             return _error("缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置")
 
-        size = compute_size(quality, aspect_ratio)
+        if model in NEW_VIDEO_MODELS:
+            # 新接口 2.5-flash：API 无 size 参数，固定 720P（分辨率输出按 720P 标注，不再按画质档位瞎算）
+            size = new_model_size_label(aspect_ratio)
+        else:
+            # 旧接口 v2.0：quality 档位下拉已移除，固定 1K 档位映射 WxH
+            size = compute_size("1K", aspect_ratio)
         output_dir = _get_output_dir()
 
         try:

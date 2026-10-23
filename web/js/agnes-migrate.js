@@ -12,6 +12,12 @@
  *   AgnesTurnaroundPromptBatch 三视图提示词批量  26 → 7  （旧 [20..25] 6 配置 → 新 [1..6]）
  *   AgnesTurnaroundBatch       三视图批量生成    26 → 7  （旧 [20..25] 6 配置 → 新 [1..6]）
  * 规则：新 [0]=""（新合并输入槽留空，输入链接优先），新 [1..K]=旧配置项尾部原样保留。
+ *
+ * 视频节点 quality（1K/2K）档位下拉移除（新接口 2.5-flash 固定 720P 无 size 参数；
+ * 旧接口 v2.0 固定 1K 档位）——widget 位置删除属中位截断，按 dropIdx 丢格重排：
+ *   AgnesNovelTextToVideo     文生视频          10 → 9  （丢 1K/2K 档位，旧索引 4）
+ *   AgnesNovelImageToVideo   关键帧生视频      10 → 9  （丢 1K/2K 档位，旧索引 4）
+ *   AgnesVideoReference      参考视频生成      13 → 12 （丢 1K/2K 档位，旧索引 6）
  * 幂等：迁移后长度为新长度，重复执行不再命中。
  * 仍报错的兜底：删节点重加（右键 Agnes Novel → 对应节点）后重连。
  */
@@ -23,6 +29,9 @@
         { cls: "AgnesAssetPromptBatch", oldLen: 27, newLen: 8, tailStart: 20 },
         { cls: "AgnesTurnaroundPromptBatch", oldLen: 26, newLen: 7, tailStart: 20 },
         { cls: "AgnesTurnaroundBatch", oldLen: 26, newLen: 7, tailStart: 20 },
+        { cls: "AgnesNovelTextToVideo", oldLen: 10, newLen: 9, dropIdx: 4 },
+        { cls: "AgnesNovelImageToVideo", oldLen: 10, newLen: 9, dropIdx: 4 },
+        { cls: "AgnesVideoReference", oldLen: 13, newLen: 12, dropIdx: 6 },
     ];
 
     function migrate(node) {
@@ -32,8 +41,14 @@
             if (node.comfyClass !== conf.cls) continue;
             var wv = node.widgets_values;
             if (!Array.isArray(wv) || wv.length !== conf.oldLen) return; // 非旧结构，不动
-            var migrated = [""];
-            for (var i = conf.tailStart; i < conf.oldLen; i++) migrated.push(wv[i]);
+            var migrated;
+            if (conf.dropIdx !== undefined) {
+                // 中位删格（视频节点 quality 档位移除）：丢 dropIdx，其余原样前移
+                migrated = wv.filter(function (_, i) { return i !== conf.dropIdx; });
+            } else {
+                migrated = [""];
+                for (var i = conf.tailStart; i < conf.oldLen; i++) migrated.push(wv[i]);
+            }
             node.widgets_values = migrated;
             // 同步已创建的 widget 对象（Vue/旧版前端序列化可能读 widget.value）
             if (node.widgets) {
@@ -89,7 +104,7 @@
                     return origQueuePrompt.apply(this, arguments);
                 };
             }
-            console.log("[AgnesFlashSuite] Agnes 批量节点旧实例 widget 值迁移扩展已注册（分镜批量 61→12；资产批量 27→8；三视图提示词批量/三视图批量 26→7）");
+            console.log("[AgnesFlashSuite] Agnes 批量节点旧实例 widget 值迁移扩展已注册（分镜批量 61→12；资产批量 27→8；三视图提示词批量/三视图批量 26→7；视频节点移除 1K/2K 档位：文生视频 10→9、关键帧生视频 10→9、参考视频 13→12）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 迁移扩展注册失败（不影响节点功能）:", e);
         }

@@ -28,6 +28,7 @@ from ._output_docs import OutputDocsMixin
 from .img2video import (
     ASPECT_RATIOS,
     compute_size,
+    new_model_size_label,
     _get_output_dir,
     _make_result,
     _error,
@@ -44,7 +45,7 @@ class AgnesVideoReference(OutputDocsMixin):
     RETURN_LABELS = ('视频', '分辨率')
     OUTPUT_DOCS = {
         "video": "生成的视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览",
-        "resolution": "视频目标尺寸（WxH）；新接口 2.5-flash 固定 720P，实际像素随 aspect_ratio 变化",
+        "resolution": "视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280，其他比例服务端自动映射，标注 720P）；旧接口 v2.0 固定 1K 档位映射 WxH",
     }
     FUNCTION = "generate"
     DESCRIPTION = "参考素材生视频：最多 5 张参考图 + 3 段参考音频（2.5-flash reference 模式）"
@@ -88,10 +89,6 @@ class AgnesVideoReference(OutputDocsMixin):
                     "max": 60,
                     "step": 1,
                     "tooltip": "帧率：旧接口传给 API；新接口 agnes-video-2.5-flash 无 frame_rate 参数，仅用于把帧数换算成 4-12 秒时长",
-                }),
-                "quality": (["1K", "2K"], {
-                    "default": "1K",
-                    "tooltip": "画质档位：仅旧接口 agnes-video-v2.0 生效（映射 WxH 像素）；新接口 2.5-flash 固定 720P，无此参数",
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "16:9",
@@ -154,7 +151,6 @@ class AgnesVideoReference(OutputDocsMixin):
         model: str = VIDEO_MODEL,
         num_frames: int = DEFAULT_VIDEO_FRAMES,
         frame_rate: int = DEFAULT_VIDEO_FPS,
-        quality: str = "1K",
         aspect_ratio: str = "16:9",
         seed: int = 0,
         max_wait_seconds: int = 600,
@@ -182,7 +178,12 @@ class AgnesVideoReference(OutputDocsMixin):
         if not refs and not audios:
             return _error("没有参考素材：请至少连接一张参考图片或填写一段音频参考")
 
-        size = compute_size(quality, aspect_ratio)
+        if model in NEW_VIDEO_MODELS:
+            # 新接口 2.5-flash：API 无 size 参数，固定 720P（分辨率输出按 720P 标注，不再按画质档位瞎算）
+            size = new_model_size_label(aspect_ratio)
+        else:
+            # 旧接口 v2.0：quality 档位下拉已移除，固定 1K 档位映射 WxH
+            size = compute_size("1K", aspect_ratio)
         output_dir = _get_output_dir()
 
         try:

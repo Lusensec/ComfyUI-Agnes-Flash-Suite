@@ -4,8 +4,8 @@ Agnes 关键帧生视频（图生视频）节点
 使用 Agnes AI 视频生成模型，从关键帧生成视频（首帧必接，尾帧可选）。
 
 - 新接口 agnes-video-2.5-flash：keyframe 模式（first_frame / last_frame，
-  固定 720P，4-12 秒）；首帧必接，尾帧可选。
-- 旧接口 agnes-video-v2.0：按帧数/帧率 + WxH 像素。
+  固定 720P，4-12 秒，API 无 size 参数）；首帧必接，尾帧可选。
+- 旧接口 agnes-video-v2.0：按帧数/帧率 + WxH 像素（quality 档位下拉已移除，固定 1K 档位）。
 
 多图参考（最多 5 张）/ 音频参考（最多 3 段）请改用「Agnes 参考视频生成」
 节点（nodes/video_reference.py，reference 模式）。
@@ -72,6 +72,17 @@ def compute_size(quality: str, aspect_ratio: str) -> str:
     return f"{width}x{height}"
 
 
+def new_model_size_label(aspect_ratio: str) -> str:
+    """新接口 2.5-flash：API 无 size 参数，固定 720P。
+    按 API 文档 aspect_ratio 两档给出像素（16:9=1280×720，9:16=720×1280）；
+    其他比例由服务端自动映射，只标 720P。"""
+    if aspect_ratio == "16:9":
+        return "1280x720 (720P)"
+    if aspect_ratio == "9:16":
+        return "720x1280 (720P)"
+    return "720P（服务端自动映射）"
+
+
 def _get_output_dir() -> str:
     """获取 ComfyUI 的视频输出目录（保存视频文件用）。"""
     global _COMFYUI_OUTPUT_DIR
@@ -122,7 +133,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
     RETURN_LABELS = ('视频', '分辨率')
     OUTPUT_DOCS = {
         "video": "生成的视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览",
-        "resolution": "视频目标尺寸（WxH）；新接口 2.5-flash 固定 720P，实际像素随 aspect_ratio 变化",
+        "resolution": "视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280，其他比例服务端自动映射，标注 720P）；旧接口 v2.0 固定 1K 档位映射 WxH",
     }
     FUNCTION = "generate"
 
@@ -153,11 +164,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                 }),
                 "model": (AVAILABLE_VIDEO_MODELS, {
                     "default": VIDEO_MODEL,
-                    "tooltip": "视频生成模型：agnes-video-2.5-flash（keyframe 模式，固定 720P）/ agnes-video-v2.0（帧数模式）",
-                }),
-                "quality": (["1K", "2K"], {
-                    "default": "1K",
-                    "tooltip": "画质档位：仅旧接口 agnes-video-v2.0 生效（映射 WxH 像素）；新接口 2.5-flash 固定 720P，无此参数",
+                    "tooltip": "视频生成模型：agnes-video-2.5-flash（keyframe 模式，固定 720P，API 无 size 参数）/ agnes-video-v2.0（帧数模式，固定 1K 档位映射 WxH）",
                 }),
                 "aspect_ratio": (ASPECT_RATIOS, {
                     "default": "16:9",
@@ -207,7 +214,6 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         base_url: str = "",
         api_key: str = "",
         model: str = VIDEO_MODEL,
-        quality: str = "1K",
         aspect_ratio: str = "16:9",
         num_frames: int = DEFAULT_VIDEO_FRAMES,
         frame_rate: int = DEFAULT_VIDEO_FPS,
@@ -223,7 +229,12 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         if not prompt.strip():
             return _error("提示词为空：请描述运动效果")
 
-        size = compute_size(quality, aspect_ratio)
+        if model in NEW_VIDEO_MODELS:
+            # 新接口 2.5-flash：API 无 size 参数，固定 720P（分辨率输出按 720P 标注，不再按画质档位瞎算）
+            size = new_model_size_label(aspect_ratio)
+        else:
+            # 旧接口 v2.0：quality 档位下拉已移除，固定 1K 档位映射 WxH
+            size = compute_size("1K", aspect_ratio)
         output_dir = _get_output_dir()
 
         try:

@@ -48,8 +48,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 |---|---|---|---|---|
 | model | ✅ | ✅ | ✅ | ✅ |
 | prompt | ✅ | ✅ | ✅ | ✅ |
-| 尺寸 | size 档位 1K/2K/3K/4K | width/height(WxH) | 固定 720P | width/height(WxH) |
-| ratio（宽高比） | ✅ 1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9（默认 1:1），与档位组合决定像素，节点已提供 aspect_ratio 下拉 | ❌ 按 WxH 像素表达 | ✅ 16:9/9:16/1:1/4:3/3:4 | ✅ 映射 WxH 像素 |
+| 尺寸 | size 档位 1K/2K/3K/4K | width/height(WxH) | 固定 720P（API 无 size 参数；节点 1K/2K 档位下拉已移除） | width/height(WxH)（节点固定 1K 档位映射） |
+| ratio（宽高比） | ✅ 1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9（默认 1:1），与档位组合决定像素，节点已提供 aspect_ratio 下拉 | ❌ 按 WxH 像素表达 | ✅ 16:9/9:16（可选，缺省服务端自动处理；16:9=1280×720，9:16=720×1280），节点下拉保留 12 种、不支持的比例自动就近映射 | ✅ 映射 WxH 像素 |
 | n（张数） | ❌ 固定 1 张 | ⚠️ 曾支持 1-4，现服务端 n>1 返回 400（图像节点自动降级 1 张） | ❌ 固定 1 | - |
 | seed（种子） | ❌ | ❌ | ✅ 可选（0=随机） | ✅ 可选 |
 | strength（强度） | ❌ 无此参数，节点将其转成提示词指令 | 同左 | - | - |
@@ -64,7 +64,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 资产提示词生成/资产提示词批量生成/三视图提示词生成/三视图提示词批量生成/图像反推提示词）均带 reasoning_effort 下拉
 > （auto/none/low/medium/high/max；auto=不传参数跟随模型默认）；
 > 2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
-| quality | 即 size 档位 | 1K/2K | ❌ 固定 720P，无此参数 | 映射 WxH 像素 |
+| quality | 即 size 档位（图像节点保留档位下拉） | 1K/2K | ❌ 已移除（API 固定 720P，无 size 参数） | 已移除（节点固定 1K 档位映射 WxH） |
 | max_wait | 客户端轮询超时，非 API 参数 | 同左 | 同左 | 同左 |
 
 > 结论：新 2.5 系列图像模型**支持 ratio 宽高比**（8 种，配合 1K-4K 档位），
@@ -72,6 +72,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > seed（图）/frame_rate（视）等参数，节点中保留这些输入框是为了兼容旧模型和
 > 习惯；使用新模型时它们不生效（已在各 widget 的 tooltip 中注明）。视频 2.5 支
 > 持 seed，可直接传入做可复现实验。
+> 视频节点 2.5-flash **固定 720P**（API 无 size 参数），原 1K/2K quality 档位下拉已移除；
+> 旧接口 v2.0 改按固定 1K 档位映射 WxH。旧工作流视频节点实例由 agnes-migrate.js
+> 自动重映射 widget 值（丢弃档位槽、其余原样前移），无需手动改图。
 
 ---
 
@@ -421,9 +424,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | prompt | STRING | "" | 视频描述（建议英文提示词） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| model | COMBO | agnes-video-2.5-flash | 视频生成模型，可选 2.5-flash（4-12s/720P）/ agnes-video-v2.0（帧数模式） |
-| quality | COMBO | 1K | 画质档位：仅旧接口 1K/2K 生效（映射 WxH 像素）；新接口 2.5-flash 固定 720P |
-| aspect_ratio | COMBO | 16:9 | 宽高比（支持 12 种；新接口不支持的比例自动就近映射） |
+| model | COMBO | agnes-video-2.5-flash | 视频生成模型，可选 2.5-flash（4-12s/固定 720P，API 无 size 参数）/ agnes-video-v2.0（帧数模式，固定 1K 档位映射 WxH） |
+| aspect_ratio | COMBO | 16:9 | 宽高比（API 文档 2.5-flash 列 16:9/9:16，缺省服务端自动处理；节点下拉保留 12 种，不支持的比例自动就近映射） |
 | num_frames | INT | 121 | 帧数（旧接口必须 8n+1，121≈5s@24fps）；新接口按 帧数/帧率 换算 4-12 秒时长 |
 | frame_rate | INT | 24 | 帧率：旧接口传给 API；新接口仅用于换算时长 |
 | seed | INT | 0 | 随机种子（0=每次随机，固定值可复现结果） |
@@ -431,7 +433,11 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 **输出（含输出描述）：**
 - video: 视频（MP4 保存到 ComfyUI output/agnes_videos/；输出类型随环境为 VIDEO/VHS_VIDEOINFO/路径字符串），可连接 SaveVideo 预览
-- resolution: 视频目标尺寸（WxH）；新接口 2.5-flash 固定 720P，实际像素随 aspect_ratio 变化
+- resolution: 视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280，其他比例服务端自动映射，标注 720P）；旧接口 v2.0 固定 1K 档位映射 WxH
+
+> 旧实例自愈：新版已移除 quality（1K/2K）档位下拉（新接口 2.5-flash 固定 720P 无 size 参数，旧接口固定 1K），
+> 旧工作流实例载入/排队时 widget 值自动重映射（web/js/agnes-migrate.js，丢弃档位槽、其余原样前移）；
+> 若仍见「Value not in list」校验报错，删节点重加（右键 Agnes Novel → 对应视频节点）后重连。
 
 > 原「Agnes 视频生成」节点（AgnesVideoGen，含 image 参考输入）已删除：
 > 文生视频用本节点；单图首帧/首尾帧请用「🎬 Agnes 关键帧生视频」节点；
@@ -450,9 +456,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | prompt | STRING | "" | 视频描述（强烈建议接）；可直连 Agnes 视频提示词生成/批量 的 video_prompt 输出，免手写运镜 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| model | COMBO | agnes-video-2.5-flash | 视频生成模型（2.5-flash keyframe 模式 / 旧 v2.0 帧数模式） |
-| quality | COMBO | 1K | 仅旧接口生效；2.5-flash 固定 720P |
-| aspect_ratio | COMBO | 16:9 | 宽高比 |
+| model | COMBO | agnes-video-2.5-flash | 视频生成模型（2.5-flash keyframe 模式，固定 720P / 旧 v2.0 帧数模式，固定 1K 档位） |
+| aspect_ratio | COMBO | 16:9 | 宽高比（API 文档 2.5-flash 列 16:9/9:16；节点下拉保留 12 种，不支持的比例自动就近映射） |
 | num_frames / frame_rate | INT | 121 / 24 | 旧接口帧数/帧率；新接口按 帧数/帧率 换算 4-12 秒 |
 | seed | INT | 0 | 随机种子（0=每次随机） |
 | max_wait_seconds | INT | 600 | 轮询超时 |
@@ -460,9 +465,10 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 **输出（含输出描述）：**
 - video: 视频（MP4 保存到 output/agnes_videos/，输出类型随环境为 VIDEO/VHS/路径）
-- resolution: 视频目标尺寸（WxH）
+- resolution: 视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280）；旧接口 v2.0 固定 1K 档位映射 WxH
 
 > 多张参考图/音频参考请用「🎞️ Agnes 参考视频生成」节点。
+> 旧实例自愈同「文生视频」：quality（1K/2K）档位下拉已移除，旧实例 widget 值由 agnes-migrate.js 自动重映射。
 
 ---
 
@@ -478,10 +484,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | prompt | STRING | "" | 视频描述；`<Picture 1>~5` / `<Audio 1>~3` 指代参考素材（可直连 Agnes 视频提示词生成 mode=reference 的输出） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| model | COMBO | agnes-video-2.5-flash | 2.5-flash（支持图片+音频参考）/ 旧 v2.0（仅多图，音频忽略） |
+| model | COMBO | agnes-video-2.5-flash | 2.5-flash（支持图片+音频参考，固定 720P）/ 旧 v2.0（仅多图，音频忽略，固定 1K 档位） |
 | num_frames / frame_rate | INT | 121 / 24 | 新接口换算 4-12 秒；旧接口直接传 API |
-| quality | COMBO | 1K | 仅旧接口生效；2.5-flash 固定 720P |
-| aspect_ratio | COMBO | 16:9 | 宽高比 |
+| aspect_ratio | COMBO | 16:9 | 宽高比（API 文档 2.5-flash 列 16:9/9:16；节点下拉保留 12 种，不支持的比例自动就近映射） |
 | seed | INT | 0 | 随机种子（0=每次随机） |
 | max_wait_seconds | INT | 600 | 轮询超时 |
 | image_1 ~ image_5 | IMAGE | - | 参考图片（1 必接或可只接音频；2.5-flash 上限 5 张） |
@@ -489,7 +494,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 
 **输出（含输出描述）：**
 - video: 视频（MP4 保存到 output/agnes_videos/）
-- resolution: 视频目标尺寸（WxH）
+- resolution: 视频目标尺寸：新接口 2.5-flash 固定 720P（16:9=1280×720，9:16=720×1280）；旧接口 v2.0 固定 1K 档位映射 WxH
+
+> 旧实例自愈同「文生视频」：quality（1K/2K）档位下拉已移除，旧实例 widget 值由 agnes-migrate.js 自动重映射。
 
 ---
 
