@@ -60,7 +60,7 @@ _TURNAROUND_DIRECTIVES = {
 # 渲染风格 + 纯主体规格 + 质量尾词（英文，随指令喂给 LLM）
 _RENDER = "Unreal Engine rendered look, PBR materials, soft diffused lighting"
 _SPEC = "pure white background, clean and minimal, no shadows"
-_QUALITY = "8K, highly detailed, sharp textures"
+_QUALITY = "high detail, sharp textures, clean composition"
 
 
 class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
@@ -71,7 +71,7 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
     RETURN_NAMES = ("three_view_prompt", "log_text")
     RETURN_LABELS = ("三视图提示词", "处理日志")
     OUTPUT_DOCS = {
-        "three_view_prompt": "完整三视图英文提示词：主体全部细节 + 分栏布局（左 1/3 特写 + 右 2/3 三视图）+ 虚幻引擎渲染/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词。可直接连 三视图生成(subject_desc)，或复制后手工修改再填入",
+        "three_view_prompt": "完整三视图英文提示词：主体全部细节 + 分栏布局（左 1/3 特写 + 右 2/3 三视图）+ 虚幻引擎渲染/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 质量尾词（high detail, sharp textures, clean composition）。可直接连 三视图生成(subject_desc)，或复制后手工修改再填入",
         "log_text": "处理日志（成功=提示词摘要+响应元数据；空响应=⚠️警示；失败=异常详情+堆栈）",
     }
     FUNCTION = "generate"

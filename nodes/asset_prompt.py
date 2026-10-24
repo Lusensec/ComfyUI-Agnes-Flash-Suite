@@ -52,7 +52,7 @@ _STYLE_TAGS = {
     "oil_painting": "oil painting, impasto brushstrokes, rich texture",
 }
 
-_QUALITY_TAGS = "masterpiece, best quality, highly detailed"
+_QUALITY_TAGS = "high detail, sharp focus, clean composition"
 
 
 class AgnesAssetPromptGenerator(OutputDocsMixin):
@@ -63,7 +63,7 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
     RETURN_NAMES = ("english_prompt", "log_text")
     RETURN_LABELS = ("英文资产生成提示词", "处理日志")
     OUTPUT_DOCS = {
-        "english_prompt": "可直接用于 文生图/三视图(subject_desc) 的英文提示词：保留 JSON 全部描述字段 + 主体构图指令 + 风格尾词 + quality 词；失败时返回 [Error] 前缀",
+        "english_prompt": "可直接用于 文生图/三视图(subject_desc) 的英文提示词：保留 JSON 全部描述字段 + 主体构图指令 + 风格尾词 + 质量尾词（high detail, sharp focus, clean composition）；失败时返回 [Error] 前缀",
         "log_text": "处理日志（成功=摘要预览+响应元数据；空响应=⚠️警示；失败=异常详情+堆栈）",
     }
     FUNCTION = "generate"

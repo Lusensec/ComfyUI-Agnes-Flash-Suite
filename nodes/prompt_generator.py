@@ -103,7 +103,7 @@ class AgnesScenePromptGenerator:
         extra = {}
         if "detailed_prompt" in kwargs:
             extra["detailed_prompt"] = {
-                "description": "转换为英文的详细图像生成提示词，包含主体描述、动作姿态、场景环境、光线设计、色彩影调、技术质量词"
+                "description": "转换为英文的详细图像生成提示词，包含主体描述、动作姿态、场景环境与构图/镜头语言、光线设计、色彩影调、风格化质量词（对齐 Agnes 官方文生图结构：主体+场景+风格+光照+构图+质量）"
             }
         if "log_text" in kwargs:
             extra["log_text"] = {
@@ -169,10 +169,11 @@ class AgnesScenePromptGenerator:
 - 手部动作
 - 动态或静态描述
 
-第三部分：场景与环境
-- 最远景/背景
-- 中景
-- 近景/前景
+第三部分：场景、环境与构图（镜头语言）
+- 最远景/背景（各列 1-3 个具体细节）
+- 中景（列 1-3 个具体细节）
+- 近景/前景（列 1-3 个具体细节）
+- 镜头语言：景别（大远景/全景/中景/近景/特写/大特写）、机位角度（平视/仰拍/俯拍/鸟瞰/贴地）、镜头焦段感（广角/标准/长焦）
 
 第四部分：光线设计
 - 主光源方向与类型
@@ -183,10 +184,11 @@ class AgnesScenePromptGenerator:
 - 整体色调
 - 饱和度与对比度
 
-第六部分：技术质量词
-- masterpiece, best quality, 8k, highly detailed, sharp focus
-- cinematic lighting, film grain, 35mm
-- rule of thirds composition, deep depth of field
+第六部分：技术质量词（须适配上方【风格要求】，优先自然语言描述，避免照搬与风格冲突的固定词表）
+- 通用质量描述：high detail, sharp focus, clean composition
+- 风格匹配：anime→clean lineart / cel shading；watercolor→paper texture / soft washes；oil_painting→impasto brushstrokes；cinematic→cinematic lighting / film grain / 35mm；realistic→photorealistic
+- 不要附加与风格冲突的电影感词（如 anime/watercolor 不加 film grain、35mm）
+- 可酌情加入 rule of thirds、depth of field 等构图技法
 
 【输出要求】
 - 只输出一个完整的英文提示词段落

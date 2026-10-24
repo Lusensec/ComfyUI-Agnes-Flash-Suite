@@ -110,7 +110,7 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
             }),
             "model": (AVAILABLE_IMAGE_MODELS, {
                 "default": IMAGE_MODEL,
-                "tooltip": "图像生成模型（agnes-image-2.5-flash 支持 1K-4K 档位）",
+                "tooltip": "图像生成模型（固定 agnes-image-2.5-flash，支持 1K-4K 档位）",
             }),
             "quality": (list(cls.QUALITIES), {
                 "default": "2K",

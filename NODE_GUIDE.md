@@ -356,9 +356,9 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | prompt | STRING | "" | 英文图像描述 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
-| model | COMBO | agnes-image-2.5-flash | 图像生成模型，可选 2.5-flash / 2.1-flash / 2.0-flash（选旧模型时 width/height 按像素生效） |
-| width | INT | 1920 | 图像宽度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效 |
-| height | INT | 1080 | 图像高度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效 |
+| model | COMBO | agnes-image-2.5-flash | 图像生成模型（固定 agnes-image-2.5-flash，套件唯一图像模型；旧 2.1/2.0-flash 选项已下线，旧实例载入时自动迁到 2.5） |
+| width | INT | 1920 | 图像宽度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效（已下线，2.5 模型下不生效，保留仅为兼容旧实例） |
+| height | INT | 1080 | 图像高度（像素）：仅旧接口 2.1/2.0 按 WxH 像素生效（已下线，2.5 模型下不生效，保留仅为兼容旧实例） |
 | quality | COMBO | 1K | 画质档位：1K/2K/3K/4K（新图像模型 agnes-image-2.5-flash 按档位出图，2K 性价比最高） |
 | aspect_ratio | COMBO | 16:9 | 宽高比（与视频节点一致）：新接口与 quality 档位组合出图，如 16:9 + 2K = 2624×1472；支持 1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9；旧接口不生效 |
 | n | INT | 1 | 单次请求生成张数 1-4：当前服务端对所有图像模型限单张（n>1 自动降级 1 张并打印提示），API 解锁后直接生效；多资产请多节点实例各出 1 张 |
@@ -372,6 +372,48 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > 文生图节点已删除；单张出图直接用本节点（n=1）
 
 > 提示词为空（prompt 留空/上游未连）时直接跳过、不调 API：输出黑图占位 + 日志「[跳过] 提示词为空…」，避免空请求被误判为「空响应」。
+
+> **官方推荐提示词结构（文生图）**：Agnes Image 2.5 官方建议六槽
+> `[主体]+[场景/环境]+[风格]+[光照]+[构图]+[质量要求]`，高密度时每槽列 1-3 个具体细节、
+> 质量用自然语言描述（如 high detail / clean lighting），避免 masterpiece/8k 类硬标签。
+> 套件内「分镜提示词生成」模板已按此结构组织（含镜头语言与风格化质量词），输出直连本节点即可。
+
+---
+
+### 🖼️ Agnes 图生图 (AgnesNovelImageToImage)
+
+**功能：** 以参考图为底做编辑/变换（img2img）：主参考图必接 + 最多 5 张额外参考图（合计 6 张，
+走 API 多图合成 `extra_body.image[]`）；与 图像生成 同一 agnes-image-2.5-flash 模型、共享画质档位/比例语义。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| image | IMAGE | （必接） | 主参考图：图生图以此图为底做编辑/变换；构图与主体布局会被尽量保留 |
+| prompt | STRING | "" | 变换描述（建议英文）；strength<1.0 时自动追加「贴近原图」指令 |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址 |
+| api_key | STRING | sk-你的Key | Agnes AI API Key |
+| model | COMBO | agnes-image-2.5-flash | 图像生成模型（固定 agnes-image-2.5-flash，套件唯一图像模型；旧 2.1/2.0 实例载入时自动迁到 2.5） |
+| quality | COMBO | 1K | 画质档位：1K/2K/3K/4K 与比例组合出图（2K 性价比最高） |
+| aspect_ratio | COMBO | 1:1 | 输出宽高比（1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9） |
+| strength | FLOAT | 0.75 | 变化强度 0-1：API 无 strength 参数，节点转成提示词指令（越低越贴近原图，1.0=完全按提示词改变） |
+| n | INT | 1 | 单次生成张数：2.5 模型 API 固定出 1 张（1-4 仅旧接口） |
+| reference_image_2..6 | IMAGE（可选）×5 | （不连=跳过） | 额外参考图（合计最多 6 张）：多图合成时各图角色需在 prompt 中指明 |
+
+**输出：**
+- images: 编辑/生成后的图像张量（可连 SaveImage 或视频节点）
+- resolution: 本次输出的实际分辨率（WxH）
+
+> **官方推荐提示词结构（图生图）**：Agnes Image 2.5 官方建议四槽
+> `[改变要求]+[新风格/场景]+[需要添加或移除的元素]+[需要保留的元素]`，
+> 显式写出「保留什么」（脸部/服装/姿势等）能显著提升编辑稳定性。示例：
+> 「把背景换成夜晚的未来都市，保留人物的脸部、服装与姿势不变」
+> （英文提交：Change the background to a futuristic city at night while keeping the person's face, outfit, and pose unchanged）。
+
+> **官方推荐提示词结构（多图合成，接 reference_image_2..6 时）**：官方建议
+> `[参考图角色]+[目标场景]+[图像之间的关系]+[风格/光照/构图]`——先指明每张参考图的角色
+> （图 1 的角色 + 图 2 的机器人…），再写目标场景与图间关系。示例：
+> 「将图 1 的角色与图 2 的机器人放进同一场科幻战斗，电影感光照，动态构图」。
+
+> 提示词为空时直接跳过、不调 API：输出黑图占位 + 日志说明。
 
 ---
 
@@ -727,6 +769,11 @@ all_prompts 空项=跳过该槽（槽号保位）；单槽失败不影响其他�
 > 典型接法（一根线）：`三视图批量生成.all_images (N,H,W,3) → 图像拼图.batch_images → 预览图像/SaveImage`（资产线全链路收尾）；
 > 旧接法 `image_1..20 → 图像拼图` 仍可用；配合 status JSON（全部失败时含 reason）核对哪些槽没出图。
 > 日志：`[Agnes 图像拼图] 有效 N/分母 张（来源: batch_images 批量张量（N 条…） / image_1..20 槽）→ 拼图 W×H（行数 × 2 列，条目 […]）`。
+
+> 提示词参考：本节点是**纯本地拼图**（无提示词、不调 API）；若多张参考图需要**经 API 出图**
+> （多图合成），走「Agnes 图生图」节点的 reference_image_2..6（合计最多 6 张），
+> 提示词按官方多图合成结构写：`[参考图角色]+[目标场景]+[图像之间的关系]+[风格/光照/构图]`
+> （详见「Agnes 图生图」章节）。
 
 ### 🔗 Agnes 字符串合并 (AgnesStringMerge)
 

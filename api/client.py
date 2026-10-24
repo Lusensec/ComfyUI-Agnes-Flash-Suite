@@ -25,7 +25,7 @@ _CONFIG_FILE = os.path.join(_PLUGIN_DIR, "config.yaml")
 # 默认配置
 DEFAULT_BASE_URL = "https://api.agnes-ai.cn/v1"
 DEFAULT_CHAT_MODEL = "agnes-2.5-flash"
-DEFAULT_IMAGE_MODEL = "agnes-image-2.1-flash"
+DEFAULT_IMAGE_MODEL = "agnes-image-2.5-flash"  # 套件唯一图像模型（2.1/2.0 已下线；对齐 api/__init__.py）
 DEFAULT_VIDEO_MODEL = "agnes-video-v2.0"
 DEFAULT_VIDEO_MAX_WAIT = 600
 DEFAULT_VIDEO_POLL_INTERVAL = 10

@@ -135,7 +135,7 @@ class AgnesSceneImageBatch(OutputDocsMixin):
             }),
             "model": (AVAILABLE_IMAGE_MODELS, {
                 "default": IMAGE_MODEL,
-                "tooltip": "图像生成模型（agnes-image-2.5-flash 支持 1K-4K 档位；2.1/2.0 旧版按像素出图）",
+                "tooltip": "图像生成模型（固定 agnes-image-2.5-flash，支持 1K-4K 档位；旧 2.1/2.0 实例载入时自动迁到 2.5）",
             }),
             "max_concurrency": ("INT", {
                 "default": 10,

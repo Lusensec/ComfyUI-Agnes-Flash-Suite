@@ -29,6 +29,8 @@
  * ① dropIdx 条目限定旧档位值指纹（[4]/[6] = "1K"/"2K"）：新增「重试次数」尾参后，
  * 新结构文生/关键帧 10 项、参考视频 13 项与旧档位实例同长度，靠该指纹避免误删；
  * 「重试次数」为纯尾部新增 widget，旧实例载入时自动补默认值 5，无需迁移条目。
+ * 图像模型单项化（2.1/2.0 下线）：5 个图像节点同长度重映射，仅把 model 槽位旧值
+ * （agnes-image-2.1/2.0-flash）换成 agnes-image-2.5-flash，指纹限定旧模型值，幂等。
  * 仍报错的兜底：删节点重加（右键 Agnes Novel → 对应节点）后重连。
  */
 (function () {
@@ -36,6 +38,11 @@
 
     var NEW_MODEL = "agnes-video-2.5-flash";
     var NEW_RES = "720P";
+    var NEW_IMAGE_MODEL = "agnes-image-2.5-flash";
+
+    // 图像模型单项化（2.1/2.0 下线）：同长度重映射，仅替换 model 槽位值为 2.5-flash
+    function isOldImageModel(v) { return v === "agnes-image-2.1-flash" || v === "agnes-image-2.0-flash"; }
+    function remapImageModel(wv, idx) { var c = wv.slice(); c[idx] = NEW_IMAGE_MODEL; return c; }
 
     // 由旧 帧数/帧率 推导 秒数（4-12 钳位；缺省 5）
     function deriveSecs(nf, fr) {
@@ -106,6 +113,33 @@
                 return typeof wv[4] === "number";
             },
             map: mapVref
+        },
+        // —— 图像：模型单项化（2.1/2.0 下线，统一 2.5-flash）：同长度重映射，
+        //    仅替换 model 槽位旧值，其余原样；指纹限定旧模型值，2.5 实例不命中（幂等）——
+        {
+            cls: "AgnesImageGen", oldLen: 9, newLen: 9,
+            fingerprint: function (wv) { return isOldImageModel(wv[3]); },
+            map: function (wv) { return remapImageModel(wv, 3); }
+        },
+        {
+            cls: "AgnesNovelImageToImage", oldLen: 8, newLen: 8,
+            fingerprint: function (wv) { return isOldImageModel(wv[3]); },
+            map: function (wv) { return remapImageModel(wv, 3); }
+        },
+        {
+            cls: "AgnesSubjectTurnaround", oldLen: 7, newLen: 7,
+            fingerprint: function (wv) { return isOldImageModel(wv[3]); },
+            map: function (wv) { return remapImageModel(wv, 3); }
+        },
+        {
+            cls: "AgnesSceneImageBatch", oldLen: 7, newLen: 7,
+            fingerprint: function (wv) { return isOldImageModel(wv[5]); },
+            map: function (wv) { return remapImageModel(wv, 5); }
+        },
+        {
+            cls: "AgnesTurnaroundBatch", oldLen: 7, newLen: 7,
+            fingerprint: function (wv) { return isOldImageModel(wv[3]); },
+            map: function (wv) { return remapImageModel(wv, 3); }
         }
     ];
 
@@ -208,7 +242,7 @@
                     return origQueuePrompt.apply(this, arguments);
                 };
             }
-            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12）");
+            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 迁移扩展注册失败（不影响节点功能）:", e);
         }

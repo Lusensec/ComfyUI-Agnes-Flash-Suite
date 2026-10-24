@@ -12,8 +12,8 @@ Supported Models:
 - agnes-3.0-flash : Agent 编程/工具编排（Thinking 7 档），推荐用于复杂任务
 - agnes-2.5-flash : LLM chat / vision / tools（默认文本模型，Thinking 5 档）
 - agnes-2.0-flash : 旧版 LLM
-- agnes-image-2.5-flash (默认): 档位 1K-4K + ratio + extra_body 多图合成
-- agnes-image-2.1/2.0 : 文生图、图生图（WxH 像素）
+- agnes-image-2.5-flash (默认): 档位 1K-4K + ratio + extra_body 多图合成（套件唯一图像模型）
+- agnes-image-2.1/2.0 : 旧版 WxH 像素路径（客户端保留兼容分支，节点已不再提供选项；显式传旧模型才走该分支）
 - agnes-video-2.5-flash (默认): seconds 4-12s + mode text/keyframe/reference, 720P
 - agnes-video-v2.0 : 文生视频、图生视频（num_frames 轮询）
 """
@@ -119,7 +119,7 @@ VIDEO_POLL_INTERVAL = _config["video_poll_interval"]
 AVAILABLE_CHAT_MODELS = list(dict.fromkeys(
     [CHAT_MODEL, "agnes-3.0-flash", "agnes-2.5-flash", "agnes-2.0-flash"]))
 AVAILABLE_IMAGE_MODELS = list(dict.fromkeys(
-    [IMAGE_MODEL, "agnes-image-2.5-flash", "agnes-image-2.1-flash", "agnes-image-2.0-flash"]))
+    [IMAGE_MODEL, "agnes-image-2.5-flash"]))  # 仅保留 2.5（2.1/2.0 已下线；旧实例由 agnes-migrate.js 自动迁到 2.5）
 AVAILABLE_VIDEO_MODELS = list(dict.fromkeys(
     [VIDEO_MODEL, "agnes-video-2.5-flash", "agnes-video-v2.0"]))
 

@@ -59,7 +59,7 @@ class AgnesImageGen:
                 }),
                 "model": (AVAILABLE_IMAGE_MODELS, {
                     "default": IMAGE_MODEL,
-                    "tooltip": "图像生成模型（当前默认 agnes-image-2.5-flash；选旧模型时 width/height 按像素生效）"
+                    "tooltip": "图像生成模型（固定 agnes-image-2.5-flash：套件唯一图像模型；旧 2.1/2.0 实例载入时自动迁到 2.5）"
                 }),
                 "width": ("INT", {
                     "default": 1920,

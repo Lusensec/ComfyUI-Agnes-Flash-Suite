@@ -108,7 +108,7 @@ class AgnesNovelImageToImage(OutputDocsMixin):
                 }),
                 "model": (AVAILABLE_IMAGE_MODELS, {
                     "default": IMAGE_MODEL,
-                    "tooltip": "图像生成模型（默认 agnes-image-2.5-flash；旧接口 2.1/2.0 按 WxH 像素出图）",
+                    "tooltip": "图像生成模型（固定 agnes-image-2.5-flash：套件唯一图像模型；旧 2.1/2.0 实例载入时自动迁到 2.5）",
                 }),
                 "quality": (["1K", "2K", "3K", "4K"], {
                     "default": "1K",
