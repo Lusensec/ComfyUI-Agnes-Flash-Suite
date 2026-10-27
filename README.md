@@ -66,7 +66,7 @@ ComfyUI 实测截图：
 - 🎬 Agnes 关键帧生视频节点：首尾帧；prompt 输入可直连 Agnes 视频提示词生成/批量 输出的英文视频提示词，免手写运镜描述；4-12 秒直控 + 720P；同上文生视频的 503 退避
 - 🎞️ Agnes 参考视频生成节点：最多 5 参考图 + 3 参考音频；4-12 秒直控 + 720P；同上文生视频的 503 退避
 - 🎞️ Agnes 视频任务提交节点：输入/退避同 文生视频（10 输入一致，503 按「重试次数」退避）；只提交不等待——拿到任务 ID 秒级返回，画布立刻解放；输出 task_url（成功=完整轮询 URL 含域名，直连 收取；失败="0" 标记=未生成任务）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）+ api_key 穿透（提交时实际用的 Key，直连 收取 的 api_key 输入，收取端免再配）
-- 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查；收到 "0"=上游提交失败标记，直接跳过收取）+ api_key（可直连 提交 节点的 api_key 穿透输出）；节点内轮询（首查 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载（3 次重试）；输出 video（环境动态类型同 文生视频：原生 VIDEO 可直连 Save Video 出片预览 / VHS_VIDEOINFO / 路径字符串；无文件态原生环境红错指引再运行，VHS/STRING 回空值）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败；error=收到 0 标记，跳过收取，原因见 提交 节点 status）
+- 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查；收到 "0"=上游提交失败标记，直接跳过收取）+ api_key（可直连 提交 节点的 api_key 穿透输出）；节点内轮询（首查 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载（3 次重试）；输出 video（环境动态类型同 文生视频：原生 VIDEO 可直连 Save Video 出片预览 / VHS_VIDEOINFO / 路径字符串；无文件态原生环境出 NO_VIDEO_ 前缀黑帧占位 + status 携带 error 内容（队列不打断），VHS/STRING 回空值）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败；error=收到 0 标记，跳过收取，原因见 提交 节点 status）
 
 前端特性：
 

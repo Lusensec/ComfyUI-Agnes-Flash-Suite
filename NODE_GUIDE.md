@@ -592,10 +592,10 @@ completed 自动下载 mp4（3 次重试 2/5/10s），输出视频（环境动�
 | timeout | INT | 600 | 本节点最长等待（秒，默认 10 分钟）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查（任务还在服务端）；视频一般 3-10 分钟出片，默认 10 分钟通常一趟收完，慢了就再点一次 |
 
 **输出（含输出描述）：**
-- video: MP4 文件（落盘 ComfyUI output/agnes_videos/），输出类型随环境三档（与 文生视频 同源动态探测）：原生 ComfyUI = VIDEO（VideoFromFile 惰性文件引用，**可直连 Save Video**：SaveVideo 读盘重编码到 output/video/ 并在输出预览面板播放）/ 装 VHS = VHS_VIDEOINFO（可接 VHS 播放器）/ 无视频节点 = 路径字符串；任务未完成/失败/未连接输入时：原生环境本节点红错（错误信息指明下一步），VHS/STRING 环境返回空值不崩
+- video: MP4 文件（落盘 ComfyUI output/agnes_videos/），输出类型随环境三档（与 文生视频 同源动态探测）：原生 ComfyUI = VIDEO（VideoFromFile 惰性文件引用，**可直连 Save Video**：SaveVideo 读盘重编码到 output/video/ 并在输出预览面板播放）/ 装 VHS = VHS_VIDEOINFO（可接 VHS 播放器）/ 无视频节点 = 路径字符串；无视频文件时（任务未完成/失败/未连接输入/0 标记/缺 Key）：原生环境输出 NO_VIDEO_ 前缀的 2 秒黑帧 720P 占位 mp4（status 携带 error 内容、队列不被打断；PyAV 不可用时回退红错），VHS/STRING 环境返回空值不崩
 - status: 任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（任务级 failed 与下载失败诊断）；processing=到轮询超时未完成（可再次右键运行本节点继续查询）；error=收到 0 标记（上游 提交 失败，跳过收取，原因见 提交 节点 status）；empty=未连接 task_url
 
-> 无文件态红错约定（同 文生视频）：原生视频环境下 收到 0 标记（上游提交失败）/failed/processing/empty/缺 Key 时本节点抛红色错误而非给空视频引用（空引用会令下游 Save Video 崩溃）——红错文案即处置指引（如「已等待 600 秒任务未完成，可再次运行本节点继续查询」「上游 提交 未成功（task_url=0 标记），等 5-10 分钟重跑 提交 节点」），出片/提交成功后再次右键运行即通过；任务仍在服务端，不重复计费。
+> 无文件态黑帧占位约定：原生视频环境下 video 槽必须交接真实文件（空引用会令下游 Save Video 崩溃），故 收到 0 标记（上游提交失败）/failed/processing/empty/缺 Key 时输出 NO_VIDEO_ 前缀黑帧占位 mp4（PyAV 现场编码 2 秒 720P，约 12KB），**status 携带完整 error 内容、队列不被打断**（如「processing: 已等待 600 秒任务未完成，可再次运行本节点继续查询」「error: 上游 提交 未成功（task_url=0 标记），等 5-10 分钟重跑 提交 节点」）；出片/提交成功后再次右键运行即得真视频；任务仍在服务端，不重复计费。占位文件靠 NO_VIDEO_ 前缀自证，勿当真实视频用；PyAV 不可用时回退旧红错约定。文生视频等节点仍维持原红错约定。
 
 ---
 
@@ -1042,7 +1042,7 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 ### 视频生成超时
 - 查看错误信息中的 video_id
 - 调低 seconds 时长（如 12→5 秒）或调大 max_wait_seconds
-- 异步两段式：收取 节点到轮询超时未完成（不算任务失败）：原生视频环境=节点红错（文案指引「再次运行本节点继续查询」），VHS/STRING 环境=status 输出 processing → 再次右键运行该节点即继续查（任务还在服务端，不重复计费）
+- 异步两段式：收取 节点到轮询超时未完成（不算任务失败）：原生视频环境=节点出 NO_VIDEO_ 黑帧占位 + status 输出 processing（文案指引「再次运行本节点继续查询」），VHS/STRING 环境=status 输出 processing → 再次右键运行该节点即继续查（任务还在服务端，不重复计费）
 - 稍后重试（服务器可能繁忙）
 
 ### 视频队列已满（503 video_queue_full）
