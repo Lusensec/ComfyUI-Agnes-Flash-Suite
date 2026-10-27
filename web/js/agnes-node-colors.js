@@ -9,7 +9,7 @@
  *   │ 文本类·绿 ── 主绿：文本输入/解说剧本/漫剧剧本 ｜ 浅绿：场景切分/总导演/资产提取/LLM 对话
  *   │               ｜ 墨绿：分镜提示词/分镜提示词批量/文本拆分/资产提示词/资产提示词批量/三视图提示词/三视图提示词批量/字符串合并
  *   │ 图片类·蓝 ── 主蓝：图像生成/三视图批量生成/分镜图批量生成 ｜ 浅蓝：图生图 ｜ 深蓝：三视图生成/图像反推提示词/图像拼图
- *   └ 视频类·紫 ── 主紫：文生视频 ｜ 浅紫：关键帧生视频 ｜ 深紫：参考视频生成/视频任务提交/视频任务收取/视频任务批量收取
+ *   └ 视频类·紫 ── 主紫：文生视频 ｜ 浅紫：关键帧生视频 ｜ 深紫：参考视频生成/视频任务提交/视频任务收取
  *
  * 同功能类用同一色系（一眼认出"这是文本/图片/视频节点"），类内再用主/浅/深三阶
  * 小幅度区分"主功能 / 次功能 / 工具与中间层"，避免全族单色无法分辨。
@@ -83,7 +83,6 @@
         "AgnesVideoReference": "video",
         "AgnesVideoTaskSubmit": "video",
         "AgnesVideoTaskCollect": "video",
-        "AgnesVideoTaskBatchCollect": "video",
     };
 
     // ── 节点 → 类内色阶：main=主功能 / light=次功能 / deep=工具与中间层（未登记=main） ──
@@ -120,7 +119,6 @@
         "AgnesVideoReference": "deep",
         "AgnesVideoTaskSubmit": "deep",
         "AgnesVideoTaskCollect": "deep",
-        "AgnesVideoTaskBatchCollect": "deep",
     };
 
     function paletteOf(nodeName) {
