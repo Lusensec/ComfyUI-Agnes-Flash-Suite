@@ -13,6 +13,8 @@ Agnes 视频任务收取节点（异步两段式·收取段，单任务）
                / VHS = VHS_VIDEOINFO / 无视频节点 = 路径字符串，
                status 输出=服务端视频 URL；
   failed     → status 输出=Agnes 服务端错误响应内容；
+  task_url=0 → 上游 视频任务提交 失败标记（未生成任务）：跳过整个收取过程
+               （零轮询零下载），status 输出 error 内容；
   processing → 到 timeout 仍生成中（不算任务失败）：
                status 输出=提示可再次右键运行本节点继续查（任务还在服务端）。
 
@@ -64,7 +66,7 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
     RETURN_LABELS = ("视频", "状态")
     OUTPUT_DOCS = {
         "video": "MP4 文件输出，类型随环境（同 文生视频 三档）：原生 ComfyUI=VIDEO（VideoFromFile 惰性文件引用，直连 Save Video：重编码到 output/video/ 并在输出预览面板播放）/ VHS=VHS_VIDEOINFO（可接 VHS 播放器）/ 无视频节点=本地路径字符串（ComfyUI output/agnes_videos/）；任务未完成/失败/未连接输入时：原生环境本节点红错（信息指明下一步），VHS/STRING 环境返回空值",
-        "status": "任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（含任务级 failed 与下载失败诊断）；processing=到轮询超时任务未完成（可再次右键运行本节点继续查询）；empty=未连接 task_url",
+        "status": "任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（含任务级 failed 与下载失败诊断）；processing=到轮询超时任务未完成（可再次右键运行本节点继续查询）；error=收到 0 标记（上游 提交 失败，跳过收取，原因见 提交 节点 status）；empty=未连接 task_url",
     }
 
     @classmethod
@@ -76,7 +78,7 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
                     "multiline": True,
                     "default": "",
                     "placeholder": "https://api.agnes-ai.cn/agnesapi?video_id=…&model_name=agnes-video-2.5-flash",
-                    "tooltip": "完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名提交的任务也能查）；留空=无任务可查（原生视频环境本节点红错提示，VHS/STRING 环境输出 empty）",
+                    "tooltip": "完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名提交的任务也能查）；留空=无任务可查（原生视频环境本节点红错提示，VHS/STRING 环境输出 empty）；收到 0=上游提交失败标记：跳过收取、status 输出 error 内容",
                 }),
                 "api_key": ("STRING", {
                     "label": "API Key",
@@ -120,6 +122,11 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
         url = str(task_url or "").strip()
         if not url:
             return self._no_video("empty", "未连接 task_url 输入（可直连 Agnes 视频任务提交 的 task_url 输出）")
+        if url == "0":
+            # 上游 提交 节点失败标记（task_url=0=未生成任务）：跳过整个收取过程（零轮询零下载），
+            # status 直接输出 error 内容；原生视频环境 video 槽不能给空引用（SaveVideo 会崩），
+            # 故红错文案指明根因去向，VHS/STRING 环境返回空值 + error 状态（不崩）
+            return self._no_video("error", "上游 Agnes 视频任务提交 未成功（task_url=0 标记）：原因见该节点 status 输出（如 503 队列满→等 5-10 分钟重跑 提交 节点）；提交成功后再次右键运行本节点收片")
 
         if not api_key.strip():
             api_key = get_api_key()

@@ -568,7 +568,7 @@ keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）�
 | retries | INT | 5 | 提交遇 503 队列满/429 限流的自动重试次数（同文生视频：10/30/60 秒，第 4 次起每次 60 秒） |
 
 **输出（含输出描述）：**
-- task_url: 完整轮询 URL（含域名 /agnesapi?video_id=…&model_name=…；域名跟随本节点请求地址，跨域名提交也拼对）——直连 收取 节点的 task_url 输入；提交失败时为空
+- task_url: 完整轮询 URL（含域名 /agnesapi?video_id=…&model_name=…；域名跟随本节点请求地址，跨域名提交也拼对）——直连 收取 节点的 task_url 输入；提交失败="0" 标记（未生成任务，收取节点见 "0" 直接跳过收取）
 - status: 任务状态：成功=`submitted: video_id=…`；失败=Agnes 服务端错误响应内容（HTTP 503 队列满/400 参数错误等的原文诊断）
 - api_key: API Key 穿透：提交时实际使用的 Key（节点输入非空=输入值，否则=全局回退值）——直连 收取 节点的 api_key 输入，收取端免再配 Key（提交失败/缺 Key 短路时为空）
 
@@ -587,15 +587,15 @@ completed 自动下载 mp4（3 次重试 2/5/10s），输出视频（环境动�
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| task_url | STRING | "" | 完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名可查）；留空=整节点跳过（status 输出 empty） |
+| task_url | STRING | "" | 完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名可查）；留空=整节点跳过（status 输出 empty）；收到 "0"=上游提交失败标记，跳过收取、status 输出 error 内容 |
 | api_key | STRING | sk-你的Key | 轮询查询需 Bearer 鉴权，可直连 视频任务提交 的 api_key 穿透输出（提交端实际用的 Key，免再配）；留空跟随全局；域名已在 task_url 里，无需再填请求地址 |
 | timeout | INT | 600 | 本节点最长等待（秒，默认 10 分钟）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查（任务还在服务端）；视频一般 3-10 分钟出片，默认 10 分钟通常一趟收完，慢了就再点一次 |
 
 **输出（含输出描述）：**
 - video: MP4 文件（落盘 ComfyUI output/agnes_videos/），输出类型随环境三档（与 文生视频 同源动态探测）：原生 ComfyUI = VIDEO（VideoFromFile 惰性文件引用，**可直连 Save Video**：SaveVideo 读盘重编码到 output/video/ 并在输出预览面板播放）/ 装 VHS = VHS_VIDEOINFO（可接 VHS 播放器）/ 无视频节点 = 路径字符串；任务未完成/失败/未连接输入时：原生环境本节点红错（错误信息指明下一步），VHS/STRING 环境返回空值不崩
-- status: 任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（任务级 failed 与下载失败诊断）；processing=到轮询超时未完成（可再次右键运行本节点继续查询）；empty=未连接 task_url
+- status: 任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（任务级 failed 与下载失败诊断）；processing=到轮询超时未完成（可再次右键运行本节点继续查询）；error=收到 0 标记（上游 提交 失败，跳过收取，原因见 提交 节点 status）；empty=未连接 task_url
 
-> 无文件态红错约定（同 文生视频）：原生视频环境下 failed/processing/empty/缺 Key 时本节点抛红色错误而非给空视频引用（空引用会令下游 Save Video 崩溃）——红错文案即处置指引（如「已等待 600 秒任务未完成，可再次运行本节点继续查询」），出片后再次右键运行即通过；任务仍在服务端，不重复计费。
+> 无文件态红错约定（同 文生视频）：原生视频环境下 收到 0 标记（上游提交失败）/failed/processing/empty/缺 Key 时本节点抛红色错误而非给空视频引用（空引用会令下游 Save Video 崩溃）——红错文案即处置指引（如「已等待 600 秒任务未完成，可再次运行本节点继续查询」「上游 提交 未成功（task_url=0 标记），等 5-10 分钟重跑 提交 节点」），出片/提交成功后再次右键运行即通过；任务仍在服务端，不重复计费。
 
 ---
 
