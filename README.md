@@ -65,9 +65,9 @@ ComfyUI 实测截图：
 - 🎞️ Agnes 文生视频节点：4-12 秒时长直控 seconds + 固定 720P 分辨率项 + 宽高比；模型为 Agnes Video 2.5-flash；提交遇 503 队列满自动退避重试：「重试次数」参数可调 0-30（默认 5）
 - 🎬 Agnes 关键帧生视频节点：首尾帧；prompt 输入可直连 Agnes 视频提示词生成/批量 输出的英文视频提示词，免手写运镜描述；4-12 秒直控 + 720P；同上文生视频的 503 退避
 - 🎞️ Agnes 参考视频生成节点：最多 5 参考图 + 3 参考音频；4-12 秒直控 + 720P；同上文生视频的 503 退避
-- 🎞️ Agnes 视频任务提交节点：输入/退避同 文生视频（10 输入一致，503 按「重试次数」退避）；只提交不等待——拿到任务 ID 秒级返回，画布立刻解放；输出 task_url（完整轮询 URL 含域名，直连 收取/批量收取）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）
-- 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查）；节点内轮询（首查 60s、之后每 5s），completed 自动下载（3 次重试）；输出 video（本地路径）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败）
-- 📥 Agnes 视频任务批量收取节点：20 个可选 url 槽（各直连 视频任务提交 task_url）或 all_urls JSON 数组；线程池并发轮询（max_concurrency 默认 10）+ completed 自动下载；输出 20 路 video 本地路径 + 20 路 status + 整批状态 JSON（completed/failed/processing/empty 四桶 + 失败 reason，可连 文本拆分 分析）+ all_videos 成功槽视频 URL JSON 数组
+- 🎞️ Agnes 视频任务提交节点：输入/退避同 文生视频（10 输入一致，503 按「重试次数」退避）；只提交不等待——拿到任务 ID 秒级返回，画布立刻解放；输出 task_url（完整轮询 URL 含域名，直连 收取/批量收取）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）+ api_key 穿透（提交时实际用的 Key，直连 收取/批量收取 的 api_key 输入，收取端免再配）
+- 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查）+ api_key（可直连 提交 节点的 api_key 穿透输出）；节点内轮询（首查 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载（3 次重试）；输出 video（本地路径）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败）
+- 📥 Agnes 视频任务批量收取节点：20 个可选 url 槽（各直连 视频任务提交 task_url）或 all_urls JSON 数组；api_key 可直连 提交 节点穿透输出；线程池并发轮询（max_concurrency 默认 10，timeout 默认 10 分钟）+ completed 自动下载；输出 20 路 video 本地路径 + 20 路 status + 整批状态 JSON（completed/failed/processing/empty 四桶 + 失败 reason，可连 文本拆分 分析）+ all_videos 成功槽视频 URL JSON 数组
 
 前端特性：
 

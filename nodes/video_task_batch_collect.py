@@ -111,7 +111,7 @@ class AgnesVideoTaskBatchCollect(OutputDocsMixin):
                 "label": "API Key",
                 "default": "",
                 "placeholder": "sk-...",
-                "tooltip": "Agnes AI API Key：轮询查询需 Bearer 鉴权，留空自动加载全局（API Key 配置节点/环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）；域名已在各 task_url 里，无需再填请求地址",
+                "tooltip": "Agnes AI API Key：轮询查询需 Bearer 鉴权，可直连 Agnes 视频任务提交 的 api_key 穿透输出（提交端实际用的 Key，免再配）；留空自动加载全局（API Key 配置节点/环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）；域名已在各 task_url 里，无需再填请求地址",
             }),
             "max_concurrency": ("INT", {
                 "label": "并发速率",
@@ -123,11 +123,11 @@ class AgnesVideoTaskBatchCollect(OutputDocsMixin):
             }),
             "timeout": ("INT", {
                 "label": "轮询超时",
-                "default": 1800,
+                "default": 600,
                 "min": 60,
                 "max": 7200,
                 "step": 60,
-                "tooltip": "本节点最长等待（秒，默认 1800=30 分钟）：到点仍生成中的槽=processing（不算失败），再次右键运行本节点即继续查（任务还在服务端）；视频一般 3-10 分钟出片，默认 30 分钟通常一趟收完",
+                "tooltip": "本节点最长等待（秒，默认 600=10 分钟）：到点仍生成中的槽=processing（不算失败），再次右键运行本节点即继续查（任务还在服务端）；视频一般 3-10 分钟出片，默认 10 分钟通常一趟收完，慢了就再点一次",
             }),
         })
         return {"required": slots, "optional": {}}
@@ -141,7 +141,7 @@ class AgnesVideoTaskBatchCollect(OutputDocsMixin):
         all_urls: str = "",
         api_key: str = "",
         max_concurrency: int = MAX_CONCURRENCY_DEFAULT,
-        timeout: int = 1800,
+        timeout: int = 600,
     ):
         url_slots = [
             str(url_1 or "").strip(), str(url_2 or "").strip(), str(url_3 or "").strip(),
@@ -155,7 +155,7 @@ class AgnesVideoTaskBatchCollect(OutputDocsMixin):
         all_urls_raw = str(all_urls or "").strip()
         api_key = str(api_key or "").strip()
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or MAX_CONCURRENCY_DEFAULT)))
-        timeout = int(timeout or 1800)
+        timeout = int(timeout or 600)
 
         # ── 槽位归一：url_i 优先；url_i 全空时回退 all_urls；槽号=条目序号 1 起保位 ──
         if any(url_slots):
