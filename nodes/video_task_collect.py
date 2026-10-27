@@ -3,13 +3,23 @@
 Agnes 视频任务收取节点（异步两段式·收取段，单任务）
 =====================================================
 输入 1 路 task_url（直连 Agnes 视频任务提交 的 task_url 输出；完整轮询 URL
-自带域名，跨域名提交的任务同样可查），节点内轮询查询任务状态：
+自带域名，跨域名提交的任务同样可查）+ api_key（可直连 提交 节点的 api_key
+穿透输出，免再配），节点内轮询查询任务状态：
 
   completed  → 自动下载 mp4 到 ComfyUI output/agnes_videos/，
-               video 输出=本地路径，status 输出=服务端视频 URL；
-  failed     → video 输出=空，status 输出=Agnes 服务端错误响应内容；
-  processing → 到 timeout 仍生成中（不算失败）：video=空，
-               status 提示可再次右键运行本节点继续查（任务还在服务端）。
+               video 输出=环境动态类型（同 文生视频 三档）：
+               原生 ComfyUI = VIDEO（VideoFromFile 惰性文件引用，
+               可直连 Save Video：SaveVideo 重编码到 output/video/ 并预览）
+               / VHS = VHS_VIDEOINFO / 无视频节点 = 路径字符串，
+               status 输出=服务端视频 URL；
+  failed     → status 输出=Agnes 服务端错误响应内容；
+  processing → 到 timeout 仍生成中（不算任务失败）：
+               status 输出=提示可再次右键运行本节点继续查（任务还在服务端）。
+
+无文件态（failed/processing/empty）的 video 输出约定（同 文生视频 _error）：
+  原生 VIDEO 环境 → 本节点抛红色错误（空文件引用会令 SaveVideo 崩溃，
+  红错信息已指明下一步：出片后再点一次即通过）；
+  VHS/STRING 环境 → 返回空值不崩（VHS 预览空白 / 路径字符串空串）。
 
 轮询节奏与 文生视频 一致：首查前等 60s（任务排队期），之后每 5s 一次；
 下载自动 3 次重试（2/5/10 秒），URL 仍在有效期内可手动抢救。
@@ -20,9 +30,13 @@ from typing import Tuple
 
 from ..api import AgnesClient, get_api_key
 from ._output_docs import OutputDocsMixin
+from .text2video import _VIDEO_MODE, _VIDEO_OUTPUT_TYPE, _make_result
 
 # 输出目录：与 文生视频 节点一致（ComfyUI output/agnes_videos/）
 _COMFYUI_OUTPUT_DIR = None
+
+# VHS 档无文件态的空视频引用（同 文生视频 _error 的 vhs 分支）
+_VHS_EMPTY = {"filename": "", "subfolder": "", "type": "output"}
 
 
 def _get_output_dir() -> str:
@@ -39,17 +53,17 @@ def _get_output_dir() -> str:
 
 
 class AgnesVideoTaskCollect(OutputDocsMixin):
-    """Agnes 视频任务收取：单路 task_url 轮询查询（URL 自带域名），completed 自动下载，输出 video 本地路径 + status。"""
+    """Agnes 视频任务收取：单路 task_url 轮询查询（URL 自带域名），completed 自动下载，输出 video（环境动态类型，可接 Save Video）+ status。"""
 
-    DESCRIPTION = "视频任务异步收取（两段式第二段，单任务）：输入 1 路 task_url（直连 视频任务提交 的 task_url 输出；完整轮询 URL 自带域名，跨域名提交的任务同样可查）+ api_key（可直连 视频任务提交 的 api_key 穿透输出，免再配）；节点内轮询查询（首查前 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载 mp4 到 output/agnes_videos/（3 次重试）；输出 2 路：video（本地路径，未完成/失败=空）+ status（completed=服务端视频 URL；failed=Agnes 服务端错误响应内容；processing=到 timeout 未完成，可再次运行本节点继续查）"
+    DESCRIPTION = "视频任务异步收取（两段式第二段，单任务）：输入 1 路 task_url（直连 视频任务提交 的 task_url 输出；完整轮询 URL 自带域名，跨域名提交的任务同样可查）+ api_key（可直连 提交 的 api_key 穿透输出，免再配）；节点内轮询查询（首查前 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载 mp4 到 output/agnes_videos/（3 次重试）；输出 2 路：video（环境动态类型同 文生视频：原生 VIDEO 可直连 Save Video 出片预览 / VHS_VIDEOINFO / 路径字符串）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到 timeout 未完成，再运行本节点继续查；empty=未连接 task_url）"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
-    RETURN_TYPES = ("STRING", "STRING",)
+    RETURN_TYPES = (_VIDEO_OUTPUT_TYPE, "STRING",)
     RETURN_NAMES = ("video", "status",)
-    RETURN_LABELS = ("视频（本地路径）", "状态")
+    RETURN_LABELS = ("视频", "状态")
     OUTPUT_DOCS = {
-        "video": "MP4 本地路径（ComfyUI output/agnes_videos/）；任务未完成/失败/未连接输入时为空。字符串路径可接支持文件路径的视频预览节点，或在 output 目录直接查看/下载",
+        "video": "MP4 文件输出，类型随环境（同 文生视频 三档）：原生 ComfyUI=VIDEO（VideoFromFile 惰性文件引用，直连 Save Video：重编码到 output/video/ 并在输出预览面板播放）/ VHS=VHS_VIDEOINFO（可接 VHS 播放器）/ 无视频节点=本地路径字符串（ComfyUI output/agnes_videos/）；任务未完成/失败/未连接输入时：原生环境本节点红错（信息指明下一步），VHS/STRING 环境返回空值",
         "status": "任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（含任务级 failed 与下载失败诊断）；processing=到轮询超时任务未完成（可再次右键运行本节点继续查询）；empty=未连接 task_url",
     }
 
@@ -62,7 +76,7 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
                     "multiline": True,
                     "default": "",
                     "placeholder": "https://api.agnes-ai.cn/agnesapi?video_id=…&model_name=agnes-video-2.5-flash",
-                    "tooltip": "完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名提交的任务也能查）；留空=整节点跳过（status 输出 empty）",
+                    "tooltip": "完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名提交的任务也能查）；留空=无任务可查（原生视频环境本节点红错提示，VHS/STRING 环境输出 empty）",
                 }),
                 "api_key": ("STRING", {
                     "label": "API Key",
@@ -82,6 +96,21 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
             },
         }
 
+    def _no_video(self, state: str, detail: str) -> Tuple:
+        """无文件态（failed/processing/empty/缺 Key）的 video 侧输出。
+
+        原生 VIDEO 环境：空文件引用会令下游 SaveVideo 崩溃（get_dimensions
+        打不开空路径），故按 文生视频 _error 约定抛红色错误——红错信息已指明
+        下一步（出片后再次运行本节点即通过）；VHS/STRING 环境返回空值不崩。
+        """
+        status = f"{state}: {detail}"
+        if _VIDEO_MODE == "comfy_api":
+            print(f"[Agnes 视频任务收取] [错误] {status}")
+            raise RuntimeError(f"[Agnes 视频任务收取] {status}")
+        if _VIDEO_MODE == "vhs":
+            return (_VHS_EMPTY, status)
+        return ("", status)
+
     def generate(
         self,
         task_url: str = "",
@@ -90,24 +119,25 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
     ) -> Tuple:
         url = str(task_url or "").strip()
         if not url:
-            return ("", "empty: 未连接 task_url 输入（可直连 Agnes 视频任务提交 的 task_url 输出）")
+            return self._no_video("empty", "未连接 task_url 输入（可直连 Agnes 视频任务提交 的 task_url 输出）")
 
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return ("", "failed: 缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）")
+            return self._no_video("failed", "缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）")
 
         client = AgnesClient(api_key)
         result = client.collect_video_task(url, timeout=timeout, output_dir=_get_output_dir())
         state = result["status"]
         if state == "completed":
-            print(f"[Agnes 视频任务收取] 完成：{result['save_path']}（服务端 URL: {result['video_url'][:80]}…）")
-            return (result["save_path"], f"completed: {result['video_url']}")
+            # 完成态：video 输出=环境动态类型（原生=VideoFromFile 惰性引用，SaveVideo 读盘重编码；零解码零内存开销）
+            video_out = _make_result(result["save_path"], "720P")[0]
+            print(f"[Agnes 视频任务收取] 完成：{result['save_path']}（服务端 URL: {result['video_url'][:80]}…，video 输出可直连 Save Video）")
+            return (video_out, f"completed: {result['video_url']}")
         if state == "failed":
-            print(f"[Agnes 视频任务收取] [错误] {result['error']}")
-            return ("", f"failed: {result['error']}")
+            return self._no_video("failed", result["error"])
         print(f"[Agnes 视频任务收取] 生成中（{result['error'].split('，')[0]}），可再次运行本节点继续查询")
-        return ("", f"processing: {result['error']}")
+        return self._no_video("processing", f"{result['error'].split('，')[0]}，可再次运行本节点继续查询")
 
 
 NODE_CLASS_MAPPINGS = {"AgnesVideoTaskCollect": AgnesVideoTaskCollect}
