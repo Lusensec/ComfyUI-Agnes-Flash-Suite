@@ -288,7 +288,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | shot_text | STRING | "" | 分镜画面描述（连 Agnes 分镜提示词批量生成 detailed_prompt_N / all_prompts 单条，或粘贴中文分镜原文；LLM 理解后扩写为视频提示词） |
 | dialogue | STRING | "" | 台词/旁白/音乐提示（可连 剧本生成 对白行）；非空才注入（视频含对白/口播/氛围音乐），空槽不占提示词篇幅 |
 | style | COMBO | cinematic | 画面风格（与图像线同一套 5 档） |
-| mode | COMBO | keyframe | 视频节点素材形态：keyframe=关键帧生视频（首帧已定，只描述帧后运动）/ text=文生视频（无参考，完整描述）/ reference=参考视频生成（<Picture N>/<Audio N> 标记指代） |
+| mode | COMBO | keyframe | 视频节点素材形态：keyframe=关键帧生视频（首帧已定，只描述帧后运动）；text=文生视频（无参考，完整描述）；reference=参考视频生成（<Picture N>/<Audio N> 标记指代） |
 | duration | INT | 5 | 视频时长（秒，4-12）：动作量与运镜节奏按此时长设计，需与下游视频节点设置一致 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
@@ -318,7 +318,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 |------|------|--------|------|
 | all_prompts | STRING | "" | **视频提示词一根线输入**（直连 分镜提示词批量生成 任一分段 all_prompts_1_20/_21_40/_41_60，各段 JSON 数组 ≤20 条，本实例出该波；3 实例各连一段=60 镜全量分波控 RPM，与 分镜图批量 ×3 实例节拍对称；也接受 ≤20 条 all_prompts 全量输出，JSON 数组从上到下逐条生成、超出 20 条截断并在日志标注，空项跳过）；也接受**单条英文提示词纯文本**（连任一 detailed_prompt_N 或手动粘贴，视为 1 条）；空=整批跳过（零 API 调用） |
 | style | COMBO | cinematic | 画面风格（整批共用） |
-| mode | COMBO | keyframe | 视频节点素材形态（整批共用）：keyframe=关键帧生视频（默认）/ text=文生视频 / reference=参考视频生成 |
+| mode | COMBO | keyframe | 视频节点素材形态（整批共用）：keyframe=关键帧生视频（默认）；text=文生视频；reference=参考视频生成 |
 | duration | INT | 5 | 视频时长（秒，4-12，整批共用）：动作量与运镜节奏按此时长设计，需与下游视频节点设置一致 |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL，可动态覆盖全局地址（位于 api_key 紧上方） |
 | api_key | STRING | sk-你的Key | Agnes AI API Key |

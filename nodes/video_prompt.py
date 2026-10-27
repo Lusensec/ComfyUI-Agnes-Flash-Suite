@@ -104,7 +104,7 @@ def build_video_user_prompt(shot_text: str, dialogue: str, style: str, mode: str
 class AgnesVideoPromptGenerator(OutputDocsMixin):
     """视频提示词生成：单条分镜 → Agnes 视频模型英文提示词（LLM 一次调用，模式/时长/风格可配）"""
 
-    DESCRIPTION = "单条分镜 → Agnes 视频模型英文提示词（运动+运镜+一致性+风格+质量词）：mode 对应 3 个视频节点素材形态（keyframe=关键帧生视频 / text=文生视频 / reference=参考视频生成），台词/旁白非空才注入，输出直连视频节点 prompt 输入"
+    DESCRIPTION = "单条分镜 → Agnes 视频模型英文提示词（运动+运镜+一致性+风格+质量词）：mode 对应 3 个视频节点素材形态（keyframe=关键帧生视频；text=文生视频；reference=参考视频生成），台词/旁白非空才注入，输出直连视频节点 prompt 输入"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -147,7 +147,7 @@ class AgnesVideoPromptGenerator(OutputDocsMixin):
                     "default": "keyframe",
                     "tooltip": (
                         "视频节点素材形态（决定提示词写法）：keyframe=关键帧生视频（首帧已定，只描述帧后运动，默认）"
-                        " / text=文生视频（无参考，完整描述） / reference=参考视频生成（<Picture N>/<Audio N> 标记指代）"
+                        "；text=文生视频（无参考，完整描述）；reference=参考视频生成（<Picture N>/<Audio N> 标记指代）"
                     ),
                 }),
                 "duration": ("INT", {

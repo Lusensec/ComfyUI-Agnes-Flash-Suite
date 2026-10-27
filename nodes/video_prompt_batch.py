@@ -94,7 +94,7 @@ class AgnesVideoPromptBatch(OutputDocsMixin):
             }),
             "mode": (list(VIDEO_PROMPT_MODES), {
                 "default": "keyframe",
-                "tooltip": "视频节点素材形态（决定提示词写法，整批共用）：keyframe=关键帧生视频（首帧已定，只描述帧后运动，默认） / text=文生视频（无参考，完整描述） / reference=参考视频生成（<Picture N>/<Audio N> 标记指代）",
+                "tooltip": "视频节点素材形态（决定提示词写法，整批共用）：keyframe=关键帧生视频（首帧已定，只描述帧后运动，默认）；text=文生视频（无参考，完整描述）；reference=参考视频生成（<Picture N>/<Audio N> 标记指代）",
             }),
             "duration": ("INT", {
                 "default": 5,
