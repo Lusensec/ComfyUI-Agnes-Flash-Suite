@@ -21,6 +21,7 @@ Supported Models:
 import base64
 import json
 import os
+import random
 import re
 import time
 import tempfile
@@ -356,17 +357,25 @@ class AgnesClient:
     _MAX_RETRIES_QUEUE = 5  # 队列满/限流专用：最多等 ~3.75 分钟
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
     # 视频 503 队列满/限流退避：重试次数可由节点「重试次数」参数动态调整（默认 5、上限 30）
-    _VIDEO_DEFAULT_RETRIES = 5   # 默认 5 次：10/30/60/60/60 秒（累计 220 秒 ≈ 3.7 分钟）
-    _VIDEO_MAX_RETRIES = 30     # 上限（第 4 次起每次 60 秒，30 次累计 1720 秒 ≈ 28.7 分钟）
-    _VIDEO_QUEUE_DELAYS = [10, 30, 60, 60, 60]  # 默认 5 次的退避表
+    _VIDEO_DEFAULT_RETRIES = 5   # 默认 5 次：10/30/30/30/30 秒（累计 130 秒 ≈ 2.2 分钟）
+    _VIDEO_MAX_RETRIES = 30      # 上限（第 6-10 次每次 60 秒、第 11 次起每次 90 秒，30 次累计 2230 秒 ≈ 37.2 分钟）
+    _VIDEO_QUEUE_DELAYS = [10, 30, 30, 30, 30]  # 默认 5 次的退避表
 
     @classmethod
     def _video_queue_delays(cls, retries: int) -> List[int]:
-        """视频 503/429 退避表：前 3 次 10/30/60 秒，第 4 次起每次 60 秒。"""
+        """视频 503/429 退避表：前 5 次 10/30/30/30/30 秒（默认累计 130 秒——前段探测密集，
+        视频队列常在 1-3 分钟内恢复，早 30-60s 接住；实际睡眠带 ±15% 随机抖动错峰），
+        第 6-10 次每次 60 秒，第 11 次起每次 90 秒（队列满越久下一次探测命中概率越低，
+        后段放宽间隔省请求、避免把 503 打成 429 限流升级）。"""
         r = max(0, int(retries))
-        delays = [10, 30, 60][:r]
-        if r > 3:
-            delays += [60] * (r - 3)
+        delays = []
+        for i in range(r):
+            if i < 5:
+                delays.append([10, 30, 30, 30, 30][i])
+            elif i < 10:
+                delays.append(60)
+            else:
+                delays.append(90)
         return delays
 
     def __init__(self, api_key: str, base_url: Optional[str] = None):
@@ -458,7 +467,9 @@ class AgnesClient:
 
         队列满/限流（429/503）默认采用分钟级退避（15/30/60/120 秒，最多
         _MAX_RETRIES_QUEUE 次）；传入 queue_delays 则按指定秒数序列退避
-        （视频提交用 10/30/60，第 4 次起每次 60 秒，次数由节点「重试次数」参数控制）；
+        （视频提交用 10/30/30/30/30，第 6-10 次每次 60 秒、第 11 次起每次 90 秒，
+        睡眠带 ±15% 随机抖动；503/429 响应带 Retry-After 头时优先按该头指定秒数；
+        次数由节点「重试次数」参数控制）；
         queue_hint 覆盖队列满建议文案。其他可重试状态维持 3/6/12 秒短退避（120 秒封顶）。
         """
         max_retries = max_retries or self._MAX_RETRIES
@@ -478,8 +489,18 @@ class AgnesClient:
                     if resp.status_code in self._QUEUE_STATUSES:
                         if queue_delays:
                             delay = queue_delays[min(attempt - 1, len(queue_delays) - 1)]
+                            # ±15% 随机抖动：与其他 503 等待者的探测错峰，避免队列恢复瞬间同步重探（惊群）
+                            delay = max(1, int(delay * random.uniform(0.85, 1.15)))
                         else:
                             delay = self._QUEUE_BASE_DELAY * (2 ** (attempt - 1))
+                        # 服务端若随 503/429 给出 Retry-After 头，优先按服务端指定秒数退避
+                        retry_after = resp.headers.get("Retry-After")
+                        if retry_after:
+                            try:
+                                delay = max(1, int(float(retry_after)))
+                                print(f"[Agnes] {resp.status_code} 响应带 Retry-After={retry_after} 秒，按服务端指定退避")
+                            except ValueError:
+                                pass
                     else:
                         delay = min(self._RETRY_BASE_DELAY * (2 ** (attempt - 1)), 120)
                     last_error = (resp.status_code, resp.text)
@@ -714,7 +735,8 @@ class AgnesClient:
                     本地文件自动转 Base64 Data URI，单段 <15MB）。
             return_ids: True 时返回 (save_path, task_id, video_id) 三元组。
             retries: 提交遇 503 队列满/429 限流的自动重试次数（None=默认 5；
-                    退避 10/30/60 秒，第 4 次起每次 60 秒；上限 30）。
+                    退避 10/30/30/30/30 秒，第 6-10 次每次 60 秒、第 11 次起每次 90 秒，
+                    睡眠带 ±15% 随机抖动；上限 30）。
         """
         new_model = model in NEW_VIDEO_MODELS
 
@@ -796,7 +818,7 @@ class AgnesClient:
 
         # --- Submit task ---
         # 视频队列满/限流（429/503）：按「重试次数」参数动态退避
-        # （默认 5 次 10/30/60/60/60 秒，累计 220 秒；第 4 次起每次 60 秒）
+        # （默认 5 次 10/30/30/30/30 秒，累计 130 秒；第 6-10 次 60 秒、第 11 次起 90 秒，睡眠带 ±15% 抖动）
         n_retries = (self._VIDEO_DEFAULT_RETRIES if retries is None
                      else max(0, min(int(retries), self._VIDEO_MAX_RETRIES)))
         q_delays = self._video_queue_delays(n_retries)
@@ -936,7 +958,7 @@ class AgnesClient:
     ) -> Dict[str, Any]:
         """异步两段式·提交段：只提交视频任务（新接口 text 模式，4-12 秒 720P），
         不做轮询与下载，秒级返回任务句柄。退避/重试与 generate_video 完全一致
-        （提交遇 503 队列满/429 限流按「重试次数」动态退避，默认 5 次 10/30/60/60/60 秒）。
+        （提交遇 503 队列满/429 限流按「重试次数」动态退避，默认 5 次 10/30/30/30/30 秒，睡眠带 ±15% 抖动）。
 
         返回 dict:
             ok: bool 提交是否成功
