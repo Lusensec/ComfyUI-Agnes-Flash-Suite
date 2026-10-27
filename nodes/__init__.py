@@ -5,7 +5,7 @@
 #   ① 文本类节点（配置：API Key/风格选择 → 文本输入 → LLM 对话/字符串合并（通用文本工具，紧随文本输入）
 #      → 剧本（解说/漫剧）→ 分镜管线：拆分/导演/提取 → 资产·三视图·分镜 提示词批量 → 视频提示词（单个/批量））
 #   ② 图片类节点（图像反推提示词 置顶 → 文生图 → 图生图 → 三视图 → 三视图批量 → 分镜图批量 → 图像拼图）
-#   ③ 视频类节点（文生视频 → 关键帧生视频 → 参考视频生成）
+#   ③ 视频类节点（文生视频 → 关键帧生视频 → 参考视频生成 → 视频任务提交 → 视频任务收取 → 视频任务批量收取（异步两段式））
 
 # ── 文本类节点 ─────────────────────────────────────────────
 from .api_key_config import AgnesNovelAPIKeyConfig
@@ -41,6 +41,9 @@ from .image_mosaic import AgnesImageMosaic
 from .text2video import AgnesNovelTextToVideo
 from .img2video import AgnesNovelImageToVideo
 from .video_reference import AgnesVideoReference
+from .video_task_submit import AgnesVideoTaskSubmit
+from .video_task_collect import AgnesVideoTaskCollect
+from .video_task_batch_collect import AgnesVideoTaskBatchCollect
 
 # 合并所有节点映射
 NODE_CLASS_MAPPINGS = {}
@@ -53,7 +56,7 @@ from . import asset_extractor, text_split, asset_prompt, asset_prompt_batch
 from . import turnaround_prompt, turnaround_prompt_batch, prompt_generator, scene_prompt_batch
 from . import video_prompt, video_prompt_batch
 from . import image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, scene_image_batch, image_mosaic
-from . import text2video, img2video, video_reference
+from . import text2video, img2video, video_reference, video_task_submit, video_task_collect, video_task_batch_collect
 
 # 文本类：API Key 配置 → 风格选择（配置信息，紧随 API Key）→ 文本输入（文本起点，替代灰色 PrimitiveNode）
 #        → LLM 对话（通用对话工具）→ 字符串合并（文本拼接工具）
@@ -72,7 +75,7 @@ from . import text2video, img2video, video_reference
 #           all_prompts_1_20/_21_40/_41_60（3 实例分波控 RPM；≤20 条 all_prompts 直连单实例），
 #           20 路并发出关键帧 + all_images 批量张量 (N,H,W,3) 每波总览）
 #        → 图像拼图（位于 分镜图批量 之后，batch_images 批量张量总输入优先 / 批量图 20 路 → 1 路拼图）
-# 视频类：文生视频 → 关键帧生视频 → 参考视频生成
+# 视频类：文生视频 → 关键帧生视频 → 参考视频生成 → 视频任务提交（异步提交段）→ 视频任务收取（单任务）→ 视频任务批量收取（20 槽并发）
 for _mod in [
     # 文本类
     api_key_config, style_selector, text_input,
@@ -86,6 +89,7 @@ for _mod in [
     image_mosaic,
     # 视频类
     text2video, img2video, video_reference,
+    video_task_submit, video_task_collect, video_task_batch_collect,
 ]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)

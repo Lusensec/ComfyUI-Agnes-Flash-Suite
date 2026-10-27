@@ -922,6 +922,161 @@ class AgnesClient:
         )
 
     # ------------------------------------------------------------------
+    # Video task split flow: submit (async submit) / collect (poll + download)
+    # ------------------------------------------------------------------
+
+    def submit_video_task(
+        self,
+        prompt: str,
+        model: str = VIDEO_MODEL,
+        seconds: Optional[int] = None,
+        aspect_ratio: Optional[str] = None,
+        seed: Optional[int] = None,
+        retries: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """异步两段式·提交段：只提交视频任务（新接口 text 模式，4-12 秒 720P），
+        不做轮询与下载，秒级返回任务句柄。退避/重试与 generate_video 完全一致
+        （提交遇 503 队列满/429 限流按「重试次数」动态退避，默认 5 次 10/30/60/60/60 秒）。
+
+        返回 dict:
+            ok: bool 提交是否成功
+            task_url: 完整轮询 URL（含域名，/agnesapi?video_id=…&model_name=…；
+                      域名取自 self.base_url，提交节点可填非官方域时照常拼对）
+            status: 成功="submitted: video_id=…"；失败="failed: <服务端错误响应/诊断>"
+        """
+        payload: Dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "seconds": str(min(12, max(4, int(seconds if seconds is not None else 5)))),
+            "mode": "text",
+            "size": "720P",
+            "aspect_ratio": _VIDEO_RATIO_FALLBACK.get(aspect_ratio or "16:9", aspect_ratio or "16:9"),
+            "n": 1,
+        }
+        if seed is not None:
+            payload["seed"] = seed
+
+        n_retries = (self._VIDEO_DEFAULT_RETRIES if retries is None
+                     else max(0, min(int(retries), self._VIDEO_MAX_RETRIES)))
+        q_delays = self._video_queue_delays(n_retries)
+        try:
+            resp = self._request_with_retry(
+                "POST", f"{self.base_url}/videos", "Video", json_payload=payload,
+                timeout=60, max_retries=n_retries + 1, queue_delays=q_delays,
+                queue_hint="建议：视频生成队列繁忙（视频与生图队列相互独立），"
+                           "请等 5-10 分钟后再运行本节点。")
+            data = resp.json()
+        except Exception as e:
+            return {"ok": False, "task_url": "",
+                    "status": f"failed: {str(e) or type(e).__name__}"}
+
+        task_id = data.get("id")
+        video_id = data.get("video_id", task_id)
+        if not task_id:
+            return {"ok": False, "task_url": "",
+                    "status": f"failed: 服务器未返回任务ID: {str(data)[:200]}"}
+
+        # 完整轮询 URL（含域名）：与 generate_video 的轮询地址同一拼法，
+        # 收取节点拿到它就能跨域名独立查询，无需再知道 base_url
+        task_url = f"{self.base_url}/agnesapi?video_id={video_id}&model_name={model}"
+        return {"ok": True, "task_url": task_url,
+                "status": f"submitted: video_id={video_id}"}
+
+    def collect_video_task(
+        self,
+        task_url: str,
+        timeout: int = 1800,
+        output_dir: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """异步两段式·收取段：对完整轮询 URL（提交节点输出的 task_url）轮询查询，
+        completed 后自动下载保存到本地。不做提交——URL 自带域名，跨域名可用。
+
+        轮询节奏与新接口一致：首查前等 60s（任务排队期），之后每 5s 一次；
+        查询遇网络抖动自动跳过本轮继续；timeout 内未完成=processing（不算失败，
+        可再次调用继续查）。
+
+        返回 dict:
+            status: "completed" / "failed" / "processing"
+            video_url: completed 时的服务端视频 URL
+            save_path: completed 且下载成功时的本地 mp4 路径
+            error: failed 时的服务端错误响应内容
+        """
+        timeout = max(60, int(timeout or 1800))
+        elapsed = 0
+        # 新接口轮询节奏：先等 60s（任务排队期），之后每 5s 一次（timeout≤90s 时首查 10s，同 generate_video）
+        interval = 60 if timeout > 90 else min(VIDEO_POLL_INTERVAL, 10)
+        while elapsed < timeout:
+            time.sleep(min(interval, max(1, timeout - elapsed)))
+            elapsed += interval
+            interval = 5
+            try:
+                status_resp = self.session.get(task_url, timeout=30)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                continue
+            if status_resp.status_code != 200:
+                continue
+            status_data = status_resp.json()
+            state = status_data.get("status")
+
+            if state == "completed":
+                video_url = None
+                for sub in ("metadata", "result", "output"):
+                    obj = status_data.get(sub, {})
+                    if isinstance(obj, dict):
+                        for key in ("url", "video_url"):
+                            val = obj.get(key)
+                            if val and isinstance(val, str) and val.startswith("http"):
+                                video_url = val
+                                break
+                    if video_url:
+                        break
+                if not video_url:
+                    for key in ("video_url", "url", "output_url", "download_url"):
+                        val = status_data.get(key)
+                        if val and isinstance(val, str) and val.startswith("http"):
+                            video_url = val
+                            break
+                if not video_url:
+                    for item in status_data.get("data", []):
+                        for key in ("url", "video_url"):
+                            val = item.get(key)
+                            if val and isinstance(val, str) and val.startswith("http"):
+                                video_url = val
+                                break
+                        if video_url:
+                            break
+                if not video_url:
+                    resp_dump = str(status_data)
+                    if len(resp_dump) > 600:
+                        resp_dump = resp_dump[:600] + "..."
+                    return {"status": "failed", "video_url": "", "save_path": "",
+                            "error": f"任务状态为 completed，但未找到 video_url。API 原始响应: {resp_dump}"}
+
+                video_bytes, dl_diag = download_url_with_retry(video_url, timeout=120)
+                if not video_bytes:
+                    return {"status": "failed", "video_url": video_url, "save_path": "",
+                            "error": (f"视频文件下载失败（已自动重试 {_DOWNLOAD_MAX_RETRIES} 次，{dl_diag}）。"
+                                      f"video_url: {video_url}；若链接仍在有效期内可手动下载")}
+                save_dir = output_dir if output_dir else tempfile.gettempdir()
+                os.makedirs(save_dir, exist_ok=True)
+                filename = f"agnes_video_collect_{int(time.time())}_{abs(hash(task_url)) % 10**8}.mp4"
+                save_path = os.path.join(save_dir, filename)
+                with open(save_path, "wb") as f:
+                    f.write(video_bytes)
+                return {"status": "completed", "video_url": video_url,
+                        "save_path": save_path, "error": ""}
+
+            if state in ("failed", "error"):
+                error_msg = status_data.get("error", "Unknown error")
+                if isinstance(error_msg, dict):
+                    error_msg = error_msg.get("message", str(error_msg))
+                return {"status": "failed", "video_url": "", "save_path": "",
+                        "error": f"视频生成失败: {error_msg}"}
+
+        return {"status": "processing", "video_url": "", "save_path": "",
+                "error": f"已等待 {timeout} 秒任务未完成，可再次运行本节点继续查询"}
+
+    # ------------------------------------------------------------------
     # Image Understanding / Reverse Prompt (via vision chat)
     # ------------------------------------------------------------------
 

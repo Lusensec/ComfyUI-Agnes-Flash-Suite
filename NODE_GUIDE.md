@@ -549,6 +549,76 @@ keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）�
 
 ---
 
+### 🎞️ Agnes 视频任务提交 (AgnesVideoTaskSubmit)
+
+**功能：** 视频任务异步提交（两段式·提交段）：输入与退避策略与「Agnes 文生视频」完全一致，
+但只执行「提交」这一段——POST 拿到任务 ID 后秒级返回，不轮询不下载，画布立刻解放。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| prompt | STRING | "" | 视频描述（建议英文，可连 Agnes 视频提示词生成/批量 的 video_prompt） |
+| base_url | STRING | （留空=跟随全局） | 请求地址 Base URL；task_url 输出按此域名拼装（跨域名提交也拼对） |
+| api_key | STRING | sk-你的Key | Agnes AI API Key（留空跟随全局） |
+| model | COMBO | agnes-video-2.5-flash | 视频生成模型（Agnes Video 2.5-flash） |
+| resolution | COMBO | 720P | 输出分辨率：固定 720P（展示项，同文生视频） |
+| aspect_ratio | COMBO | 16:9 | 画面宽高比（同文生视频，不支持比例自动就近映射） |
+| seconds | INT | 5 | 视频时长（秒，4-12 直控，同文生视频） |
+| seed | INT | 0 | 随机种子（同文生视频，已禁用「生成后控制」英文下拉） |
+| max_wait_seconds | INT | 600 | 保留项（与文生视频输入一致）：本节点只提交不轮询，此值不生效；轮询时限在 收取/批量收取 节点 timeout 设置 |
+| retries | INT | 5 | 提交遇 503 队列满/429 限流的自动重试次数（同文生视频：10/30/60 秒，第 4 次起每次 60 秒） |
+
+**输出（含输出描述）：**
+- task_url: 完整轮询 URL（含域名 /agnesapi?video_id=…&model_name=…；域名跟随本节点请求地址，跨域名提交也拼对）——直连 收取/批量收取 节点的 task_url 输入；提交失败时为空
+- status: 任务状态：成功=`submitted: video_id=…`；失败=Agnes 服务端错误响应内容（HTTP 503 队列满/400 参数错误等的原文诊断）
+
+> 两段式用法：提交节点秒级返回 → 出片期间画布可跑其他工作流（分镜图/下一部小说）→
+> 之后右键运行 收取/批量收取 节点收片（自动下载到 output/agnes_videos/）。
+> 60 镜线新接法：视频提示词批量 ×3 分段 → 视频任务提交 ×3（几内分钟提交完 60 任务）
+> → 视频任务批量收取 ×3（右键部分执行，并发轮询+自动下载）→ 60 镜视频全量落盘。
+
+---
+
+### 📥 Agnes 视频任务收取 (AgnesVideoTaskCollect)
+
+**功能：** 视频任务异步收取（两段式·收取段，单任务）：输入 1 路 task_url（完整轮询 URL
+自带域名，跨域名提交的任务同样可查），节点内轮询查询（首查前 60s、之后每 5s），
+completed 自动下载 mp4（3 次重试 2/5/10s），输出视频本地路径 + 状态。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| task_url | STRING | "" | 完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名可查）；留空=整节点跳过（status 输出 empty） |
+| api_key | STRING | sk-你的Key | 轮询查询需 Bearer 鉴权，留空跟随全局；域名已在 task_url 里，无需再填请求地址 |
+| timeout | INT | 1800 | 本节点最长等待（秒，默认 30 分钟）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查（任务还在服务端） |
+
+**输出（含输出描述）：**
+- video: MP4 本地路径（ComfyUI output/agnes_videos/）；任务未完成/失败/未连接输入时为空
+- status: 任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（任务级 failed 与下载失败诊断）；processing=到轮询超时未完成（可再次右键运行本节点继续查询）；empty=未连接 task_url
+
+---
+
+### 📥 Agnes 视频任务批量收取 (AgnesVideoTaskBatchCollect)
+
+**功能：** 视频任务批量收取（两段式·收取段，20 槽并发）：与 Agnes 三视图批量生成 同范式——
+20 个可选 url_i 槽（各直连 视频任务提交 的 task_url 输出，不连线自动跳过不红框）
+或 1 路 all_urls JSON 数组合并输入（url_i 优先），线程池并发轮询（max_concurrency 默认 10，
+每线程独立 client），completed 槽自动下载 mp4；单槽失败/未完成不影响其他槽。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| url_1 ~ url_20 | STRING | ""（可选） | 第 N 个任务的完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（不连线自动跳过）；URL 自带域名，跨域名提交的任务也能查 |
+| all_urls | STRING | "" | 轮询 URL 合并输入：JSON 数组（≤20 条，超出截断；空项=跳过该槽，槽号保位）或单 URL 纯文本（视为 1 条）；与 url_1..20 同时连接时 url_i 优先；全空=整批跳过（零 API 调用） |
+| api_key | STRING | sk-你的Key | 轮询查询需 Bearer 鉴权，留空自动加载全局 |
+| max_concurrency | INT | 10 | 并发速率限制：线程池大小（同时轮询数 1-20，默认 10）；非空槽数超过该值时排队执行；查询为轻量 GET，一般无需调小 |
+| timeout | INT | 1800 | 本节点最长等待（秒，默认 30 分钟）：到点仍生成中的槽=processing（不算失败），再次右键运行本节点即继续查 |
+
+**输出（含输出描述，共 42 路）：**
+- video_1 ~ video_20: 第 N 个任务的 MP4 本地路径（output/agnes_videos/；未完成/失败/空槽=空）
+- status_1 ~ status_20: 第 N 个任务状态：completed=服务端视频 URL；failed=Agnes 服务端错误响应内容；processing=到轮询超时未完成（可再次运行继续查）；empty=该槽无输入
+- batch_status: 整批执行状态 JSON：{"completed":[槽号],"failed":[槽号],"processing":[槽号],"empty":[槽号]}（槽号=任务序号 1 起保位）；存在失败槽时额外含 "reason" 字段（各失败槽同一原因=字符串，不同=槽号→原因映射）；可直连 Agnes 文本拆分（JSON 数组模式）拆成 4 条名单做对接分析
+- all_videos: 成功槽按槽号升序的服务端视频 URL JSON 数组（零成功=空串）
+
+---
+
 ### 📝 Agnes 解说剧本生成 (AgnesScriptGenerator)
 
 **功能：** 生成影视解说文案（口播稿/配音轨，对观众的叙述腔）
@@ -962,6 +1032,9 @@ all_items 空项=跳过该槽（槽号保位，与旧 20 槽行为一致）；�
 3. **提示词生成** → 连接 scene_1 + characters_json + locations_json
 4. **图像生成** → 生成场景图像
 5. **文生视频** → 按提示词生成视频（图参考请用「Agnes 关键帧生视频」/「Agnes 参考视频生成」节点）
+   - 多视频异步接法（推荐）：「Agnes 视频任务提交」秒级提交拿 task_url（画布立刻解放）→
+     「Agnes 视频任务收取/批量收取」稍后右键运行收片（自动下载 output/agnes_videos/；
+     批量收取 20 槽并发轮询+下载，60 镜线 3 实例分波，墙钟从串行 sum 压到并发 max）
 6. **剧本生成** → 独立流程，生成解说文案
 
 ---
@@ -989,6 +1062,7 @@ Starter 档位 ($4/月) 可支持约 1-2 集/天
 ### 视频生成超时
 - 查看错误信息中的 video_id
 - 调低 seconds 时长（如 12→5 秒）或调大 max_wait_seconds
+- 异步两段式：收取/批量收取 节点输出 processing（到轮询超时未完成，不算失败）→ 再次右键运行该节点即继续查（任务还在服务端，不重复计费）
 - 稍后重试（服务器可能繁忙）
 
 ### 视频队列已满（503 video_queue_full）
