@@ -1,54 +1,48 @@
 # -*- coding: utf-8 -*-
 """
-Agnes 视频任务批量收取节点（异步两段式·收取段，≤20 任务并发）
-==============================================================
-「Agnes 视频任务批量收取」：把 N 个视频任务（1-20 条）交给一个节点，
-线程池并发轮询收取，全部 settled（completed/failed/processing）才返回——
+Agnes 视频任务批量收取节点（异步两段式·收取段，20 任务并发）
+============================================================
+「Agnes 视频任务批量收取」：把 ≤20 个视频任务交给一个节点（输入 N → 输出 N
+对应：task_i ↔ video_i），线程池并发轮询收取，全部 settled 才返回——
 单节点完成 N 次「轮询 + 下载」，免 N 个 收取 实例逐个右键。
 
-输入 1 路 tasks（STRING，JSON 合并输入，多形态宽容解析）：
-  ① JSON 数组（主形态）：元素 = Agnes 视频任务提交 的 task_url_key 单线双参
-     对象 {"task_url","api_key"}（N 个提交实例的 task_url_key 拼数组，
-     一行带齐 URL+Key）；元素也接受 纯 task_url 字符串（Key 走 api_key
-     兜底）与 嵌套 JSON 字符串元素；
-  ② 单个 JSON 对象 {"task_url","api_key"}（= 1 任务）；
-  ③ 换行分隔的 JSON 对象行（Agnes 字符串合并 换行拼接 N 路 task_url_key
-     的输出形态，逐行识别）；
-  ④ 换行分隔的纯 URL 行 / 单行纯文本（= 1 任务）；
-  ⑤ 空输入=整批跳过（零 API 调用）。
-  条目 ≤20，超出截断（status 附 note）；条目 "0"=上游 提交 失败标记：
-  跳过收取（零轮询零下载），记 error 状态；空条目=跳过，记 empty（槽号保位）。
+20 个输入 task_1…task_20（每槽 1 个任务，一一对应 video_1…video_20 输出）：
+  - Agnes 视频任务提交 的 task_url_key 单线双参 JSON（{"task_url","api_key"}，
+    一行带齐 URL+Key）：N 个提交实例的 task_url_key 输出直连 N 个槽，
+    0 个中间合并节点；各槽 Key 可以全不同——条目自带 Key 只作用于本任务
+    （每任务线程各建一个 AgnesClient），互不干扰；
+  - 也接受 纯轮询 URL 字符串（Key 走 api_key 兜底输入 → 全局配置）；
+  - "0"=上游 提交 失败标记：该槽跳过收取（零轮询零下载），记 error 状态；
+  - 未连接/空=跳过该槽，记 empty 状态（槽号保位）。
 
 轮询节奏与单 收取 一致：首查前 60s、之后每 5s（timeout 默认 600s/任务）；
-completed 自动下载（3 次重试）到 ComfyUI output/agnes_videos/；
-每任务线程各建一个 AgnesClient（请求的 Key 用该条自带 api_key，缺省走
-api_key 兜底→全局配置；Session 非线程安全，不复用）。
+completed 自动下载（3 次重试）到 ComfyUI output/agnes_videos/。
 
 输出 22 槽 = video_1..video_20 + status + all_video_paths：
   video_i: 环境动态类型（同 文生视频/单收取 三档）：
            原生 ComfyUI=VIDEO（VideoFromFile 惰性引用，可直连 Save Video）
            / VHS=VHS_VIDEOINFO / 无视频节点=路径字符串；
-           completed=真实文件，failed/processing/empty/0 标记/缺 Key
-           =NO_VIDEO_ 前缀黑帧占位（原生，同 单收取 B1 约定，队列不打断）
+           completed=真实文件，failed/processing/empty/"0" 标记/缺 Key
+           =NO_VIDEO_ 前缀黑帧占位（原生，文件名带槽号，队列不打断）
            或空值（VHS/STRING）；
   status:  整批执行状态 JSON（槽号 1 起保位）：
            {"success":[completed 槽],"failed":[服务端失败/下载失败/缺 Key/
-            网络异常槽],"processing":[到 timeout 未完成槽],"empty":[空条目槽],
-            "error":["0" 标记槽], "details":{槽:原因}, 超 20 条附 "note"}；
+            网络异常槽],"processing":[到 timeout 未完成槽],"empty":[空输入槽],
+            "error":["0" 标记槽], "details":{槽:原因}}；
   all_video_paths: 20 元素 JSON 数组（与 video_i 槽下标一一对应）：
            completed=本地落盘路径（下载失败时=服务端 URL），其余=""。
 
-60 镜线接法（批量收取版，免逐任务右键）：
-  视频提示词批量 ×3 分段 → 视频任务提交 ×3（3 实例各连一段，几分钟提完）
-  → 各实例 task_url_key 输出拼 JSON 数组（每段 ≤20 条：手拼 / LLM 对话
-  生成 / 多路经 Agnes 字符串合并 换行拼接——本节点逐行识别）
-  → 视频任务批量收取 ×3（线程池并发收取，单节点收完一段 20 镜）
-  → 20×3 路 video 直连 Save Video 全量落盘。
+60 镜线接法（零中间节点版）：
+  视频提示词批量 ×3 分段 → 视频任务提交 ×60（分 3 波，每波 20 实例）
+  → 每波 20 个提交实例的 task_url_key 输出 直连 1 个 批量收取 实例的
+  task_1…task_20（各槽 Key 可全不同）
+  → 3 个批量收取 ×3 = 60 路 video 直连 Save Video 全量落盘
+  （总时长≈max(各视频渲染时长)，非逐任务右键的 sum；出片期间画布可跑别的）。
 """
 
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Tuple
+from typing import Tuple
 
 from ..api import AgnesClient, get_api_key
 from ._output_docs import OutputDocsMixin
@@ -58,83 +52,35 @@ from .video_task_collect import _make_placeholder_video, _get_output_dir, _VHS_E
 MAX_TASKS = 20
 
 
-def _entry_from_obj(obj) -> Tuple[str, str]:
-    """dict 元素 → (task_url, api_key)（缺字段=空串，走兜底）。"""
-    url = str(obj.get("task_url", "") or "").strip()
-    key = str(obj.get("api_key", "") or "").strip()
-    return (url, key)
-
-
-def _parse_tasks(raw) -> Tuple[List[Tuple[str, str]], str, bool]:
-    """tasks 输入多形态解析（从上到下）：
-    ① JSON 数组 → 逐条（dict=task_url_key 单线双参对象；str=嵌套 JSON 字符串
-       再解一层/纯 URL；空项=保位占位——槽号=条目位置）；
-    ② JSON 对象 → 1 条；③ JSON 字符串 → 1 条；
-    ④ 非 JSON 纯文本：换行分隔逐行识别（每行 JSON 对象=task_url_key，
-       否则按 URL 行处理；空行跳过）；单行=1 条；
-    ⑤ 空输入 → 空批。
-    返回 (entries, source, truncated, total)；entries=(task_url, api_key) 保位列表（截断后），
-    total=截断前条目数。"""
+def _parse_entry(raw) -> Tuple[str, str, str]:
+    """单输入解析（从上到下）：task_url_key JSON 对象（{"task_url","api_key"}，
+    提交节点第 4 输出，一行带齐 URL+Key）/ 嵌套 JSON 字符串元素 / 纯轮询 URL /
+    "0" 标记 / 空。返回 (task_url, api_key, 形态标签)。"""
     raw = str(raw or "").strip()
     if not raw:
-        return [], "空输入", False, 0
-    parsed_obj = None
+        return ("", "", "空")
+    if raw == "0":
+        return ("0", "", "0标记")
     try:
-        parsed_obj = json.loads(raw)
+        obj = json.loads(raw)
     except (json.JSONDecodeError, TypeError):
-        parsed_obj = None
-    if isinstance(parsed_obj, list):
-        source = "JSON 数组"
-        entries = []
-        for x in parsed_obj:
-            if isinstance(x, dict):
-                entries.append(_entry_from_obj(x))
-            elif isinstance(x, str):
-                x = x.strip()
-                if not x:
-                    entries.append(("", ""))
-                    continue
-                try:
-                    inner = json.loads(x)
-                    if isinstance(inner, dict):
-                        entries.append(_entry_from_obj(inner))
-                    else:
-                        entries.append((x, ""))
-                except json.JSONDecodeError:
-                    entries.append((x, ""))
-            else:
-                entries.append(("", ""))
-    elif isinstance(parsed_obj, dict):
-        source = "JSON 对象"
-        entries = [_entry_from_obj(parsed_obj)]
-    elif isinstance(parsed_obj, str):
-        source = "JSON 字符串"
-        entries = [(parsed_obj.strip(), "")]
-    else:
-        # 非 JSON 纯文本（换行分隔 JSON 对象行 / URL 行 / 单行）
-        lines = [l.strip() for l in raw.splitlines()]
-        entries, json_lines = [], 0
-        for l in lines:
-            if not l:
-                continue
-            try:
-                obj = json.loads(l)
-                if isinstance(obj, dict):
-                    entries.append(_entry_from_obj(obj))
-                    json_lines += 1
-                else:
-                    entries.append((l, ""))
-            except json.JSONDecodeError:
-                entries.append((l, ""))
-        if json_lines:
-            source = "换行 JSON 对象（字符串合并形态）"
-        else:
-            source = "换行文本" if len(lines) > 1 else "单行文本"
-    total = len(entries)
-    truncated = total > MAX_TASKS
-    if truncated:
-        entries = entries[:MAX_TASKS]
-    return entries, source, truncated, total
+        obj = None
+    if isinstance(obj, dict):
+        return (str(obj.get("task_url", "") or "").strip(),
+                str(obj.get("api_key", "") or "").strip(), "JSON对象")
+    if isinstance(obj, str):
+        inner = obj.strip()
+        try:
+            inner_obj = json.loads(inner)
+            if isinstance(inner_obj, dict):
+                return (str(inner_obj.get("task_url", "") or "").strip(),
+                        str(inner_obj.get("api_key", "") or "").strip(), "JSON字符串")
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return (inner, "", "URL")
+    # 非 JSON 纯文本：取首行作 URL（URL 单行，多行输入防御性截取）
+    first = raw.splitlines()[0].strip()
+    return (first, "", "URL")
 
 
 def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
@@ -143,7 +89,8 @@ def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
     与 单收取 _no_video 同约定：原生 VIDEO 环境出 NO_VIDEO_ 前缀黑帧占位
     mp4（video 槽必须交接真实文件，空引用会崩 SaveVideo；status 携带
     error 内容、队列不打断；PyAV 不可用回退红错）；VHS/STRING 环境回空值。
-    批量场景占位文件名带槽号后缀，避免 20 槽同状态同名混淆。
+    批量场景占位文件名带槽号（NO_VIDEO_{state}_{slot}_*.mp4），20 槽同
+    状态可辨识到槽。
     """
     status = f"{state}: {detail}"
     if _VIDEO_MODE == "comfy_api":
@@ -165,9 +112,9 @@ def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
 
 
 class AgnesVideoTaskCollectBatch(OutputDocsMixin):
-    """Agnes 视频任务批量收取：tasks JSON 合并输入（task_url_key 单线双参对象），线程池并发轮询 ≤20 任务，输出 20 路 video（环境动态类型）+ 整批状态 JSON + 全部视频路径 JSON。"""
+    """Agnes 视频任务批量收取：20 个 task 输入（task_i ↔ video_i，task_url_key 单线双参或纯 URL），线程池并发收取 ≤20 任务，输出 20 路 video（环境动态类型）+ 整批状态 JSON + 全部视频路径 JSON。"""
 
-    DESCRIPTION = "视频任务异步批量收取（两段式第二段，≤20 任务并发）：输入 1 路 tasks JSON 合并输入（元素=视频任务提交 的 task_url_key 单线双参对象 {task_url,api_key}，一行带齐 URL+Key；也接受单个对象/换行 JSON 对象行（字符串合并形态）/纯 URL 行；条目 0 标记=跳过记 error、空条目=跳过记 empty、超 20 条截断）；线程池并发轮询（max_concurrency 默认 10，每任务 60s 首查后每 5s，timeout 默认 600s），completed 自动下载（3 次重试）到 output/agnes_videos/；输出 22 槽：video_1..video_20（环境动态类型同 文生视频，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位+队列不打断）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单+details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，其余空）"
+    DESCRIPTION = "视频任务异步批量收取（两段式第二段，20 任务并发）：20 个输入 task_1…task_20（task_i 对应 video_i 输出：Agnes 视频任务提交 的 task_url_key 单线双参 JSON {task_url,api_key}，N 个提交实例直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL（Key 走 api_key 兜底→全局）；0 标记=跳过记 error、空=跳过记 empty（槽号保位））；线程池并发轮询（max_concurrency 默认 10，每任务 60s 首查后每 5s，timeout 默认 600s），completed 自动下载（3 次重试）到 output/agnes_videos/；输出 22 槽：video_1..video_20（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单+details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，其余空）"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -177,29 +124,32 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
     RETURN_TYPES = (_VIDEO_OUTPUT_TYPE,) * MAX_TASKS + ("STRING", "STRING")
     RETURN_LABELS = tuple(f"视频 {i}" for i in range(1, MAX_TASKS + 1)) + ("执行状态 JSON", "全部视频路径 JSON")
     OUTPUT_DOCS = {
-        **{f"video_{i}": f"第 {i} 条任务（tasks 第 {i} 条）的视频：completed=本地 mp4（环境动态类型，可接 Save Video）；failed/processing/empty/0 标记/缺 Key=NO_VIDEO_ 黑帧占位（原生环境）或空值（VHS/STRING）"
+        **{f"video_{i}": f"task {i} 输入的任务（与 task_{i} 槽一一对应）：completed=本地 mp4（环境动态类型，可接 Save Video）；failed/processing/空输入/0 标记/缺 Key=NO_VIDEO_ 黑帧占位（原生环境，文件名带槽号）或空值（VHS/STRING）"
            for i in range(1, MAX_TASKS + 1)},
-        "status": "整批执行状态 JSON（槽号 1 起保位）：success/failed/processing/empty/error 五类槽号清单 + details 槽→原因映射；超 20 条截断附 note；可直接连 Agnes 文本拆分（JSON 数组模式）拆成 5 条名单做对接分析",
+        "status": "整批执行状态 JSON（槽号 1 起保位）：success/failed/processing/empty/error 五类槽号清单 + details 槽→原因映射；可直接连 Agnes 文本拆分（JSON 数组模式）拆成 5 条名单做对接分析",
         "all_video_paths": "20 元素 JSON 数组（与 video_i 槽下标一一对应）：completed=本地落盘路径（下载失败时=服务端 URL），其余槽=空串；JSON 一行带走 20 条路径清单，可手动拷片/投喂其他工具",
     }
 
     @classmethod
     def INPUT_TYPES(cls):
+        task_slots = {}
+        for i in range(1, MAX_TASKS + 1):
+            task_slots[f"task_{i}"] = ("STRING", {
+                "label": f"任务 {i}",
+                "multiline": False,
+                "default": "",
+                "placeholder": '{' + '"task_url": "https://api.agnes-ai.cn/agnesapi?video_id=…", "api_key": "sk-…"' + '} 或 纯轮询 URL',
+                "tooltip": f"任务 {i} 输入（对应 视频 {i} 输出）：Agnes 视频任务提交 的 task_url_key 单线双参 JSON（一行带齐 URL+Key；各槽 Key 可全不同，条目自带 Key 只作用于本任务）；也接受 纯轮询 URL 字符串（Key 走 api_key 兜底输入→全局配置）；0=上游提交失败标记：跳过记 error；空=跳过该槽记 empty（槽号保位）",
+            })
         return {
-            "required": {
-                "tasks": ("STRING", {
-                    "label": "任务列表",
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": '[\n  {"task_url": "https://api.agnes-ai.cn/agnesapi?video_id=…", "api_key": "sk-…"},\n  {"task_url": "…", "api_key": "…"}\n]（每段 ≤20 条）',
-                    "tooltip": "任务合并输入（多形态宽容解析）：① JSON 数组=视频任务提交 的 task_url_key 单线双参对象（{" + '"task_url","api_key"' + "}" + "，N 实例拼数组，一行带齐 URL+Key；元素也接受纯 task_url 字符串，Key 走 api_key 兜底）② 单个 JSON 对象=1 任务 ③ 换行分隔的 JSON 对象行（N 路 task_url_key 经 Agnes 字符串合并 换行拼接的输出形态，逐行识别）④ 换行/单行纯 URL ⑤ 空=整批跳过（零 API 调用）；条目 0 标记=上游提交失败（跳过记 error）；超 20 条截断（status 附 note）",
-                }),
+            "required": task_slots,
+            "optional": {
                 "api_key": ("STRING", {
                     "label": "API Key（兜底）",
                     "multiline": False,
                     "default": "",
                     "placeholder": "sk-...",
-                    "tooltip": "条目未自带 api_key 时的兜底 Key：可直连某提交节点 的 api_key 穿透输出（单 Key 场景全体共用）；留空则跟随全局配置（API Key 配置节点/环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）。条目自带 Key 的优先用自带",
+                    "tooltip": "条目未自带 api_key（纯 URL 输入）时的兜底 Key：可连某 提交 节点的 api_key 穿透输出；留空则跟随全局配置（API Key 配置节点/环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）。task_url_key 输入自带 Key 的优先用自带",
                 }),
                 "timeout": ("INT", {
                     "label": "轮询超时（每任务）",
@@ -220,44 +170,41 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
             },
         }
 
-    def generate(
-        self,
-        tasks: str = "",
-        api_key: str = "",
-        timeout: int = 600,
-        max_concurrency: int = 10,
-    ) -> Tuple:
-        entries, source, truncated, total = _parse_tasks(tasks)
+    def generate(self, task_1="", task_2="", task_3="", task_4="", task_5="", task_6="", task_7="", task_8="", task_9="", task_10="",
+                 task_11="", task_12="", task_13="", task_14="", task_15="", task_16="", task_17="", task_18="", task_19="", task_20="",
+                 api_key="", timeout=600, max_concurrency=10) -> Tuple:
+        # 20 个 task 槽（task_1…task_20）按位取；各槽独立解析（task_url_key JSON / 纯 URL / 0 / 空）
+        raws = [task_1, task_2, task_3, task_4, task_5, task_6, task_7, task_8, task_9, task_10,
+                 task_11, task_12, task_13, task_14, task_15, task_16, task_17, task_18, task_19, task_20]
+        entries = [_parse_entry(r)[:2] for r in raws]   # [(task_url, api_key), ×20]
         fallback_key = str(api_key or "").strip() or str(get_api_key() or "").strip()
         max_conc = max(1, min(MAX_TASKS, int(max_concurrency or 10)))
 
-        def _status_json(success, failed, processing, empty, error, details=None, note=None):
+        def _status_json(success, failed, processing, empty, error, details=None):
             data = {"success": success, "failed": failed, "processing": processing,
                     "empty": empty, "error": error}
             if details:
                 data["details"] = details
-            if note:
-                data["note"] = note
             return json.dumps(data, ensure_ascii=False, indent=2)
 
-        def _empty_slots():
-            return [i for i in range(1, MAX_TASKS + 1)]
+        def _all_slots():
+            return list(range(1, MAX_TASKS + 1))
 
-        # ── 空输入：整批跳过，零 API 调用 ──
-        if not entries:
-            print(f"[Agnes 视频任务批量收取] [跳过] 输入为空：请连接 视频任务提交 的 task_url_key 输出（拼 JSON 数组），或粘贴 JSON/换行 URL；零 API 调用")
-            videos = [self._video_for("empty", "未连接/空输入", i) for i in _empty_slots()]
-            return tuple(videos) + (_status_json([], [], [], _empty_slots(), []),
+        # ── 全空：整批跳过，零 API 调用 ──
+        if not any(u for u, _k in entries):
+            print("[Agnes 视频任务批量收取] [跳过] 全部 20 个 task 输入为空：请连接 视频任务提交 的 task_url_key 输出（task_i ↔ 视频 i），零 API 调用")
+            videos = [self._video_for("empty", "未连接 task 输入（槽号保位）", i) for i in _all_slots()]
+            return tuple(videos) + (_status_json([], [], [], _all_slots(), []),
                                     json.dumps([""] * MAX_TASKS, ensure_ascii=False))
 
-        # ── 分类：0 标记/空条目 零请求短路；其余进线程池 ──
+        # ── 分类：0 标记/空条目/缺 Key 零请求短路；其余进线程池 ──
         details: dict = {}
-        paths = {i: "" for i in range(1, MAX_TASKS + 1)}
-        zero = []   # (slot, state, detail)  请求前短路
+        paths = {i: "" for i in _all_slots()}
+        zero = []    # (slot, state, detail)  请求前短路
         to_run = []  # (slot, url, key)
         for slot, (url, key) in enumerate(entries, 1):
             if not url:
-                zero.append((slot, "empty", "空条目（无 task_url，槽号保位）"))
+                zero.append((slot, "empty", "未连接 task 输入（槽号保位）"))
             elif url == "0":
                 zero.append((slot, "error", "上游 Agnes 视频任务提交 未成功（task_url=0 标记）：原因见该提交节点 status（如 503 队列满→等 5-10 分钟重跑 提交 节点）"))
             else:
@@ -267,15 +214,18 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
                 else:
                     to_run.append((slot, url, k))
 
-        print(f"\n[Agnes 视频任务批量收取] 输入={source}，条目 {len(entries)}"
-              + ("（超 20 条已截断）" if truncated else "")
-              + f"，可收取 {len(to_run)} 条，短路 {len(zero)} 条，并发 {max_conc}，每任务 timeout {timeout}s")
+
+        print("\n[Agnes 视频任务批量收取] 任务 "
+              f"{len(to_run)} 条（含 0 标记 "
+              f"{sum(1 for _s, st, _d in zero if st == 'error')} 条），"
+              f"空槽 {sum(1 for _s, st, _d in zero if st == 'empty')} 个，"
+              f"并发 {max_conc}，每任务 timeout {timeout}s")
 
         videos = [None] * MAX_TASKS
         success, failed, processing, empty, error = [], [], [], [], []
         results = {}
 
-        # ── 短路条目先落槽（零请求）──
+        # ── 短路槽先落位（零请求）──
         for slot, state, detail in zero:
             if state == "empty":
                 empty.append(slot)
@@ -284,7 +234,7 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
             else:
                 failed.append(slot)
             details[slot] = detail
-            videos[slot - 1], st = self._video_for(state, detail, slot)
+            videos[slot - 1], _st = self._video_for(state, detail, slot)
             print(f"[Agnes 视频任务批量收取] #{slot} [{state}] {detail}（零请求）")
 
         # ── 线程池并发收取（每线程各建 client：Key 按条目走，Session 非线程安全）──
@@ -306,9 +256,8 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
                         state = res["status"]
                         if state == "completed":
                             success.append(slot)
-                            path = res.get("save_path") or res.get("video_url") or ""
-                            paths[slot] = path
-                            print(f"[Agnes 视频任务批量收取] #{slot} 完成 {path}（服务端: {str(res.get('video_url', ''))[:60]}…）")
+                            paths[slot] = res.get("save_path") or res.get("video_url") or ""
+                            print(f"[Agnes 视频任务批量收取] #{slot} 完成 {paths[slot]}（服务端: {str(res.get('video_url', ''))[:60]}…）")
                         elif state == "failed":
                             failed.append(slot)
                             details[slot] = res.get("error") or "服务端错误"
@@ -324,23 +273,21 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
                     slot_state = "success" if slot in success else ("failed" if slot in failed else "processing")
                     if slot in success:
                         # completed：video=环境动态类型真实文件（可直连 Save Video）
-                        res = results[slot]
-                        videos[slot - 1], st = self._video_for_file(
-                            res.get("save_path") or "", slot)
+                        videos[slot - 1], _st = self._video_for_file(
+                            results[slot].get("save_path") or "", slot)
                     else:
-                        videos[slot - 1], st = self._video_for(slot_state, details.get(slot, ""), slot)
+                        videos[slot - 1], _st = self._video_for(slot_state, details.get(slot, ""), slot)
 
-        # ── 槽位补全（未处理槽不应存在，防御）──
-        for i in _empty_slots():
+        # ── 槽位补全（防御：理论上 20 槽全部已落位）──
+        for i in _all_slots():
             if videos[i - 1] is None:
                 videos[i - 1], _ = _no_video("empty", "未处理槽（防御）", i)
 
         success.sort(); failed.sort(); processing.sort(); empty.sort(); error.sort()
-        note = f"输入 {total} 条，超出 20 条已截断" if truncated else None
         status_json = _status_json(success, failed, processing, empty, error,
-                                   details=details or None, note=note)
-        all_paths_json = json.dumps([paths[i] for i in _empty_slots()], ensure_ascii=False)
-        print(f"[Agnes 视频任务批量收取] 完成：成功 {len(success)}/{len(entries)}，失败 {len(failed)}，"
+                                   details=details or None)
+        all_paths_json = json.dumps([paths[i] for i in _all_slots()], ensure_ascii=False)
+        print(f"[Agnes 视频任务批量收取] 完成：成功 {len(success)}/20，失败 {len(failed)}，"
               f"未完成 {len(processing)}，短路 {len(zero)}（并发 {max_conc}）")
         print(f"[Agnes 视频任务批量收取] 状态: success={success} failed={failed} processing={processing} "
               f"empty={empty} error={error}")

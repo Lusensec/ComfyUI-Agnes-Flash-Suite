@@ -77,8 +77,9 @@ from . import text2video, img2video, video_reference, video_task_submit, video_t
 #           20 路并发出关键帧 + all_images 批量张量 (N,H,W,3) 每波总览）
 #        → 图像拼图（位于 分镜图批量 之后，batch_images 批量张量总输入优先 / 批量图 20 路 → 1 路拼图）
 # 视频类：文生视频 → 关键帧生视频 → 参考视频生成 → 视频任务提交（异步提交段）
-#        → 视频任务收取（单任务收片）→ 视频任务批量收取（tasks JSON 合并输入，线程池并发 ≤20 任务，
-#           20 路 video + 整批状态 JSON + 全部视频路径 JSON；task_url_key 单线双参直连）
+#        → 视频任务收取（单任务收片）→ 视频任务批量收取（20 个 task 输入 task_i ↔ video_i，
+#           提交节点 task_url_key 单线双参 0 中间节点直连；线程池并发 ≤20 任务，
+#           20 路 video + 整批状态 JSON + 全部视频路径 JSON）
 for _mod in [
     # 文本类
     api_key_config, style_selector, text_input,
