@@ -356,16 +356,16 @@ class AgnesClient:
     _MAX_RETRIES = 3
     _MAX_RETRIES_QUEUE = 5  # 队列满/限流专用：最多等 ~3.75 分钟
     _RETRY_BASE_DELAY = 3  # seconds (exponential backoff: 3, 6, 12)
-    # 视频 503 队列满/限流退避：重试次数可由节点「重试次数」参数动态调整（默认 5、上限 30）
+    # 视频 503 队列满/限流退避：重试次数可由节点「重试次数」参数动态调整（默认 5、上限 120）
     _VIDEO_DEFAULT_RETRIES = 5   # 默认 5 次：固定 30 秒/次（累计 150 秒 = 2.5 分钟）
-    _VIDEO_MAX_RETRIES = 30      # 上限：固定 30 秒/次，30 次累计 900 秒 = 15 分钟
+    _VIDEO_MAX_RETRIES = 120     # 上限：固定 30 秒/次，120 次累计 3600 秒 = 60 分钟
     _VIDEO_QUEUE_DELAYS = [30]   # 退避表：固定 30 秒 × 重试次数
 
     @classmethod
     def _video_queue_delays(cls, retries: int) -> List[int]:
         """视频 503/429 退避表：固定 30 秒 × 重试次数（默认 5 次累计 150 秒/2.5 分钟；
-        上限 30 次累计 900 秒/15 分钟——超过 15 分钟的等待交给两段式「0 标记 + 稍后重跑」，
-        不在节点内死等）。视频队列恢复尺度为分钟级，30s 探测=每分钟 2 次，密度适中；
+        上限 120 次累计 3600 秒/60 分钟——仍满则按两段式「0 标记 + 稍后重跑」，不在节点内无限死等）。
+        视频队列恢复尺度为分钟级，30s 探测=每分钟 2 次，密度适中；
         实际睡眠另带 ±15% 随机抖动错峰，503/429 响应带 Retry-After 头时优先按该头秒数。"""
         r = max(0, int(retries))
         return [30] * r
@@ -727,7 +727,7 @@ class AgnesClient:
                     本地文件自动转 Base64 Data URI，单段 <15MB）。
             return_ids: True 时返回 (save_path, task_id, video_id) 三元组。
             retries: 提交遇 503 队列满/429 限流的自动重试次数（None=默认 5；
-                    固定 30 秒/次，默认 5 次累计 150 秒，睡眠带 ±15% 随机抖动；上限 30=900 秒）。
+                    固定 30 秒/次，默认 5 次累计 150 秒，睡眠带 ±15% 随机抖动；上限 120=3600 秒）。
         """
         new_model = model in NEW_VIDEO_MODELS
 
