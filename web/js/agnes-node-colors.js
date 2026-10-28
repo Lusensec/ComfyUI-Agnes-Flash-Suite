@@ -83,6 +83,7 @@
         "AgnesVideoReference": "video",
         "AgnesVideoTaskSubmit": "video",
         "AgnesVideoTaskCollect": "video",
+        "AgnesVideoTaskCollectBatch": "video",
     };
 
     // ── 节点 → 类内色阶：main=主功能 / light=次功能 / deep=工具与中间层（未登记=main） ──
@@ -119,6 +120,7 @@
         "AgnesVideoReference": "deep",
         "AgnesVideoTaskSubmit": "deep",
         "AgnesVideoTaskCollect": "deep",
+        "AgnesVideoTaskCollectBatch": "main",  // 批量收取=主功能（同 三视图批量/分镜图批量 批量档）
     };
 
     function paletteOf(nodeName) {

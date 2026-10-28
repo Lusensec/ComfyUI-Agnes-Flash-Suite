@@ -571,11 +571,15 @@ keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）�
 - task_url: 完整轮询 URL（含域名 /agnesapi?video_id=…&model_name=…；域名跟随本节点请求地址，跨域名提交也拼对）——直连 收取 节点的 task_url 输入；提交失败="0" 标记（未生成任务，收取节点见 "0" 直接跳过收取）
 - status: 任务状态：成功=`submitted: video_id=…`；失败=Agnes 服务端错误响应内容（HTTP 503 队列满/400 参数错误等的原文诊断）
 - api_key: API Key 穿透：提交时实际使用的 Key（节点输入非空=输入值，否则=全局回退值）——直连 收取 节点的 api_key 输入，收取端免再配 Key（提交失败/缺 Key 短路时为空）
+- task_url_key: 单线双参 JSON：{"task_url": 轮询 URL（失败=0 标记）, "api_key": 实际使用的 Key}（与 task_url/api_key 两路输出同源）——直连 批量收取 节点的 tasks 合并输入：N 个提交实例的 task_url_key 拼 JSON 数组（手拼 / LLM 对话生成 / 多路经 字符串合并 换行拼接——批量收取逐行识别），一根线带齐 URL+Key 两个参数
 
 > 两段式用法：提交节点秒级返回 → 出片期间画布可跑其他工作流（分镜图/下一部小说）→
 > 之后右键运行 收取 节点收片（自动下载到 output/agnes_videos/）。
-> 60 镜线新接法：视频提示词批量 ×3 分段 → 视频任务提交 ×3（几内分钟提交完 60 任务）
-> → 视频任务收取 ×N 实例（一任务一实例，右键部分执行，自动下载）→ 60 镜视频全量落盘。
+> 60 镜线接法两种：
+> ① 逐个收取：视频提示词批量 ×3 分段 → 视频任务提交 ×3（几分钟提交完 60 任务）
+> → 视频任务收取 ×N 实例（一任务一实例，右键部分执行，自动下载）→ 60 镜视频全量落盘；
+> ② 批量收取：同上提交 ×3 → 各实例 task_url_key 输出拼 JSON 数组（每段 ≤20 条）
+> → 视频任务批量收取 ×3（线程池并发收取，单节点收完一段 20 镜）→ 20×3 路 video 直连 Save Video 全量落盘。
 
 ---
 
@@ -595,7 +599,34 @@ completed 自动下载 mp4（3 次重试 2/5/10s），输出视频（环境动�
 - video: MP4 文件（落盘 ComfyUI output/agnes_videos/），输出类型随环境三档（与 文生视频 同源动态探测）：原生 ComfyUI = VIDEO（VideoFromFile 惰性文件引用，**可直连 Save Video**：SaveVideo 读盘重编码到 output/video/ 并在输出预览面板播放）/ 装 VHS = VHS_VIDEOINFO（可接 VHS 播放器）/ 无视频节点 = 路径字符串；无视频文件时（任务未完成/失败/未连接输入/0 标记/缺 Key）：原生环境输出 NO_VIDEO_ 前缀的 2 秒黑帧 720P 占位 mp4（status 携带 error 内容、队列不被打断；PyAV 不可用时回退红错），VHS/STRING 环境返回空值不崩
 - status: 任务状态：completed=服务端视频 URL（有效期内可浏览器直接播放/下载）；failed=Agnes 服务端错误响应内容（任务级 failed 与下载失败诊断）；processing=到轮询超时未完成（可再次右键运行本节点继续查询）；error=收到 0 标记（上游 提交 失败，跳过收取，原因见 提交 节点 status）；empty=未连接 task_url
 
-> 无文件态黑帧占位约定：原生视频环境下 video 槽必须交接真实文件（空引用会令下游 Save Video 崩溃），故 收到 0 标记（上游提交失败）/failed/processing/empty/缺 Key 时输出 NO_VIDEO_ 前缀黑帧占位 mp4（PyAV 现场编码 2 秒 720P，约 12KB），**status 携带完整 error 内容、队列不被打断**（如「processing: 已等待 600 秒任务未完成，可再次运行本节点继续查询」「error: 上游 提交 未成功（task_url=0 标记），等 5-10 分钟重跑 提交 节点」）；出片/提交成功后再次右键运行即得真视频；任务仍在服务端，不重复计费。占位文件靠 NO_VIDEO_ 前缀自证，勿当真实视频用；PyAV 不可用时回退旧红错约定。文生视频等节点仍维持原红错约定。
+> 无文件态黑帧占位约定：原生视频环境下 video 槽必须交接真实文件（空引用会令下游 Save Video 崩溃），故 收到 0 标记（上游提交失败）/failed/processing/empty/缺 Key 时输出 NO_VIDEO_ 前缀黑帧占位 mp4（PyAV 现场编码 2 秒 720P，约 12KB），**status 携带完整 error 内容、队列不被打断**（如「processing: 已等待 600 秒任务未完成，可再次运行本节点继续查询」「error: 上游 提交 未成功（task_url=0 标记），等 5-10 分钟重跑 提交 节点」）；出片/提交成功后再次右键运行即得真视频；任务仍在服务端，不重复计费。占位文件靠 NO_VIDEO_ 前缀自证（批量收取文件名带槽号），勿当真实视频用；PyAV 不可用时回退旧红错约定。文生视频等节点仍维持原红错约定。
+
+---
+
+### 📥 Agnes 视频任务批量收取 (AgnesVideoTaskCollectBatch)
+
+**功能：** 视频任务异步批量收取（两段式·收取段，≤20 任务并发）：把 N 个视频任务交给
+一个节点，线程池并发轮询收取（免 N 个 收取 实例逐个右键），全部 settled 才返回；
+completed 自动下载到 output/agnes_videos/（3 次重试）。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| tasks | STRING | "" | 任务合并输入（多形态宽容解析）：① JSON 数组=视频任务提交 的 task_url_key 单线双参对象（{"task_url","api_key"}，N 实例拼数组，一行带齐 URL+Key；元素也接受纯 task_url 字符串，Key 走 api_key 兜底）② 单个 JSON 对象=1 任务 ③ 换行分隔的 JSON 对象行（N 路 task_url_key 经 字符串合并 换行拼接的输出形态，逐行识别）④ 换行/单行纯 URL ⑤ 空=整批跳过（零 API 调用）；条目 "0"=上游提交失败标记（跳过记 error）；超 20 条截断（status 附 note） |
+| api_key | STRING | （留空=全局） | 条目未自带 api_key 时的兜底 Key（可直连某 提交 节点的 api_key 穿透输出，单 Key 场景全体共用）；条目自带 Key 的优先用自带 |
+| timeout | INT | 600 | 单任务最长等待（秒，默认 10 分钟，同 单收取）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查未完成任务（全批 settled 才返回） |
+| max_concurrency | INT | 10 | 线程池并发（同时轮询任务数 1-20，默认 10）：非空条目超过该值时排队执行；轮询是轻 GET，10 并发压力很小 |
+
+**输出（22 槽，含输出描述）：**
+- video_1…video_20: 第 i 条任务（tasks 第 i 条）的视频，环境动态类型（同 文生视频/单收取 三档）：原生 ComfyUI=VIDEO（VideoFromFile 惰性引用，**可直连 Save Video**）/ VHS=VHS_VIDEOINFO / 无视频节点=路径字符串；completed=真实文件，failed/processing/empty/0 标记/缺 Key=NO_VIDEO_ 前缀黑帧占位（原生环境，文件名带槽号，队列不打断）或空值（VHS/STRING）
+- status: 整批执行状态 JSON（槽号 1 起保位）：{"success":[completed 槽],"failed":[服务端失败/下载失败/缺 Key/网络异常槽],"processing":[到 timeout 未完成槽],"empty":[空条目槽],"error":["0" 标记槽],"details":{槽:原因}}；超 20 条截断附 note；可连 文本拆分（JSON 数组模式）拆成名单做对接分析
+- all_video_paths: 20 元素 JSON 数组（与 video_i 槽下标一一对应）：completed=本地落盘路径（下载失败时=服务端 URL），其余=空串；JSON 一行带走 20 条路径清单（手动拷片/投喂其他工具/台账记录）
+
+> 批量收取用法：视频提示词批量 ×3 分段 → 视频任务提交 ×3 → 各实例 task_url_key 输出
+> 拼 JSON 数组（每段 ≤20 条：手拼 / LLM 对话生成 / 多路经 字符串合并 换行拼接）
+> → 视频任务批量收取 ×3（线程池并发收取，单节点收完一段 20 镜）
+> → 20×3 路 video 直连 Save Video 全量落盘。与 单收取 的差别：一个节点收 ≤20 任务
+> （总时长≈max(各视频渲染时长)，非 sum），免逐任务右键；processing 槽再次运行本节点
+> 即继续查（completed 任务重查秒回不重下），不重复计费。
 
 ---
 
@@ -1013,8 +1044,12 @@ all_items 空项=跳过该槽（槽号保位，与旧 20 槽行为一致）；�
 4. **图像生成** → 生成场景图像
 5. **文生视频** → 按提示词生成视频（图参考请用「Agnes 关键帧生视频」/「Agnes 参考视频生成」节点）
    - 多视频异步接法（推荐）：「Agnes 视频任务提交」秒级提交拿 task_url（画布立刻解放）→
-     「Agnes 视频任务收取」稍后右键运行收片（自动下载 output/agnes_videos/；
-     一任务一收取实例，多实例分波放置，出片期间画布空闲）
+     收取两种接法任选：
+     a. 「Agnes 视频任务收取」单任务实例：一任务一实例，稍后右键运行收片
+     （自动下载 output/agnes_videos/，多实例分波放置，出片期间画布空闲）；
+     b. 「Agnes 视频任务批量收取」：提交实例的 task_url_key 输出拼 JSON 数组
+     （每段 ≤20 条，手拼 / LLM 生成 / 字符串合并换行拼接），线程池并发收取，
+     单节点收完一段 20 镜（总时长≈max 而非 sum，免逐任务右键）
 6. **剧本生成** → 独立流程，生成解说文案
 
 ---
