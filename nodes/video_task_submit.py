@@ -2,7 +2,8 @@
 """
 Agnes 视频任务提交节点（异步两段式·提交段）
 ==========================================
-输入与退避策略与 Agnes 文生视频 节点完全一致（10 个输入同序同默认，
+输入与退避策略与 Agnes 文生视频 节点一致（9 个输入同序同默认，
+唯一差异：无 max_wait_seconds 保留项——本节点只提交不轮询，轮询时限在 收取 节点 timeout 设置；
 提交遇 503 队列满/429 限流按「重试次数」固定 30 秒/次退避（睡眠带 ±15% 抖动，Retry-After 头优先）），
 但只执行「提交」这一段：POST /v1/videos 拿到任务 ID 后秒级返回，
 不轮询、不下载——画布立刻解放，可继续跑其他工作流。
@@ -20,16 +21,16 @@ Agnes 视频任务提交节点（异步两段式·提交段）
             收取端免再配 Key（缺 Key 短路时为空）。
   task_url_key: 单线双参 JSON——{"task_url": 上述 task_url, "api_key": 上述 api_key}
             （一行带齐 收取 所需的 URL+Key 两个参数），直连「Agnes 视频任务批量收取」
-            的 tasks 合并输入（N 个提交实例的 task_url_key 拼 JSON 数组后一根线进批量收取）；
+            的 task_i 槽（N 个提交实例的 task_url_key 直连 N 个 task_i 槽，0 中间节点）；
             失败时 task_url="0" 标记，批量收取见 "0" 条目跳过、记 error 状态。
 
 60 镜线接法（两种）：
-  ① 逐个收取：视频提示词批量 ×3 分段 → 视频任务提交 ×3（3 实例各连一段，
+  ① 逐个收取：视频提示词批量 ×3 分段 → 视频任务提交 ×60（分 3 波 × 20 实例，
   几分钟内提交完 60 个任务）→ 出片期间画布空闲 → 视频任务收取 ×N 实例
   （一任务一实例，右键部分执行，自动下载）→ 60 镜视频全量落盘；
-  ② 批量收取：同上提交 ×3 → 各实例 task_url_key 输出拼 JSON 数组
-  （每段 ≤20 条）→ 视频任务批量收取 ×3（线程池并发收取，20 路 video +
-  整批状态 JSON + 全部路径清单）→ 60 镜视频全量落盘。
+  ② 批量收取：同上提交 ×60（分 3 波 × 20 实例）→ 每波 20 个实例的 task_url_key
+  直连 1 个 视频任务批量收取 实例的 task_1…task_20（0 中间节点，各槽 Key 可全不同）
+  → 3 实例 × 20 路 video 直连 Save Video → 60 镜视频全量落盘。
 """
 
 import json
@@ -55,7 +56,7 @@ SECONDS_DEFAULT = 5
 class AgnesVideoTaskSubmit(OutputDocsMixin):
     """Agnes 视频任务提交：只提交不等待（输入/退避同 文生视频），秒级返回 task_url + status，画布立刻解放。"""
 
-    DESCRIPTION = "视频任务异步提交（两段式第一段）：输入与退避同 Agnes 文生视频（10 个输入同序，503 队列满按「重试次数」固定 30 秒/次退避（默认 5 次累计 150 秒）），只执行提交段——POST 拿到任务 ID 即返回，不轮询不下载；输出 4 路：task_url（完整轮询 URL 含域名，直连 收取 节点）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）+ api_key 穿透（提交时实际使用的 Key，直连 收取 的 api_key 输入，收取端免再配 Key）+ task_url_key（单线双参 JSON：{\"task_url\",\"api_key\"}，直连 视频任务批量收取 的 tasks 合并输入，一根线带齐 URL+Key），出片期间画布可继续跑其他工作流"
+    DESCRIPTION = "视频任务异步提交（两段式第一段）：输入与退避同 Agnes 文生视频（9 个输入，无 max_wait_seconds 保留项——本节点不轮询，轮询时限在 收取 节点 timeout 设置；503 队列满按「重试次数」固定 30 秒/次退避（默认 5 次累计 150 秒）），只执行提交段——POST 拿到任务 ID 即返回，不轮询不下载；输出 4 路：task_url（完整轮询 URL 含域名，直连 收取 节点）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）+ api_key 穿透（提交时实际使用的 Key，直连 收取 的 api_key 输入，收取端免再配 Key）+ task_url_key（单线双参 JSON：{\"task_url\",\"api_key\"}，直连 视频任务批量收取 的 task_i 槽，一根线带齐 URL+Key），出片期间画布可继续跑其他工作流"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -66,7 +67,7 @@ class AgnesVideoTaskSubmit(OutputDocsMixin):
         "task_url": "成功=完整轮询 URL（含域名 /agnesapi?video_id=…&model_name=…，域名跟随本节点请求地址）：直连 Agnes 视频任务收取 的 task_url 输入；提交失败=0 标记（未生成任务，收取节点见 0 直接跳过收取、status 输出 error 内容）",
         "status": "任务状态：成功=submitted: video_id=…；失败=服务端错误响应内容（HTTP 503 队列满/400 参数错误等的原文诊断）；提交失败时 task_url 为空",
         "api_key": "API Key 穿透：提交时实际使用的 Key（节点输入非空=输入值，否则=全局回退值）：直连 Agnes 视频任务收取 的 api_key 输入，收取端免再配 Key；缺 Key 短路时为空",
-        "task_url_key": "单线双参 JSON：{\"task_url\": 轮询 URL（失败=0 标记）, \"api_key\": 实际使用的 Key}（与 task_url/api_key 两路输出同源）：直连 Agnes 视频任务批量收取 的 tasks 合并输入（N 个提交实例的 task_url_key 拼 JSON 数组，一根线带齐 URL+Key 两个参数）",
+        "task_url_key": "单线双参 JSON：{\"task_url\": 轮询 URL（失败=0 标记）, \"api_key\": 实际使用的 Key}（与 task_url/api_key 两路输出同源）：直连 Agnes 视频任务批量收取 的 task_i 槽（N 个提交实例的 task_url_key 直连 N 个 task_i 槽，0 中间节点，一根线带齐 URL+Key 两个参数）",
     }
 
     @classmethod
@@ -126,14 +127,6 @@ class AgnesVideoTaskSubmit(OutputDocsMixin):
                     "control_after_generate": False,
                     "tooltip": "随机种子（0=每次随机，固定值可复现结果）；随机请用输入框旁的骰子按钮（本节点已禁用前端自动附加的「生成后控制」英文下拉）",
                 }),
-                "max_wait_seconds": ("INT", {
-                    "label": "轮询超时",
-                    "default": 600,
-                    "min": 60,
-                    "max": 3600,
-                    "step": 30,
-                    "tooltip": "保留项（与 文生视频 输入一致）：本节点只提交不轮询，此值不生效；轮询时限在 收取 节点的 timeout 参数设置",
-                }),
                 "retries": ("INT", {
                     "label": "重试次数",
                     "default": 5,
@@ -156,7 +149,6 @@ class AgnesVideoTaskSubmit(OutputDocsMixin):
         aspect_ratio: str = "16:9",
         seconds: int = SECONDS_DEFAULT,
         seed: int = 0,
-        max_wait_seconds: int = 600,
         retries: int = 5,
     ) -> Tuple:
         if not prompt.strip():
