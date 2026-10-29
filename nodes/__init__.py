@@ -6,9 +6,8 @@
 #      → 剧本（解说/漫剧）→ 分镜管线：拆分/导演/提取 → 资产·三视图·分镜 提示词批量 → 视频提示词（单个/批量））
 #   ② 图片类节点（图像反推提示词 置顶 → 文生图 → 图生图 → 三视图 → 三视图批量 → 分镜图批量 → 图像拼图）
 #   ③ 视频类节点（文生视频 → 关键帧生视频 → 参考视频生成 → 视频任务提交
-#      → 视频任务并发提交（多端点 Key 池·顺序短路）→ 视频任务收取（单任务）
-#      → 视频任务批量收取（≤20 任务线程池并发收取，异步两段式）
-#      → 视频任务并发结果（池提交逐条目矩阵展示终端））
+#      → 视频任务并发提交（多端点 Key 池·顺序短路）→ 视频任务并发结果（池提交逐条目矩阵展示终端，紧随并发提交）
+#      → 视频任务收取（单任务）→ 视频任务批量收取（≤20 任务线程池并发收取，异步两段式））
 
 # ── 文本类节点 ─────────────────────────────────────────────
 from .api_key_config import AgnesNovelAPIKeyConfig
@@ -47,9 +46,9 @@ from .img2video import AgnesNovelImageToVideo
 from .video_reference import AgnesVideoReference
 from .video_task_submit import AgnesVideoTaskSubmit
 from .video_task_submit_pool import AgnesVideoTaskSubmitPool
+from .video_task_pool_status import AgnesVideoTaskPoolStatus
 from .video_task_collect import AgnesVideoTaskCollect
 from .video_task_collect_batch import AgnesVideoTaskCollectBatch
-from .video_task_pool_status import AgnesVideoTaskPoolStatus
 
 # 合并所有节点映射
 NODE_CLASS_MAPPINGS = {}
@@ -62,7 +61,7 @@ from . import asset_extractor, text_split, asset_prompt, asset_prompt_batch
 from . import turnaround_prompt, turnaround_prompt_batch, prompt_generator, scene_prompt_batch
 from . import video_prompt, video_prompt_batch
 from . import image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, scene_image_batch, image_mosaic
-from . import text2video, img2video, video_reference, video_task_submit, video_task_submit_pool, video_task_collect, video_task_collect_batch, video_task_pool_status
+from . import text2video, img2video, video_reference, video_task_submit, video_task_submit_pool, video_task_pool_status, video_task_collect, video_task_collect_batch
 
 # 文本类：API Key 配置 → API Key 池配置（多端点 Key 池 JSON，供 视频任务并发提交；配置信息，紧随 API Key）→ 风格选择 → 文本输入（文本起点，替代灰色 PrimitiveNode）
 #        → LLM 对话（通用对话工具）→ 字符串合并（文本拼接工具）
@@ -84,11 +83,14 @@ from . import text2video, img2video, video_reference, video_task_submit, video_t
 # 视频类：文生视频 → 关键帧生视频 → 参考视频生成 → 视频任务提交（异步提交段）
 #        → 视频任务并发提交（多端点 Key 池·顺序短路：池 JSON 输入替代 base_url+api_key，
 #           按池序逐条目试探、命中即停零浪费，retries 机制同 单提交；task_url_key 胜出 Key 随行，
-#           批量收取 零改动直连；pool_report 逐条目矩阵）
+#           批量收取 零改动直连；pool_report 逐条目矩阵；面板输出顺序
+#           task_url→api_key→task_url_key→pool_report→status（status 置最下））
+#        → 视频任务并发结果（池提交逐条目矩阵展示终端，紧随并发提交：
+#           输入顺序 task_url_key→pool_report→status（多行文本可展开查看），
+#           两路输出 result（展示）+ task_url_key（原样穿透，转接 批量收取 task_i），零 API 调用）
 #        → 视频任务收取（单任务收片）→ 视频任务批量收取（20 个 task 输入 task_i ↔ video_i，
 #           提交节点 task_url_key 单线双参 0 中间节点直连；线程池并发 ≤20 任务，
 #           20 路 video + 整批状态 JSON + 全部视频路径 JSON）
-#        → 视频任务并发结果（池提交逐条目矩阵展示终端，零 API 调用）
 for _mod in [
     # 文本类
     api_key_config, api_key_pool, style_selector, text_input,
@@ -102,8 +104,8 @@ for _mod in [
     image_mosaic,
     # 视频类
     text2video, img2video, video_reference,
-    video_task_submit, video_task_submit_pool, video_task_collect, video_task_collect_batch,
-    video_task_pool_status,
+    video_task_submit, video_task_submit_pool, video_task_pool_status,
+    video_task_collect, video_task_collect_batch,
 ]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)

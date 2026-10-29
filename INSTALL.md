@@ -65,5 +65,5 @@ $env:AGNES_API_KEY = "sk-你的Key"
 - 🎨 Agnes 图像生成 / 🖼️ Agnes 图生图 / 📐 Agnes 三视图生成 / 📐 Agnes 三视图批量生成
 - 🎞️ Agnes 分镜图批量生成 / 🔍 Agnes 图像反推提示词 / 🧩 Agnes 图像拼图
 - 🎞️ Agnes 文生视频 / 🎬 Agnes 关键帧生视频 / 🎞️ Agnes 参考视频生成
-- 🎞️ Agnes 视频任务提交 / 🎞️ Agnes 视频任务并发提交（多端点 Key 池）
-- 📥 Agnes 视频任务收取 / 📥 Agnes 视频任务批量收取 / 📊 Agnes 视频任务并发结果
+- 🎞️ Agnes 视频任务提交 / 🎞️ Agnes 视频任务并发提交（多端点 Key 池）/ 📊 Agnes 视频任务并发结果
+- 📥 Agnes 视频任务收取 / 📥 Agnes 视频任务批量收取

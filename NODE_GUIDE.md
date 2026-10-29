@@ -650,7 +650,8 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 
 > 池线接法：API Key 池配置（pool_json）→ 视频任务并发提交 ×N（N=镜头数/池容量）
 > → task_url_key 直连 批量收取 task_1…task_20（各槽 Key=各胜出条目 Key，互不干扰，批量收取 零改动）
-> → status + pool_report + task_url_key 三路直连 视频任务并发结果（逐条目矩阵展示）。
+> → task_url_key + pool_report + status 三路直连 视频任务并发结果（逐条目矩阵展示；
+>    task_url_key 还可经其穿透输出转接 批量收取 task_i）。
 
 ---
 
@@ -674,16 +675,16 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | seed | INT | 0 | 随机种子（0=每次随机；全池条目共用同一种子） |
 | retries | INT | 5 | 与 单提交 retries 同机制：一轮=按池序全条目试探一次（一条目一次 POST），整轮全灭固定 30 秒/轮退避（±15% 抖动；Retry-After 头优先）；默认 5（6 轮、累计 150 秒）；上限 120（121 轮、累计 3600 秒/60 分钟，**累计等待与池大小无关**）；400/401/403/404 条目标 dead 后续轮跳过（不反复打无效 Key）、全灭提前终止 |
 
-**输出（5 路，均 STRING）：**
+**输出（5 路，均 STRING；面板自上而下，status 置最下）：**
 - task_url: 成功=**胜出条目**的完整轮询 URL（含该条目域名 /agnesapi?video_id=…&model_name=…，跨域名拼对）——直连 收取/批量收取；失败="0" 标记
-- status: 成功=`submitted: video_id=…（池 #i / base_url）`；失败=末次诊断原文（503 队列满等）+ 退避轮数/累计等待 + 建议（5-10 分钟重跑 / 增配池条目 / 错峰）；鉴权全灭=`池内全部条目 dead` 提前终止诊断
 - api_key: API Key 穿透：胜出条目实际使用的 Key（失败=空串）——直连 收取 的 api_key 输入免再配
 - task_url_key: 单线双参 JSON {"task_url", "api_key"}（胜出条目 URL+Key 一行带齐）——直连 批量收取 task_i 槽，**批量收取 节点零改动**（各槽 Key 可全不同）
 - pool_report: 逐条目 JSON 数组 `[{i, base_url, key(掩码), attempts, result}]`（result ∈ success@roundN / dead:HTTPxxx / 末次诊断 / 未请求(短路跳过)）——直连「Agnes 视频任务并发结果」展示节点
+- status: 成功=`submitted: video_id=…（池 #i / base_url）`；失败=末次诊断原文（503 队列满等）+ 退避轮数/累计等待 + 建议（5-10 分钟重跑 / 增配池条目 / 错峰）；鉴权全灭=`池内全部条目 dead` 提前终止诊断
 
 > 池线用法（与 60 镜线同构）：API Key 池配置（国内+国外多账号条目）
 > → 视频任务并发提交 ×N → task_url_key 直连 批量收取 task_1…task_20
-> → 20 路 video 直连 Save Video；status/pool_report/task_url_key 三路直连 视频任务并发结果。
+> → 20 路 video 直连 Save Video；task_url_key/pool_report/status 三路直连 视频任务并发结果。
 > 何时用：单 Key 提交全 503 video_queue_full（分钟级持续态）且池内条目分属**不同容量池**
 > （不同账号/国内国外不同平台端点）——一端满、另一端绿窗时任务直接落地；
 > 池内条目若共享同一平台全局限额，并发探测收益有限（仍可用，顺序短路保证成功时零浪费）。
@@ -693,21 +694,24 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 ### 📊 Agnes 视频任务并发结果 (AgnesVideoTaskPoolStatus)
 
 **功能：** 池并发提交结果展示终端（纯展示，零 API 调用、无需 Key）：接「Agnes 视频任务
-并发提交」的 status + pool_report + task_url_key 三路输出，格式化为逐条目结果矩阵——
-哪条胜出（掩码 Key + 请求地址）、哪些条目 dead（鉴权/参数错误）、哪些仍在队列满
-（末次诊断）、task_url_key 是否可直连「Agnes 视频任务批量收取」。
+并发提交」的 task_url_key + pool_report + status 三路输出（面板输入顺序同左→右），
+格式化为逐条目结果矩阵——哪条胜出（掩码 Key + 请求地址）、哪些条目 dead（鉴权/参数
+错误）、哪些仍在队列满（末次诊断）；task_url_key 原样穿透输出，可继续直连
+「Agnes 视频任务批量收取」的 task_i 槽（展示与收取两条线互不干扰）。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| status | STRING（多行） | "" | 直连 并发提交 的 status 输出（提交状态：成功/末次诊断+建议） |
+| task_url_key | STRING（多行，可展开查看） | "" | 直连 并发提交 的 task_url_key 输出（胜出条目 URL+Key 单线双参；本节点只展示掩码 Key 与直连提示，不参与任何请求） |
 | pool_report | STRING（多行） | "" | 直连 并发提交 的 pool_report 输出（逐条目 JSON 数组；零请求短路=空数组 []） |
-| task_url_key | STRING | "" | 直连 并发提交 的 task_url_key 输出（胜出条目 URL+Key 单线双参；本节点只展示掩码 Key 与直连提示，不参与任何请求） |
+| status | STRING（多行） | "" | 直连 并发提交 的 status 输出（提交状态：成功/末次诊断+建议；并发提交面板最下的一路） |
 
-**输出（1 路 STRING）：**
+**输出（2 路，均 STRING）：**
 - result: 多行格式化文本：【状态】提交成败与末次诊断 /【胜出】条目序号+请求地址+掩码 Key+「task_url_key 可直连 批量收取 task_i」提示（0 标记=「未生成任务，5-10 分钟重跑」提示）/【逐条目矩阵】每条目 `#i 请求地址 掩码Key → result（attempts=N）`；并发提交 未运行/未连线时输出空态提示（不报错）
+- task_url_key: 原样穿透——本节点收到的 task_url_key 输入（单线双参 JSON，0 标记时原样为 0 标记 JSON），转接「Agnes 视频任务批量收取」task_i 槽（**批量收取 节点零改动**）
 
-> 接法：并发提交 的 status / pool_report / task_url_key 三路直连本节点，右键运行即可查看
-> 逐条目结果；result 输出可接 文本输入 节点或 LLM 对话做台账/分析。
+> 接法：并发提交 的 task_url_key / pool_report / status 三路直连本节点，右键运行即可查看
+> 逐条目结果；result 输出可接 文本输入 节点或 LLM 对话做台账/分析；
+> task_url_key 穿透输出转接 批量收取 task_i（如需"结果展示 + 收取"两条线并行）。
 
 ---
 
