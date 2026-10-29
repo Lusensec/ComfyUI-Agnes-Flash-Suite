@@ -96,9 +96,9 @@ ComfyUI 实测截图：
 1. 克隆本插件到 `ComfyUI/custom_nodes/`：
    ```powershell
    cd "你的ComfyUI路径\ComfyUI\custom_nodes"
-   git clone https://github.com/Lusensec/Comfyui-Agnes-Flash-Suite.git
+   git clone https://github.com/Lusensec/ComfyUI-Agnes-Flash-Suite.git
    ```
-   或下载 ZIP 解压为 `ComfyUI/custom_nodes/Comfyui-Agnes-Flash-Suite/`
+   或下载 ZIP 解压为 `ComfyUI/custom_nodes/ComfyUI-Agnes-Flash-Suite/`
 2. 重启 ComfyUI
 
 ## 配置 API Key

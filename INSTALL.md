@@ -9,7 +9,7 @@
 cd "你的ComfyUI路径\ComfyUI\custom_nodes"
 
 # 2. 克隆本插件
-git clone https://github.com/Lusensec/Comfyui-Agnes-Flash-Suite.git
+git clone https://github.com/Lusensec/ComfyUI-Agnes-Flash-Suite.git
 
 # 3. 重启 ComfyUI
 ```
@@ -17,7 +17,7 @@ git clone https://github.com/Lusensec/Comfyui-Agnes-Flash-Suite.git
 ## 方式 2：ZIP 下载
 
 1. 下载 release ZIP（或代码 ZIP）并解压
-2. 解压到 `ComfyUI/custom_nodes/`，目录名保持为 `Comfyui-Agnes-Flash-Suite`
+2. 解压到 `ComfyUI/custom_nodes/`，目录名保持为 `ComfyUI-Agnes-Flash-Suite`
 3. 重启 ComfyUI
 
 ## 依赖
