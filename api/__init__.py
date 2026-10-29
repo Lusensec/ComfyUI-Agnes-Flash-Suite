@@ -1152,6 +1152,156 @@ class AgnesClient:
 
 
 # ---------------------------------------------------------------------------
+# Video task pool submit（多端点 Key 池·顺序短路）
+# ---------------------------------------------------------------------------
+
+# 不可重试响应：鉴权/参数错误（400/401/403/404）→ 条目标记 dead，后续轮跳过
+# （不再重复打无效 Key）；429/5xx 与网络异常是瞬时态 → 条目保持存活，下轮再探
+_POOL_ENTRY_DEAD_CODES = {400, 401, 403, 404}
+_POOL_ROUND_DELAY = 30  # 秒，整轮退避：与单提交节点 固定 30 秒/次 同节奏（±15% 抖动，Retry-After 优先）
+
+
+def _pool_submit_once(entry: Dict[str, Any], payload: Dict[str, Any], model: str):
+    """单个池条目的一次性提交（无内层重试，一条目一 POST）。
+
+    entry: {"base_url": str|空(=跟随全局), "api_key": str}
+    返回 (ok, task_url, status, http_status, retry_after)：
+      ok=True  → task_url=完整轮询 URL（含该条目域名，跨域名拼对）；
+      ok=False → http_status=服务端状态码（0=网络异常），
+                 retry_after=Retry-After 头秒数（无则为 None）
+    """
+    client = AgnesClient(entry["api_key"], entry.get("base_url") or None)
+    try:
+        resp = client.session.post(f"{client.base_url}/videos", json=payload, timeout=60)
+    except requests.exceptions.RequestException as e:
+        return (False, "", f"failed: 网络异常: {type(e).__name__}: {str(e)[:200]}", 0, None)
+    if resp.status_code == 200:
+        try:
+            data = resp.json()
+        except (ValueError, TypeError):
+            return (False, "", "failed: 服务端 200 但响应非 JSON", 200, None)
+        task_id = data.get("id")
+        video_id = data.get("video_id", task_id)
+        if not task_id:
+            return (False, "", f"failed: 服务器未返回任务ID: {str(data)[:200]}", 200, None)
+        task_url = f"{client.base_url}/agnesapi?video_id={video_id}&model_name={model}"
+        return (True, task_url, f"submitted: video_id={video_id}", 200, None)
+    ra = resp.headers.get("Retry-After")
+    try:
+        ra_s = max(1, int(float(ra))) if ra else None
+    except (ValueError, TypeError):
+        ra_s = None
+    err = AgnesClient._clean_error(resp.status_code, resp.text, "Video")
+    return (False, "", f"failed: {err}", resp.status_code, ra_s)
+
+
+def submit_video_task_pool(
+    pool: List[Dict[str, Any]],
+    prompt: str,
+    model: str = VIDEO_MODEL,
+    seconds: Optional[int] = None,
+    aspect_ratio: Optional[str] = None,
+    seed: Optional[int] = None,
+    retries: Optional[int] = None,
+) -> Dict[str, Any]:
+    """视频任务池并发提交（顺序短路）：同一提示词，按池序在多组「Base URL + Key」端点间轮询试探。
+
+    语义（retries 机制与单 Agnes 视频任务提交 节点一一对应）：
+    - 一轮 = 按序试探池内存活条目（一条目一次 POST），一旦命中成功 → 立即短路返回
+      （本轮后续条目零请求，零浪费）；
+    - 整轮全灭 → 固定 30 秒退避（睡眠带 ±15% 随机抖动错峰；503/429 带 Retry-After 头
+      时优先按服务端指定秒数，与单提交节点一致），轮数 = 1 + retries
+      （retries 钳制 0-120，与单提交节点同义，累计等待时长与池大小无关）；
+    - 不可重试响应（400/401/403/404）条目标 dead，后续轮跳过（不反复打无效 Key）；
+      全部条目 dead → 提前终止（继续轮询无意义）。
+
+    池条目格式（节点侧解析产出）:
+        [{"base_url": "https://api.agnes-ai.cn/v1" | 空(=全局), "api_key": "sk-…", "name": 可选}, …]
+
+    返回 dict:
+        ok: bool
+        task_url: 胜出条目的完整轮询 URL（失败=""）
+        status: "submitted: video_id=…（池 #i / base_url）" / "failed: …（诊断 + 建议）"
+        api_key: 胜出条目的 Key（失败=""）
+        pool_report: 每条目 [{i, base_url, key(掩码), attempts, result}]，
+            result ∈ success@roundN / dead:HTTPxxx / 最后一次诊断 / 未请求（短路跳过）
+        winner: 胜出条目池下标（0 起，失败=None）
+    """
+    payload: Dict[str, Any] = {
+        "model": model,
+        "prompt": prompt,
+        "seconds": str(min(12, max(4, int(seconds if seconds is not None else 5)))),
+        "mode": "text",
+        "size": "720P",
+        "aspect_ratio": _VIDEO_RATIO_FALLBACK.get(aspect_ratio or "16:9", aspect_ratio or "16:9"),
+        "n": 1,
+    }
+    if seed is not None:
+        payload["seed"] = seed
+
+    if not pool:
+        return {"ok": False, "task_url": "",
+                "status": "failed: API Key 池为空：请在「Agnes API Key 池配置」节点配置条目（零请求短路）",
+                "api_key": "", "pool_report": [], "winner": None}
+
+    n_retries = (AgnesClient._VIDEO_DEFAULT_RETRIES if retries is None
+                 else max(0, min(int(retries), AgnesClient._VIDEO_MAX_RETRIES)))
+    rounds = n_retries + 1  # 与单提交同义：首次试探 + retries 个退避轮（累计等待与池大小无关）
+
+    def _report(results, attempts, untried_label):
+        return [{"i": i + 1,
+                 "base_url": pool[i].get("base_url") or "(全局)",
+                 "key": _mask_key(pool[i]["api_key"]),
+                 "attempts": attempts[i],
+                 "result": results[i] if results[i] else untried_label}
+                for i in range(len(pool))]
+
+    alive = set(range(len(pool)))
+    attempts = [0] * len(pool)
+    results = [""] * len(pool)
+    last_diag = ""
+    total_waited = 0
+
+    for rnd in range(1, rounds + 1):
+        ra_best = 0
+        for i in sorted(alive):  # 池序
+            ok, task_url, status, http, ra_s = _pool_submit_once(pool[i], payload, model)
+            attempts[i] += 1
+            if ok:
+                results[i] = f"success@round{rnd}"
+                return {"ok": True, "task_url": task_url,
+                        "status": f"{status}（池 #{i + 1} / {pool[i].get('base_url') or '全局'}）",
+                        "api_key": pool[i]["api_key"],
+                        "pool_report": _report(results, attempts, "未请求（短路跳过）"),
+                        "winner": i}
+            last_diag = status
+            if http in _POOL_ENTRY_DEAD_CODES:
+                results[i] = f"dead:HTTP {http}（鉴权/参数错误，后续轮跳过）"
+                alive.discard(i)
+            else:
+                results[i] = status
+                if ra_s:
+                    ra_best = max(ra_best, ra_s)
+        if not alive:
+            break  # 池内全部条目 dead（鉴权/参数错误）：继续退避轮无意义
+        if rnd < rounds:
+            delay = max(1, int(_POOL_ROUND_DELAY * random.uniform(0.85, 1.15)))  # ±15% 抖动错峰
+            if ra_best:
+                delay = ra_best  # Retry-After 优先（同单提交节点）
+            time.sleep(delay)
+            total_waited += delay
+
+    if not alive:
+        status = (f"failed: 池内全部条目 dead（鉴权/参数错误 400/401/403/404，末次诊断: {last_diag}）："
+                  f"请在「Agnes API Key 池配置」节点检查 Key 有效性，不做无谓退避")
+    else:
+        status = (f"failed: {last_diag}（{rounds} 轮全灭、累计等待约 {total_waited} 秒）："
+                  f"队列满恢复为分钟级——请 5-10 分钟后再运行本节点，或增配池条目/错峰再试")
+    return {"ok": False, "task_url": "", "status": status, "api_key": "",
+            "pool_report": _report(results, attempts, "未请求（前轮已结束）"), "winner": None}
+
+
+# ---------------------------------------------------------------------------
 # Global state helper (shared across nodes)
 # ---------------------------------------------------------------------------
 
