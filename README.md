@@ -1,5 +1,5 @@
 # ComfyUI Agnes Flash Suite
-Agnes AI 全能力 ComfyUI 节点套件 — 35 个节点（20 文本 + 7 图片 + 8 视频），
+Agnes AI 全能力 ComfyUI 节点套件 — 34 个节点（20 文本 + 7 图片 + 7 视频），
 覆盖 Agnes 模型全能力：LLM 对话/创作（小说·分镜·剧本·解说·漫剧）、
 文生图/图生图/三视图/多图合成、文生视频/关键帧生视频/参考视频 + 视频任务异步提交/收取 +
 多端点 Key 池并发提交（国内/国外不同账号，队列满互备）。
@@ -75,10 +75,9 @@ ComfyUI 实测截图：
 - 🎬 Agnes 关键帧生视频节点：首尾帧；prompt 输入可直连 Agnes 视频提示词生成/批量 输出的英文视频提示词，免手写运镜描述；4-12 秒直控 + 720P；同上文生视频的 503 退避
 - 🎞️ Agnes 参考视频生成节点：最多 5 参考图 + 3 参考音频；4-12 秒直控 + 720P；同上文生视频的 503 退避
 - 🎞️ Agnes 视频任务提交节点：输入/退避同 文生视频（9 输入，无 max_wait_seconds 保留项——本节点不轮询；503 按「重试次数」退避）；只提交不等待——拿到任务 ID 秒级返回，画布立刻解放；输出 task_url（成功=完整轮询 URL 含域名，直连 收取；失败="0" 标记=未生成任务）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）+ api_key 穿透（提交时实际用的 Key，直连 收取 的 api_key 输入，收取端免再配）+ task_url_key（单线双参 JSON：{"task_url","api_key"}，一根线带齐 URL+Key，直连 批量收取 的 tasks 合并输入）
-- 🎞️ Agnes 视频任务并发提交节点：视频任务提交 的多端点 Key 池版本（顺序短路 B）——输入 池 JSON（直连 API Key 池配置 pool_json，多组 Base URL+Key 条目）替代单 base_url+api_key；同一提示词按池序逐条目试探，#1 成功即停、后续条目零请求（零浪费）；#1 队列满 503 时另一端点绿窗可接住；retries 机制同 单提交（固定 30 秒/轮 ±15% 抖动、Retry-After 优先、上限 120 轮累计 60 分钟，累计等待与池大小无关；400/401/403/404 条目标 dead 后续轮跳过、全灭提前终止）；输出 5 路（面板自上而下，status 置最下）：task_url（胜出条目完整轮询 URL）+ api_key（胜出 Key 穿透）+ task_url_key（胜出 URL+Key 单线双参 JSON，直连 批量收取 task_i 槽零改动）+ pool_report（逐条目 JSON 矩阵，直连 并发结果 展示节点）+ status（成功=submitted: video_id=…（池 #i / base_url），失败=末次诊断+建议）
+- 🎞️ Agnes 视频任务并发提交节点：视频任务提交 的多端点 Key 池版本（顺序短路 B）——输入 池 JSON（直连 API Key 池配置 pool_json，多组 Base URL+Key 条目）替代单 base_url+api_key；同一提示词按池序逐条目试探，#1 成功即停、后续条目零请求（零浪费）；#1 队列满 503 时另一端点绿窗可接住；retries 机制同 单提交（固定 30 秒/轮 ±15% 抖动、Retry-After 优先、上限 120 轮累计 60 分钟，累计等待与池大小无关；400/401/403/404 条目标 dead 后续轮跳过、全灭提前终止）；输出 5 路（面板自上而下，status 置最下）：task_url（胜出条目完整轮询 URL）+ api_key（胜出 Key 穿透）+ task_url_key（胜出 URL+Key 单线双参 JSON，直连 批量收取 task_i 槽零改动）+ pool_report（逐条目 JSON 矩阵，人工查看或接 LLM 对话做台账）+ status（成功=submitted: video_id=…（池 #i / base_url），失败=末次诊断+建议）
 - 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查；收到 "0"=上游提交失败标记，直接跳过收取）+ api_key（可直连 提交 节点的 api_key 穿透输出）；节点内轮询（首查 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载（3 次重试）；输出 video（环境动态类型同 文生视频：原生 VIDEO 可直连 Save Video 出片预览 / VHS_VIDEOINFO / 路径字符串；无文件态原生环境出 NO_VIDEO_ 前缀黑帧占位 + status 携带 error 内容（队列不打断），VHS/STRING 回空值）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败；error=收到 0 标记，跳过收取，原因见 提交 节点 status）
 - 📥 Agnes 视频任务批量收取节点：20 个任务输入 task_1…task_20（**task_i ↔ video_i 一一对应**，提交节点 task_url_key 单线双参 {task_url,api_key} 直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL，Key 走 api_key 兜底；"0" 标记=跳过记 error、空槽=跳过记 empty 槽号保位）；线程池并发轮询（并发默认 10、每任务 timeout 默认 10 分钟），免 20 个 收取 实例逐个右键；输出 20 路 video（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单 + details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，一行带走 20 条路径清单）
-- 📊 Agnes 视频任务并发结果节点：纯展示终端（零 API 调用、无需 Key；菜单紧随 并发提交）——接 并发提交 的 task_url_key/pool_report/status 三路输入（task_url_key 多行文本可展开查看），格式化为逐条目结果矩阵：【状态】提交成败与末次诊断、【胜出】条目序号+请求地址+掩码 Key+「task_url_key 可直连 批量收取」提示（0 标记=跳过提示）、【逐条目矩阵】每条目 attempts 次数与 result（success@roundN / dead:HTTPxxx / 末次诊断 / 未请求短路跳过）；两路输出：result（展示文本）+ task_url_key（原样穿透，可转接 批量收取 task_i 槽）；节点最下方自带只读「实时结果（自动刷新）」文本框——跑完 并发提交 自动出矩阵（ShowText 化，无需右键执行本节点）
 
 前端特性：
 
@@ -91,7 +90,7 @@ ComfyUI 实测截图：
 
 ## 依赖
 
-本套件**自包含**，API 客户端已内置于 `api/` 模块（AgnesClient，chat/images/video 三类端点），**不再依赖外部 comfyui-agnes-ai 插件**（旧版 README 中「comfyui-agnes-ai 提供核心 API 客户端」的说法已过时，该包的相关功能已并入本套件）。
+本套件**自包含**，API 客户端已内置于 `api/` 模块（AgnesClient，chat/images/video 三类端点），零外部插件依赖。
 
 - ComfyUI 本体即提供全部第三方库（requests / PyYAML / Pillow / numpy / torch / folder_paths），无需额外 pip 安装
 - Python 3.10+

@@ -10,7 +10,7 @@
  *   │               ｜ 墨绿：分镜提示词/分镜提示词批量/文本拆分/资产提示词/资产提示词批量/三视图提示词/三视图提示词批量/字符串合并
  *   │ 图片类·蓝 ── 主蓝：图像生成/三视图批量生成/分镜图批量生成 ｜ 浅蓝：图生图 ｜ 深蓝：三视图生成/图像反推提示词/图像拼图
  *   └ 视频类·紫 ── 主紫：文生视频/视频任务并发提交（池线主功能） ｜ 浅紫：关键帧生视频
- *                 ｜ 深紫：参考视频生成/视频任务提交/视频任务收取/视频任务并发结果
+ *                 ｜ 深紫：参考视频生成/视频任务提交/视频任务收取
  *
  * 同功能类用同一色系（一眼认出"这是文本/图片/视频节点"），类内再用主/浅/深三阶
  * 小幅度区分"主功能 / 次功能 / 工具与中间层"，避免全族单色无法分辨。
@@ -87,7 +87,6 @@
         "AgnesVideoTaskSubmitPool": "video",
         "AgnesVideoTaskCollect": "video",
         "AgnesVideoTaskCollectBatch": "video",
-        "AgnesVideoTaskPoolStatus": "video",
     };
 
     // ── 节点 → 类内色阶：main=主功能 / light=次功能 / deep=工具与中间层（未登记=main） ──
@@ -126,7 +125,6 @@
         "AgnesVideoTaskSubmitPool": "main",  // 池线主功能（多端点顺序短路，同 批量收取 批量档）
         "AgnesVideoTaskCollect": "deep",
         "AgnesVideoTaskCollectBatch": "main",  // 批量收取=主功能（同 三视图批量/分镜图批量 批量档）
-        "AgnesVideoTaskPoolStatus": "deep",   // 展示终端（工具档）
     };
 
     function paletteOf(nodeName) {

@@ -20,14 +20,14 @@ Retry-After 头优先、上限 120 轮累计 3600 秒/60 分钟，累计等待�
       直连「Agnes 视频任务批量收取」的 task_i 槽——批量收取 节点零改动）/
   pool_report: 每条目 JSON 数组 [{i, base_url, key(掩码), attempts, result}]
       （result ∈ success@roundN / dead:HTTPxxx / 末次诊断 / 未请求(短路跳过)），
-      直连「Agnes 视频任务并发结果」展示节点做逐条目矩阵；
+      逐条目矩阵 JSON，人工查看或接 LLM 对话/文本输入节点做台账；
   status: 放在最下（pool_report 之下）——成功=submitted: video_id=…（池 #i / base_url），
       失败=末次诊断+建议（5-10 分钟重跑/增配池条目/错峰）
 
 池线接法（与 60 镜线同构）：
   Agnes API Key 池配置（pool_json）→ 视频任务并发提交 ×N（N=镜头数/池容量）
   → task_url_key 直连 批量收取 task_1…task_20（各槽 Key=各胜出条目 Key，互不干扰）
-  → 20 路 video 直连 Save Video；status/pool_report → 视频任务并发结果（逐条目矩阵）。
+  → 20 路 video 直连 Save Video；status/pool_report 逐条目 JSON 直接人工查看（或接 LLM 对话节点做台账）。
 """
 
 import json
@@ -51,7 +51,7 @@ from .video_task_submit import (
 class AgnesVideoTaskSubmitPool(OutputDocsMixin):
     """Agnes 视频任务并发提交：多端点 Key 池顺序短路提交（#1 成功即停、后续条目零请求），retries 机制同 单提交，胜出条目 Key 随 task_url_key 直连 批量收取。"""
 
-    DESCRIPTION = "视频任务多端点池并发提交（两段式·提交段，顺序短路 B）：同一提示词在「Agnes API Key 池配置」输出的池 JSON（多组 Base URL+Key 条目，国内+国外不同账号等）中按池序顺序试探——#1 成功即停、后续条目零请求（零浪费）；#1 队列满时后续条目绿窗可接住；retries 机制同 单提交（固定 30 秒/轮 ±15% 抖动、Retry-After 优先、上限 120 轮累计 60 分钟，400/401/403/404 条目标 dead 跳过、全灭提前终止）；只提交不轮询，秒级返回。输出 5 路（面板自上而下）：task_url（成功=胜出条目完整轮询 URL 含其域名，失败=0 标记）+ api_key（胜出条目 Key 穿透）+ task_url_key（单线双参 JSON {task_url,api_key}，胜出 Key 随行，直连 批量收取 task_i 零改动）+ pool_report（逐条目 JSON 矩阵，直连 并发结果 展示节点）+ status（置于最下：成功=submitted: video_id=…（池 #i / base_url），失败=末次诊断+建议）"
+    DESCRIPTION = "视频任务多端点池并发提交（两段式·提交段，顺序短路 B）：同一提示词在「Agnes API Key 池配置」输出的池 JSON（多组 Base URL+Key 条目，国内+国外不同账号等）中按池序顺序试探——#1 成功即停、后续条目零请求（零浪费）；#1 队列满时后续条目绿窗可接住；retries 机制同 单提交（固定 30 秒/轮 ±15% 抖动、Retry-After 优先、上限 120 轮累计 60 分钟，400/401/403/404 条目标 dead 跳过、全灭提前终止）；只提交不轮询，秒级返回。输出 5 路（面板自上而下）：task_url（成功=胜出条目完整轮询 URL 含其域名，失败=0 标记）+ api_key（胜出条目 Key 穿透）+ task_url_key（单线双参 JSON {task_url,api_key}，胜出 Key 随行，直连 批量收取 task_i 零改动）+ pool_report（逐条目 JSON 矩阵，人工查看或接 LLM 对话做台账）+ status（置于最下：成功=submitted: video_id=…（池 #i / base_url），失败=末次诊断+建议）"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -62,7 +62,7 @@ class AgnesVideoTaskSubmitPool(OutputDocsMixin):
         "task_url": "成功=胜出条目的完整轮询 URL（含该条目域名 /agnesapi?video_id=…&model_name=…，跨域名拼对）：直连 Agnes 视频任务收取/批量收取；失败=0 标记（未生成任务，收取节点见 0 直接跳过、status 输出 error 内容）",
         "api_key": "API Key 穿透：胜出条目实际使用的 Key（失败=空串）：直连 Agnes 视频任务收取 的 api_key 输入，收取端免再配 Key",
         "task_url_key": "单线双参 JSON：{\"task_url\": 轮询 URL（失败=0 标记）, \"api_key\": 胜出条目 Key}（与 task_url/api_key 两路输出同源）：直连 Agnes 视频任务批量收取 的 task_i 槽（批量收取 节点零改动，各槽 Key 可全不同）",
-        "pool_report": "逐条目 JSON 数组 [{i, base_url, key(掩码), attempts, result}]：result ∈ success@roundN（胜出处）/ dead:HTTPxxx（鉴权/参数错误，后续轮跳过）/ 末次诊断（存活末态）/ 未请求（短路跳过）——直连「Agnes 视频任务并发结果」展示节点做逐条目矩阵；零请求短路=空数组 []",
+        "pool_report": "逐条目 JSON 数组 [{i, base_url, key(掩码), attempts, result}]：result ∈ success@roundN（胜出处）/ dead:HTTPxxx（鉴权/参数错误，后续轮跳过）/ 末次诊断（存活末态）/ 未请求（短路跳过）——逐条目矩阵 JSON，人工查看或接 LLM 对话/文本输入节点做台账；零请求短路=空数组 []",
         "status": "任务状态（面板最下输出）：成功=submitted: video_id=…（池 #i / base_url）；失败=末次诊断原文（503 队列满/400 参数错误等）+ 退避轮数/累计等待 + 建议（5-10 分钟重跑/增配池条目/错峰）；401 等鉴权错误=池内全部条目 dead 提前终止诊断",
     }
 
@@ -169,7 +169,7 @@ class AgnesVideoTaskSubmitPool(OutputDocsMixin):
         # 第 3 输出 task_url_key：单线双参 JSON（胜出条目 URL+Key 一行带齐，批量收取零改动直连）
         task_url_key_out = json.dumps(
             {"task_url": task_url_out, "api_key": res["api_key"]}, ensure_ascii=False)
-        # 第 4 输出 pool_report：逐条目 JSON 矩阵（直连 并发结果 展示节点）
+        # 第 4 输出 pool_report：逐条目 JSON 矩阵（人工查看 / 接 LLM 对话做台账）
         pool_report_out = json.dumps(res["pool_report"], ensure_ascii=False)
         # 输出顺序：task_url / api_key / task_url_key / pool_report / status（status 置最下）
         return (task_url_out, res["api_key"], task_url_key_out, pool_report_out, res["status"])
