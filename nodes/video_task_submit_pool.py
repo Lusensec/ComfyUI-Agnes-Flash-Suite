@@ -118,12 +118,12 @@ class AgnesVideoTaskSubmitPool(OutputDocsMixin):
                 }),
                 "retries": ("INT", {
                     "label": "重试次数（轮数-1）",
-                    "default": 5,
+                    "default": 120,
                     "min": 0,
                     "max": 120,
                     "step": 1,
                     "control_after_generate": False,
-                    "tooltip": "与 单提交 节点 retries 同机制：一轮=按池序全条目试探一次，整轮全灭固定 30 秒/轮退避（±15% 抖动，Retry-After 头优先）；默认 5（6 轮、累计 150 秒）；上限 120（121 轮、累计 3600 秒/60 分钟，累计等待与池大小无关）；400/401/403/404 条目标 dead 后续轮跳过、全灭提前终止",
+                    "tooltip": "与 单提交 节点 retries 同机制：一轮=按池序全条目试探一次，整轮全灭固定 30 秒/轮退避（±15% 抖动，Retry-After 头优先）；默认 120（121 轮、累计 3600 秒/60 分钟，累计等待与池大小无关，队列满时等绿窗自然排上队）；可下调 0=只提交一次不退避；400/401/403/404 条目标 dead 后续轮跳过、全灭提前终止",
                 }),
             },
         }
@@ -137,7 +137,7 @@ class AgnesVideoTaskSubmitPool(OutputDocsMixin):
         aspect_ratio: str = "16:9",
         seconds: int = SECONDS_DEFAULT,
         seed: int = 0,
-        retries: int = 5,
+        retries: int = 120,
     ) -> Tuple:
         zero_report = "[]"
         zero_tuk = json.dumps({"task_url": "0", "api_key": ""}, ensure_ascii=False)
