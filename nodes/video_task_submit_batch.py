@@ -11,8 +11,8 @@ Agnes 视频多任务并发提交节点（异步两段式·提交段·多任务�
 单提交/并发提交 retries 完全一致，复用现成 submit_video_task_pool 实现）。
 
 - 单条失败隔离：该槽 "0" 标记 + 诊断，**继续下一条**，不整批中止
-- 最坏总时长 = N 条 × (1+retries) × 30 秒（retries=5 默认 → 单条最坏 ≈3 分钟，
-  全批 20 条最坏 ≈60 分钟）；两段式设计：提交完画布即解放，收取走 批量收取
+- 最坏总时长 = N 条 × (1+retries) × 30 秒（retries=120 默认 → 单条最坏 ≈60 分钟，
+  全批 20 条最坏可达 ≈20 小时）；两段式设计：提交完画布即解放，收取走 批量收取
 - 22 槽输出（顺序与「Agnes 视频提示词批量」video_prompt_1..20 + status +
   all_video_prompts 一一对齐：提示词槽 i ↔ 任务句柄槽 i）：
   task_url_key_1..task_url_key_20（成功=单线双参 JSON {task_url,api_key}；
@@ -150,12 +150,12 @@ class AgnesVideoTaskSubmitBatch(OutputDocsMixin):
                 }),
                 "retries": ("INT", {
                     "label": "重试次数（轮数-1）",
-                    "default": 5,
+                    "default": 120,
                     "min": 0,
                     "max": 120,
                     "step": 1,
                     "control_after_generate": False,
-                    "tooltip": "与 并发提交 节点 retries 同机制（作用于每条提示词）：一轮=按池序全条目试探一次，整轮全灭固定 30 秒/轮退避（±15% 抖动，Retry-After 头优先）；默认 5（单条 6 轮、最坏 150 秒）；上限 120（单条最坏 3600 秒/60 分钟）；整批最坏总时长=条数×单条最坏",
+                    "tooltip": "与 并发提交 节点 retries 同机制（作用于每条提示词）：一轮=按池序全条目试探一次，整轮全灭固定 30 秒/轮退避（±15% 抖动，Retry-After 头优先）；默认 120（单条 121 轮、最坏 3600 秒/60 分钟，队列满等绿窗自然排上队）；可下调 0=单条只提交一次不退避；整批最坏总时长=条数×单条最坏",
                 }),
             },
         }
@@ -208,7 +208,7 @@ class AgnesVideoTaskSubmitBatch(OutputDocsMixin):
         aspect_ratio: str = "16:9",
         seconds: int = SECONDS_DEFAULT,
         seed: int = 0,
-        retries: int = 5,
+        retries: int = 120,
     ) -> Tuple:
         # ── 提示词解析（三档，与 视频提示词批量 同款）──
         items, source, truncated = self._parse_all_prompts(all_prompts)
