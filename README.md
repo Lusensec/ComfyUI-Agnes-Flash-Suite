@@ -39,7 +39,7 @@ ComfyUI 实测截图：
 文本类（20 个）：
 
 - 🔑 Agnes API Key 配置
-- 🔑 Agnes API Key 池配置：多组「Base URL + API Key」条目（国内 + 国外不同账号等）聚合成一份池 JSON（api_key 必填、base_url 可空=跟随全局、name 仅展示，重复 Key 自动去重；可选并入当前全局 Key 为末尾条目——单账号场景免手贴），纯数据节点零 API 调用；无有效条目输出 "0" 标记（下游并发提交 零请求短路）；输出 pool_json（直连 视频任务并发提交）+ pool_count + pool_report（掩码清单）+ status
+- 🔑 Agnes API Key 池配置：多组「Base URL + API Key」条目（国内 + 国外不同账号等）聚合成一份池 JSON（api_key 必填、base_url 可空=跟随全局、name 仅展示，重复 Key 自动去重；可选并入当前全局 Key 为末尾条目——单账号场景免手贴），纯数据节点零 API 调用；无有效条目输出 "0" 标记（下游并发提交 零请求短路）；输出 7 路（面板自上而下）：置顶 3 路随机条目 base_url / full_key（完整未掩码 Key，可直连单端点 提交/收取 的 api_key 输入）/ masked_key（掩码，人工核对抽到哪条；每次运行重新随机，3 路与 pool_json 同批同条，无有效条目=空串）+ pool_json（直连 视频任务并发提交/多任务并发提交）+ pool_count + pool_report（掩码清单）+ status
 - 🪄 Agnes 风格选择节点：视觉风格 × 导演风格双轴，纯本地组合
 - 📥 Agnes 文本输入节点：管线文本起点
 - 📝 Agnes 解说剧本生成节点：影视解说文案/口播稿

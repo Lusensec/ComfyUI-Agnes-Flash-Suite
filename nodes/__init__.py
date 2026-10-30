@@ -63,7 +63,8 @@ from . import video_prompt, video_prompt_batch
 from . import image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, scene_image_batch, image_mosaic
 from . import text2video, img2video, video_reference, video_task_submit, video_task_submit_pool, video_task_submit_batch, video_task_collect, video_task_collect_batch
 
-# 文本类：API Key 配置 → API Key 池配置（多端点 Key 池 JSON，供 视频任务并发提交；配置信息，紧随 API Key）→ 风格选择 → 文本输入（文本起点，替代灰色 PrimitiveNode）
+# 文本类：API Key 配置 → API Key 池配置（多端点 Key 池 JSON，供 视频任务并发提交/多任务并发提交；
+#        置顶 3 路随机条目输出 base_url/full_key/masked_key，可直连单端点 提交/收取 api_key；配置信息，紧随 API Key）→ 风格选择 → 文本输入（文本起点，替代灰色 PrimitiveNode）
 #        → LLM 对话（通用对话工具）→ 字符串合并（文本拼接工具）
 #        → 解说剧本生成（常用入口）→ 漫剧剧本生成（分场剧本）
 #        → 场景切分 → 总导演 → 资产提取

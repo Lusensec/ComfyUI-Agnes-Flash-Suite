@@ -647,11 +647,14 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | pool_json | STRING（多行） | "" | 池条目 JSON 对象数组：`[{"base_url": "https://api.agnes-ai.cn/v1", "api_key": "sk-…（国内）", "name": "国内"}, {"base_url": "https://api.agnes-ai.com/v1", "api_key": "sk-…（国外）", "name": "国外"}]`；api_key 必填（缺 Key 条目自动跳过）；base_url 可空=跟随全局配置；name 可选仅展示（供 池报告 辨识）；重复 Key 自动去重（首个生效）；一行或多行均可 |
 | include_global | BOOLEAN | 否 | 启用时把当前全局 Key（API Key 配置节点 / 环境变量 AGNES_API_KEY / api_key_config.json / config.yaml，同 单提交 节点回退链）作为**末尾条目**并入池（已在池中则不重复，全局 Key 为空则跳过）——「单账号」场景免手贴，池退化为 1 条目（行为等同 单提交 节点） |
 
-**输出（4 路，均 STRING）：**
+**输出（7 路，均 STRING；置顶 3 路随机条目在 pool_json 上方）：**
+- base_url: 池 JSON 数组中**随机抽 1 条**该条目的 Base URL（空=该条目跟随全局配置）；每次运行重新随机，与 full_key/masked_key/pool_json 同批同条；无有效条目=空串
+- full_key: 该随机条目的**完整 API Key（未掩码）**——直连单端点「视频任务提交/收取」的 api_key 输入（免再配，随机条目=池内任一账号）；仅画布内传递，日志只显示掩码；无有效条目=空串
+- masked_key: 该随机条目的掩码 Key（sk-…****…）：与 full_key 同条目，人工核对这次随机到的是池内哪一条；无有效条目=空串
 - pool_json: 规范化池 JSON（一行数组）：直连「Agnes 视频任务并发提交」/「Agnes 视频多任务并发提交」的池输入；无有效条目="0" 标记（下游见 "0" 零请求短路，同 单提交 "0" 标记族语义）
 - pool_count: 池内有效条目数（"0"=空池）
 - pool_report: 掩码清单（每条目一行：`#i 名称 | 请求地址(空=全局) | sk-…****…`）：人工核对池内容，Key 已掩码可安全显示
-- status: 配置结果：`ok: 池内 N 条（含并入全局说明）` / `error: 原因`（JSON 解析错误 / 无有效条目 / 池为空）
+- status: 配置结果：`ok: 池内 N 条（含并入全局说明 + 随机条目号）` / `error: 原因`（JSON 解析错误 / 无有效条目 / 池为空）
 
 > 池线接法 A（逐镜头多实例）：API Key 池配置（pool_json）→ 视频任务并发提交 ×N（N=镜头数/池容量）
 > → task_url_key 直连 批量收取 task_1…task_20（各槽 Key=各胜出条目 Key，互不干扰，批量收取 零改动）
@@ -659,6 +662,9 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 > 池线接法 B（多任务单节点，20 镜/波）：API Key 池配置（pool_json）
 > → 视频多任务并发提交（all_prompts 直连 视频提示词批量 all_video_prompts，提示词串行 × 池短路）
 > → all_task_url_keys 一根线直连 批量收取 all_task_url_keys 合并输入。
+> 随机 3 路用法（base_url/full_key/masked_key，每次运行随机 1 条目）：full_key 直连单端点
+> 「视频任务提交/收取」的 api_key 输入（免手贴 Key，重跑池节点即重新随机）；
+> base_url/masked_key 供人工核对这条是哪个账号/端点。
 
 ---
 
