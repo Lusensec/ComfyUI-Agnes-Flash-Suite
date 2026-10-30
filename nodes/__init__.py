@@ -7,7 +7,8 @@
 #   ② 图片类节点（图像反推提示词 置顶 → 文生图 → 图生图 → 三视图 → 三视图批量 → 分镜图批量 → 图像拼图）
 #   ③ 视频类节点（文生视频 → 关键帧生视频 → 参考视频生成 → 视频任务提交
 #      → 视频任务并发提交（多端点 Key 池·顺序短路）→ 视频任务多任务并发提交（all_prompts 合并输入，提示词串行 × 池短路）
-#      → 视频任务收取（单任务）→ 视频任务批量收取（all_task_url_keys 合并输入优先 + ≤20 任务线程池并发收取，异步两段式））
+#      → 视频任务收取（单任务）→ 视频任务批量收取（all_task_url_keys 合并输入优先 + ≤20 任务线程池并发收取，异步两段式）
+#      → 视频拼图（N 路视频同步矩阵视频，同 图像拼图 视频版））
 
 # ── 文本类节点 ─────────────────────────────────────────────
 from .api_key_config import AgnesNovelAPIKeyConfig
@@ -49,6 +50,7 @@ from .video_task_submit_pool import AgnesVideoTaskSubmitPool
 from .video_task_submit_batch import AgnesVideoTaskSubmitBatch
 from .video_task_collect import AgnesVideoTaskCollect
 from .video_task_collect_batch import AgnesVideoTaskCollectBatch
+from .video_mosaic import AgnesVideoMosaic
 
 # 合并所有节点映射
 NODE_CLASS_MAPPINGS = {}
@@ -61,7 +63,7 @@ from . import asset_extractor, text_split, asset_prompt, asset_prompt_batch
 from . import turnaround_prompt, turnaround_prompt_batch, prompt_generator, scene_prompt_batch
 from . import video_prompt, video_prompt_batch
 from . import image_reverse, image_gen, img2img, character_turnaround, turnaround_batch, scene_image_batch, image_mosaic
-from . import text2video, img2video, video_reference, video_task_submit, video_task_submit_pool, video_task_submit_batch, video_task_collect, video_task_collect_batch
+from . import text2video, img2video, video_reference, video_task_submit, video_task_submit_pool, video_task_submit_batch, video_task_collect, video_task_collect_batch, video_mosaic
 
 # 文本类：API Key 配置 → API Key 池配置（多端点 Key 池 JSON，供 视频任务并发提交/多任务并发提交；
 #        置顶 3 路随机条目输出 base_url/full_key/masked_key，可直连单端点 提交/收取 api_key；配置信息，紧随 API Key）→ 风格选择 → 文本输入（文本起点，替代灰色 PrimitiveNode）
@@ -95,6 +97,10 @@ from . import text2video, img2video, video_reference, video_task_submit, video_t
 #           （直连 多任务并发提交 all_task_url_keys，按序填充 task_1..20 槽）/ 20 个 task_i 逐一连线
 #           （task_i ↔ video_i，提交节点 task_url_key 单线双参 0 中间节点直连；"0" 条目跳过记 error
 #           并默认视频占位填充）；线程池并发 ≤20 任务，20 路 video + 整批状态 JSON + 全部视频路径 JSON）
+#        → 视频拼图（图像拼图 的视频版：all_video_paths 总输入一根线 / 20 个 video_i 槽，N 路视频
+#           同步拼成 columns × ⌈N/columns⌉ 矩阵视频（短视频末帧冻结、无效槽不占格、格角标槽号），
+#           纯本地 PyAV 解码/编码 H.264 自动落盘 output/agnes_videos/；节点面板内嵌播放，免 20 个
+#           Save Video 排列；全无效=黑帧占位不炸队列）
 for _mod in [
     # 文本类
     api_key_config, api_key_pool, style_selector, text_input,
@@ -110,6 +116,7 @@ for _mod in [
     text2video, img2video, video_reference,
     video_task_submit, video_task_submit_pool, video_task_submit_batch,
     video_task_collect, video_task_collect_batch,
+    video_mosaic,
 ]:
     if hasattr(_mod, 'NODE_CLASS_MAPPINGS'):
         NODE_CLASS_MAPPINGS.update(_mod.NODE_CLASS_MAPPINGS)

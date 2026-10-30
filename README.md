@@ -1,5 +1,5 @@
 # ComfyUI Agnes Flash Suite
-Agnes AI 全能力 ComfyUI 节点套件 — 35 个节点（20 文本 + 7 图片 + 8 视频），
+Agnes AI 全能力 ComfyUI 节点套件 — 36 个节点（20 文本 + 7 图片 + 9 视频），
 覆盖 Agnes 模型全能力：LLM 对话/创作（小说·分镜·剧本·解说·漫剧）、
 文生图/图生图/三视图/多图合成、文生视频/关键帧生视频/参考视频 + 视频任务异步提交/收取 +
 多端点 Key 池并发提交（国内/国外不同账号，队列满互备）。
@@ -9,7 +9,7 @@ Agnes AI 全能力 ComfyUI 节点套件 — 35 个节点（20 文本 + 7 图片 
 
 - **资产线**（定妆图）：文本拆分/资产提取 → 资产提示词批量 → 三视图提示词批量 → 三视图批量生成 → 图像拼图
 - **分镜线**（关键帧 + 视频提示词）：总导演/场景切分 → 分镜提示词批量（60 镜·3 路分段）→ 分镜图批量 ×3（分波 60 镜全量）→ 图像拼图
-- **视频线**（逐镜一对一）：分镜提示词批量 3 路分段 → 视频提示词批量 ×3 → 关键帧生视频；多视频异步接法：视频任务提交（秒级返回 task_url，画布解放）→ 视频任务收取（稍后右键收片，自动下载）；分波全量异步接法（20 镜/波，提交侧单节点）：视频提示词批量 all_video_prompts → 视频多任务并发提交（提示词串行 × 池短路）→ 批量收取 all_task_url_keys 合并输入
+- **视频线**（逐镜一对一）：分镜提示词批量 3 路分段 → 视频提示词批量 ×3 → 关键帧生视频；多视频异步接法：视频任务提交（秒级返回 task_url，画布解放）→ 视频任务收取（稍后右键收片，自动下载）；分波全量异步接法（20 镜/波，提交侧单节点）：视频提示词批量 all_video_prompts → 视频多任务并发提交（提示词串行 × 池短路）→ 批量收取 all_task_url_keys 合并输入 → 视频拼图 all_video_paths 一根线矩阵视频（免 20 个 Save Video 排列）
 
 节点级接线入口（哪个输出连哪个输入）见下方「功能」各条；管线示例与排错见 [NODE_GUIDE.md](NODE_GUIDE.md)。
 
@@ -69,7 +69,7 @@ ComfyUI 实测截图：
 - 🔍 Agnes 图像反推提示词
 - 🧩 Agnes 图像拼图节点：batch_images 批量张量总输入（三视图批量/分镜图批量 all_images 直连，优先于 20 槽）或 20 路批量图 → 1 张 2 列网格拼图；全部 21 输入可选（不连线自动跳过不红框）；自动跳过黑图占位，N 动态定行数，纯本地
 
-视频类（8 个）：
+视频类（9 个）：
 
 - 🎞️ Agnes 文生视频节点：4-12 秒时长直控 seconds + 固定 720P 分辨率项 + 宽高比；模型为 Agnes Video 2.5-flash；提交遇 503 队列满自动退避重试：「重试次数」参数可调 0-30（默认 5）
 - 🎬 Agnes 关键帧生视频节点：首尾帧；prompt 输入可直连 Agnes 视频提示词生成/批量 输出的英文视频提示词，免手写运镜描述；4-12 秒直控 + 720P；同上文生视频的 503 退避
@@ -79,6 +79,7 @@ ComfyUI 实测截图：
 - 🎞️ Agnes 视频多任务并发提交节点：视频任务并发提交 的多任务版本——输入 all_prompts 一根线（直连 视频提示词批量 all_video_prompts，JSON 数组 ≤20 条，单条纯文本也接受=1 任务）+ 池 JSON（直连 API Key 池配置 pool_json）；节点内**提示词串行循环**（一次只提交一个提示词，绝不同双提示词并发，队列压力=逐个 并发提交 实例节拍），每条走池序顺序短路（机制同 并发提交，retries 默认 120 同 并发提交，复用现成实现）；单条失败=该槽 "0" 标记，继续下一条不整批中止；最坏总时长=N 条×(1+retries)×30 秒；输出 22 槽（顺序对齐 视频提示词批量 video_prompt_1..20+status+all_video_prompts）：20 路 task_url_key_1..20（成功=单线双参 JSON {task_url,api_key}；失败="0"；空槽="" 保位）+ status 整批状态 JSON（success/failed/empty+details）+ all_task_url_keys 20 元素保位 JSON 数组（一根线直连 批量收取 新增合并输入）
 - 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查；收到 "0"=上游提交失败标记，直接跳过收取）+ api_key（可直连 提交 节点的 api_key 穿透输出）；节点内轮询（首查 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载（3 次重试）；输出 video（环境动态类型同 文生视频：原生 VIDEO 可直连 Save Video 出片预览 / VHS_VIDEOINFO / 路径字符串；无文件态原生环境出 NO_VIDEO_ 前缀黑帧占位 + status 携带 error 内容（队列不打断），VHS/STRING 回空值）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败；error=收到 0 标记，跳过收取，原因见 提交 节点 status）
 - 📥 Agnes 视频任务批量收取节点：合并输入 all_task_url_keys（面板置顶，优先）直连 视频多任务并发提交 的 all_task_url_keys 输出（20 元素保位 JSON 数组，一行带齐 N 个任务句柄；非空时按条目序填充 task_1..task_20 槽，video_1..20 按序输出；"0" 条目跳过收取记 error 并默认视频占位填充，空条目记 empty 保位；空=走 20 槽逐一连线旧语义）；或 20 个任务输入 task_1…task_20（**task_i ↔ video_i 一一对应**，提交节点 task_url_key 单线双参 {task_url,api_key} 直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL，Key 走 api_key 兜底；"0" 标记=跳过记 error 并默认视频占位填充、空槽=跳过记 empty 槽号保位）；线程池并发轮询（并发默认 10、每任务 timeout 默认 10 分钟），免 20 个 收取 实例逐个右键；输出 20 路 video（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单 + details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，一行带走 20 条路径清单）
+- 🧩 Agnes 视频拼图节点（图像拼图 的视频版，N 路视频 → 1 个矩阵视频）：all_video_paths 总输入一根线（直连 批量收取 all_video_paths 输出，优先）或 20 个 video_i 槽（直连 批量收取 video_i，原生 VIDEO，未连线自动跳过不红框）；把 N 个可解码视频同步拼成「矩阵列数 × ⌈N/列数⌉」矩阵视频（播放同步：输出帧率=首个有效视频 fps，总时长=最长视频，短视频末帧冻结；无效槽不占格，格左上角标原槽号 #i；不同宽高比源等比缩放居中不拉伸）；纯本地 PyAV 解码/编码 H.264（ultrafast）自动落盘 output/agnes_videos/，节点面板内嵌播放（可再连 Save Video 自定义前缀存档，免 20 个 Save Video 排列）；全无效=2 秒黑帧占位 + status 标注 error（队列不打断）；输出 3 路：矩阵视频（环境动态类型 VIDEO/VHS_VIDEOINFO/路径字符串）+ 有效视频数 + 执行状态
 
 前端特性：
 
