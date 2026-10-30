@@ -12,6 +12,8 @@
  *   AgnesTurnaroundPromptBatch 三视图提示词批量  26 → 7  （旧 [20..25] 6 配置 → 新 [1..6]）
  *   AgnesTurnaroundBatch       三视图批量生成    26 → 7  （旧 [20..25] 6 配置 → 新 [1..6]）
  * 规则：新 [0]=""（新合并输入槽留空，输入链接优先），新 [1..K]=旧配置项尾部原样保留。
+ * 视频任务批量收取 置顶新增 all_task_url_keys 合并输入：23 → 24（旧 [0..22] 整体
+ * 下移一格为 新 [1..23]，新 [0]=合并输入留空；新结构 24 项实例不命中 23 指纹，幂等）。
  *
  * 视频节点三段演进（按数组顺序逐段应用，一个节点可连续命中多段）：
  * ① quality（1K/2K）档位移除 —— 中位截断，按 dropIdx 丢格重排：
@@ -78,6 +80,16 @@
         { cls: "AgnesAssetPromptBatch", oldLen: 27, newLen: 8, tailStart: 20 },
         { cls: "AgnesTurnaroundPromptBatch", oldLen: 26, newLen: 7, tailStart: 20 },
         { cls: "AgnesTurnaroundBatch", oldLen: 26, newLen: 7, tailStart: 20 },
+        // —— 批量收取：置顶新增 all_task_url_keys 合并输入（头部纯新增 widget；
+        //    旧 23 项实例自动前补 ""，旧 [0..22] 整体下移一格；新 24 项实例不命中，幂等）——
+        {
+            cls: "AgnesVideoTaskCollectBatch", oldLen: 23, newLen: 24,
+            map: function (wv) {
+                var c = [""];
+                for (var i = 0; i < wv.length; i++) c.push(wv[i]);
+                return c;
+            }
+        },
         // —— 视频 ①：1K/2K 档位移除（中位丢格；指纹限定旧档位值，避免误伤
         //    新结构同长度实例：文生/关键帧 10 项[idx4=720P]、参考视频 13 项[idx6=秒数]）——
         {
@@ -242,7 +254,7 @@
                     return origQueuePrompt.apply(this, arguments);
                 };
             }
-            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash）");
+            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；批量收取置顶合并输入 23→24；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 迁移扩展注册失败（不影响节点功能）:", e);
         }

@@ -52,10 +52,10 @@ $env:AGNES_API_KEY = "sk-你的Key"
 重启 ComfyUI 后，控制台应出现：
 
 ```
-[AgnesNovel] 已加载 34 个节点
+[AgnesNovel] 已加载 35 个节点
 ```
 
-在节点列表中搜索 "Agnes"，应看到 34 个节点（按功能分类配色）：
+在节点列表中搜索 "Agnes"，应看到 35 个节点（按功能分类配色）：
 
 - 🔑 Agnes API Key 配置 / 🔑 Agnes API Key 池配置 / 🪄 Agnes 风格选择 / 📥 Agnes 文本输入
 - 📝 Agnes 解说剧本生成 / 🎭 Agnes 剧本生成 / 🎬 Agnes 场景切分 / 🎬 Agnes 总导演
@@ -65,5 +65,5 @@ $env:AGNES_API_KEY = "sk-你的Key"
 - 🎨 Agnes 图像生成 / 🖼️ Agnes 图生图 / 📐 Agnes 三视图生成 / 📐 Agnes 三视图批量生成
 - 🎞️ Agnes 分镜图批量生成 / 🔍 Agnes 图像反推提示词 / 🧩 Agnes 图像拼图
 - 🎞️ Agnes 文生视频 / 🎬 Agnes 关键帧生视频 / 🎞️ Agnes 参考视频生成
-- 🎞️ Agnes 视频任务提交 / 🎞️ Agnes 视频任务并发提交（多端点 Key 池）
-- 📥 Agnes 视频任务收取 / 📥 Agnes 视频任务批量收取
+- 🎞️ Agnes 视频任务提交 / 🎞️ Agnes 视频任务并发提交（多端点 Key 池）/ 🎞️ Agnes 视频多任务并发提交（all_prompts 合并输入，提示词串行 × 池短路）
+- 📥 Agnes 视频任务收取 / 📥 Agnes 视频任务批量收取（all_task_url_keys 合并输入优先）

@@ -1,5 +1,5 @@
 # ComfyUI Agnes Flash Suite
-Agnes AI 全能力 ComfyUI 节点套件 — 34 个节点（20 文本 + 7 图片 + 7 视频），
+Agnes AI 全能力 ComfyUI 节点套件 — 35 个节点（20 文本 + 7 图片 + 8 视频），
 覆盖 Agnes 模型全能力：LLM 对话/创作（小说·分镜·剧本·解说·漫剧）、
 文生图/图生图/三视图/多图合成、文生视频/关键帧生视频/参考视频 + 视频任务异步提交/收取 +
 多端点 Key 池并发提交（国内/国外不同账号，队列满互备）。
@@ -9,7 +9,7 @@ Agnes AI 全能力 ComfyUI 节点套件 — 34 个节点（20 文本 + 7 图片 
 
 - **资产线**（定妆图）：文本拆分/资产提取 → 资产提示词批量 → 三视图提示词批量 → 三视图批量生成 → 图像拼图
 - **分镜线**（关键帧 + 视频提示词）：总导演/场景切分 → 分镜提示词批量（60 镜·3 路分段）→ 分镜图批量 ×3（分波 60 镜全量）→ 图像拼图
-- **视频线**（逐镜一对一）：分镜提示词批量 3 路分段 → 视频提示词批量 ×3 → 关键帧生视频；多视频异步接法：视频任务提交（秒级返回 task_url，画布解放）→ 视频任务收取（稍后右键收片，自动下载）
+- **视频线**（逐镜一对一）：分镜提示词批量 3 路分段 → 视频提示词批量 ×3 → 关键帧生视频；多视频异步接法：视频任务提交（秒级返回 task_url，画布解放）→ 视频任务收取（稍后右键收片，自动下载）；分波全量异步接法（20 镜/波，提交侧单节点）：视频提示词批量 all_video_prompts → 视频多任务并发提交（提示词串行 × 池短路）→ 批量收取 all_task_url_keys 合并输入
 
 节点级接线入口（哪个输出连哪个输入）见下方「功能」各条；管线示例与排错见 [NODE_GUIDE.md](NODE_GUIDE.md)。
 
@@ -76,13 +76,14 @@ ComfyUI 实测截图：
 - 🎞️ Agnes 参考视频生成节点：最多 5 参考图 + 3 参考音频；4-12 秒直控 + 720P；同上文生视频的 503 退避
 - 🎞️ Agnes 视频任务提交节点：输入/退避同 文生视频（9 输入，无 max_wait_seconds 保留项——本节点不轮询；503 按「重试次数」退避）；只提交不等待——拿到任务 ID 秒级返回，画布立刻解放；输出 task_url（成功=完整轮询 URL 含域名，直连 收取；失败="0" 标记=未生成任务）+ status（成功=submitted: video_id=…，失败=服务端错误响应原文）+ api_key 穿透（提交时实际用的 Key，直连 收取 的 api_key 输入，收取端免再配）+ task_url_key（单线双参 JSON：{"task_url","api_key"}，一根线带齐 URL+Key，直连 批量收取 的 tasks 合并输入）
 - 🎞️ Agnes 视频任务并发提交节点：视频任务提交 的多端点 Key 池版本（顺序短路 B）——输入 池 JSON（直连 API Key 池配置 pool_json，多组 Base URL+Key 条目）替代单 base_url+api_key；同一提示词按池序逐条目试探，#1 成功即停、后续条目零请求（零浪费）；#1 队列满 503 时另一端点绿窗可接住；retries 机制同 单提交（固定 30 秒/轮 ±15% 抖动、Retry-After 优先、上限 120 轮累计 60 分钟，累计等待与池大小无关；400/401/403/404 条目标 dead 后续轮跳过、全灭提前终止）；输出 5 路（面板自上而下，status 置最下）：task_url（胜出条目完整轮询 URL）+ api_key（胜出 Key 穿透）+ task_url_key（胜出 URL+Key 单线双参 JSON，直连 批量收取 task_i 槽零改动）+ pool_report（逐条目 JSON 矩阵，人工查看或接 LLM 对话做台账）+ status（成功=submitted: video_id=…（池 #i / base_url），失败=末次诊断+建议）
+- 🎞️ Agnes 视频多任务并发提交节点：视频任务并发提交 的多任务版本——输入 all_prompts 一根线（直连 视频提示词批量 all_video_prompts，JSON 数组 ≤20 条，单条纯文本也接受=1 任务）+ 池 JSON（直连 API Key 池配置 pool_json）；节点内**提示词串行循环**（一次只提交一个提示词，绝不同双提示词并发，队列压力=逐个 并发提交 实例节拍），每条走池序顺序短路（机制同 并发提交，复用现成实现）；单条失败=该槽 "0" 标记，继续下一条不整批中止；最坏总时长=N 条×(1+retries)×30 秒；输出 22 槽（顺序对齐 视频提示词批量 video_prompt_1..20+status+all_video_prompts）：20 路 task_url_key_1..20（成功=单线双参 JSON {task_url,api_key}；失败="0"；空槽="" 保位）+ status 整批状态 JSON（success/failed/empty+details）+ all_task_url_keys 20 元素保位 JSON 数组（一根线直连 批量收取 新增合并输入）
 - 📥 Agnes 视频任务收取节点：单路 task_url 输入（URL 自带域名，跨域名提交可查；收到 "0"=上游提交失败标记，直接跳过收取）+ api_key（可直连 提交 节点的 api_key 穿透输出）；节点内轮询（首查 60s、之后每 5s，timeout 默认 10 分钟），completed 自动下载（3 次重试）；输出 video（环境动态类型同 文生视频：原生 VIDEO 可直连 Save Video 出片预览 / VHS_VIDEOINFO / 路径字符串；无文件态原生环境出 NO_VIDEO_ 前缀黑帧占位 + status 携带 error 内容（队列不打断），VHS/STRING 回空值）+ status（completed=服务端视频 URL；failed=服务端错误内容；processing=到超时未完成，再运行本节点继续查，不算失败；error=收到 0 标记，跳过收取，原因见 提交 节点 status）
-- 📥 Agnes 视频任务批量收取节点：20 个任务输入 task_1…task_20（**task_i ↔ video_i 一一对应**，提交节点 task_url_key 单线双参 {task_url,api_key} 直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL，Key 走 api_key 兜底；"0" 标记=跳过记 error、空槽=跳过记 empty 槽号保位）；线程池并发轮询（并发默认 10、每任务 timeout 默认 10 分钟），免 20 个 收取 实例逐个右键；输出 20 路 video（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单 + details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，一行带走 20 条路径清单）
+- 📥 Agnes 视频任务批量收取节点：合并输入 all_task_url_keys（面板置顶，优先）直连 视频多任务并发提交 的 all_task_url_keys 输出（20 元素保位 JSON 数组，一行带齐 N 个任务句柄；非空时按条目序填充 task_1..task_20 槽，video_1..20 按序输出；"0" 条目跳过收取记 error 并默认视频占位填充，空条目记 empty 保位；空=走 20 槽逐一连线旧语义）；或 20 个任务输入 task_1…task_20（**task_i ↔ video_i 一一对应**，提交节点 task_url_key 单线双参 {task_url,api_key} 直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL，Key 走 api_key 兜底；"0" 标记=跳过记 error 并默认视频占位填充、空槽=跳过记 empty 槽号保位）；线程池并发轮询（并发默认 10、每任务 timeout 默认 10 分钟），免 20 个 收取 实例逐个右键；输出 20 路 video（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单 + details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，一行带走 20 条路径清单）
 
 前端特性：
 
 - 分类配色：Agnes 节点在画布上按功能整体染色（配置类=琥珀；文本类=绿；图片类=蓝；视频类=紫，同类同色系，主体色明显带色而非近黑），且类内按 主/浅/深 三阶小幅度区分主功能、次功能、工具与中间层；由前端扩展 `web/js/agnes-node-colors.js` 实现，仍可用右键「Set color」给单个节点换色
-- 旧实例自愈：批量节点输入结构升级（如 分镜提示词批量 50 槽 → all_scenes 单输入）与视频节点结构演进（移除 1K/2K 画质档位 → 帧数/帧率 改 seconds 秒数直控 + 720P 分辨率项 + 模型单项）后，旧工作流实例的 widget 值在载入/排队时自动重映射（`web/js/agnes-migrate.js`：批量节点尾部配置重排、视频节点丢弃档位槽/帧数帧率推导秒数），避免「Value not in list」类校验报错
+- 旧实例自愈：批量节点输入结构升级（如 分镜提示词批量 50 槽 → all_scenes 单输入；视频任务批量收取 置顶新增 all_task_url_keys 合并输入 23→24 项，旧 widget 整体下移一格）与视频节点结构演进（移除 1K/2K 画质档位 → 帧数/帧率 改 seconds 秒数直控 + 720P 分辨率项 + 模型单项）后，旧工作流实例的 widget 值在载入/排队时自动重映射（`web/js/agnes-migrate.js`：批量节点尾部配置重排、视频节点丢弃档位槽/帧数帧率推导秒数），避免「Value not in list」类校验报错
 - 视频节点 seed 中文化：ComfyUI 内核会给任何名为 seed 的输入自动挂一个「生成后控制」英文下拉（提示语为内核硬编码英文、无法从套件本地化），3 个视频节点已在输入定义中禁用它；随机种子仍可用 seed 输入框旁的骰子按钮
 - 视频提交退避：视频生成提交遇 503 队列满/429 限流时客户端自动退避重试，次数由节点「重试次数」参数控制（默认 5 次：固定 30 秒/次，累计 150 秒；睡眠带 ±15% 随机抖动错峰，文生视频等节点可调 0-30 次（上限 30 次累计 900 秒/15 分钟），视频任务提交节点可调 0-120 次（上限 120 次累计 3600 秒/60 分钟）；503 响应带 Retry-After 头时优先按服务端指定秒数）
 - 池并发提交（顺序短路 B）：视频任务并发提交 按池序逐端点试探——一轮全条目各一次 POST，#1 成功即停（后续条目零请求、零浪费）；整轮全灭固定 30 秒/轮退避（±15% 抖动、Retry-After 优先），轮数=1+retries（上限 120，累计等待与池大小无关）；400/401/403/404 条目标 dead 后续轮跳过（不反复打无效 Key）、全灭提前终止

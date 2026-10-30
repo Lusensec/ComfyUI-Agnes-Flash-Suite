@@ -12,8 +12,17 @@ Agnes 视频任务批量收取节点（异步两段式·收取段，20 任务并
     0 个中间合并节点；各槽 Key 可以全不同——条目自带 Key 只作用于本任务
     （每任务线程各建一个 AgnesClient），互不干扰；
   - 也接受 纯轮询 URL 字符串（Key 走 api_key 兜底输入 → 全局配置）；
-  - "0"=上游 提交 失败标记：该槽跳过收取（零轮询零下载），记 error 状态；
+  - "0"=上游 提交 失败标记：该槽跳过收取（零轮询零下载），记 error 状态，
+    video_i 出默认视频填充（NO_VIDEO_ 黑帧占位/空值）；
   - 未连接/空=跳过该槽，记 empty 状态（槽号保位）。
+
+合并输入 all_task_url_keys（面板置顶，优先于 20 槽逐一连线）：
+  20 元素保位 JSON 数组，直连「Agnes 视频多任务并发提交」的 all_task_url_keys
+  输出（一行带齐 N 个任务句柄，0 中间节点）；非空时按条目序填充
+  task_1..task_20 槽（条目 ≤20 超出截断；条目可为 task_url_key 单线双参 JSON /
+  "0" / 空 / 纯轮询 URL；"0" 条目跳过收取记 error 并默认视频占位填充，
+  空条目记 empty 保位），video_1..20 按序输出；空=走上方 20 槽逐一连线
+  语义（旧工作流零影响）。
 
 轮询节奏与单 收取 一致：首查前 60s、之后每 5s（timeout 默认 600s/任务）；
 completed 自动下载（3 次重试）到 ComfyUI output/agnes_videos/。
@@ -38,6 +47,13 @@ completed 自动下载（3 次重试）到 ComfyUI output/agnes_videos/。
   task_1…task_20（各槽 Key 可全不同）
   → 3 个批量收取 ×3 = 60 路 video 直连 Save Video 全量落盘
   （总时长≈max(各视频渲染时长)，非逐任务右键的 sum；出片期间画布可跑别的）。
+
+分波全量合并输入接法（20 镜/波，提交侧单节点版）：
+   视频提示词批量（分段）→ Agnes 视频多任务并发提交（all_prompts 一根线，
+   提示词串行 × 池顺序短路，20 镜/波）
+   → all_task_url_keys 一根线直连 1 个 批量收取 实例的 all_task_url_keys
+   合并输入（0 中间节点；"0" 条目跳过收取并默认视频占位填充）
+   → 20 路 video 按序直连 Save Video。
 """
 
 import json
@@ -83,6 +99,38 @@ def _parse_entry(raw) -> Tuple[str, str, str]:
     return (first, "", "URL")
 
 
+def _parse_all_tasks(raw) -> Tuple[list, str]:
+    """合并输入 all_task_url_keys 解析（优先于 20 槽逐一连线）：20 元素保位 JSON
+    数组（直连「Agnes 视频多任务并发提交」的 all_task_url_keys 输出）：条目可为
+    task_url_key 单线双参 JSON 对象（{"task_url","api_key"}）/ "0" 标记 / 空 /
+    纯轮询 URL 字符串 / 嵌套 JSON 字符串。条目 i → task 槽 i（超 20 条截断，保位）。
+    返回 (raws(20 槽位保位列表，每槽=可喂 _parse_entry 的原始形态), 来源标签)。"""
+    raw = str(raw or "").strip()
+    if raw == "0":  # 防御：整个合并输入=0 标记（上游全灭）→ 全槽 0
+        return (["0"] * MAX_TASKS, "0 标记（上游全灭，全槽跳过收取）")
+    try:
+        obj = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return ([raw], "纯文本（1 条）")
+    if isinstance(obj, str):
+        obj = [obj]
+    if not isinstance(obj, list):
+        return ([raw], "非数组 JSON（按整段 1 条）")
+    raws = []
+    for el in obj:
+        if isinstance(el, dict):
+            raws.append(json.dumps(el, ensure_ascii=False))
+        elif el is None:
+            raws.append("")
+        else:
+            raws.append(el)
+    truncated = len(raws) > MAX_TASKS
+    if truncated:
+        raws = raws[:MAX_TASKS]
+    raws = raws + [""] * (MAX_TASKS - len(raws))
+    return (raws, f"JSON 数组（{len(obj)} 条" + ("，超出 20 已截断" if truncated else "") + "）")
+
+
 def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
     """无文件态（failed/processing/empty/0 标记/缺 Key）的 video 侧输出。
 
@@ -112,9 +160,9 @@ def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
 
 
 class AgnesVideoTaskCollectBatch(OutputDocsMixin):
-    """Agnes 视频任务批量收取：20 个 task 输入（task_i ↔ video_i，task_url_key 单线双参或纯 URL），线程池并发收取 ≤20 任务，输出 20 路 video（环境动态类型）+ 整批状态 JSON + 全部视频路径 JSON。"""
+    """Agnes 视频任务批量收取：all_task_url_keys 合并输入（优先，直连 视频多任务并发提交）或 20 个 task_i 逐一连线（task_i ↔ video_i，task_url_key 单线双参或纯 URL），线程池并发收取 ≤20 任务，输出 20 路 video（环境动态类型）+ 整批状态 JSON + 全部视频路径 JSON。"""
 
-    DESCRIPTION = "视频任务异步批量收取（两段式第二段，20 任务并发）：20 个输入 task_1…task_20（task_i 对应 video_i 输出：Agnes 视频任务提交 的 task_url_key 单线双参 JSON {task_url,api_key}，N 个提交实例直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL（Key 走 api_key 兜底→全局）；0 标记=跳过记 error、空=跳过记 empty（槽号保位））；线程池并发轮询（max_concurrency 默认 10，每任务 60s 首查后每 5s，timeout 默认 600s），completed 自动下载（3 次重试）到 output/agnes_videos/；输出 22 槽：video_1..video_20（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单+details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，其余空）"
+    DESCRIPTION = "视频任务异步批量收取（两段式第二段，20 任务并发）：合并输入 all_task_url_keys（面板置顶，优先）直连 Agnes 视频多任务并发提交 的 all_task_url_keys 输出（20 元素保位 JSON 数组，一行带齐 N 个任务句柄；非空时按条目序填充 task_1..task_20 槽，video_1..20 按序输出；\"0\" 条目跳过收取记 error 并默认视频占位填充，空条目记 empty 保位；空=走 20 槽逐一连线旧语义）；20 个输入 task_1…task_20（task_i 对应 video_i 输出：Agnes 视频任务提交 的 task_url_key 单线双参 JSON {task_url,api_key}，N 个提交实例直连 N 槽 0 中间节点，各槽 Key 可全不同；也接受纯轮询 URL（Key 走 api_key 兜底→全局）；0 标记=跳过记 error（默认视频占位填充）、空=跳过记 empty（槽号保位））；线程池并发轮询（max_concurrency 默认 10，每任务 60s 首查后每 5s，timeout 默认 600s），completed 自动下载（3 次重试）到 output/agnes_videos/；输出 22 槽：video_1..video_20（环境动态类型，completed=真实文件可直连 Save Video，无文件态=NO_VIDEO_ 黑帧占位（文件名带槽号）/空值）+ status 整批状态 JSON（success/failed/processing/empty/error 槽号清单+details 原因）+ all_video_paths 20 元素路径 JSON（completed=本地落盘路径，其余空）"
 
     CATEGORY = "Agnes Novel"
     FUNCTION = "generate"
@@ -142,7 +190,16 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
                 "tooltip": f"任务 {i} 输入（对应 视频 {i} 输出）：Agnes 视频任务提交 的 task_url_key 单线双参 JSON（一行带齐 URL+Key；各槽 Key 可全不同，条目自带 Key 只作用于本任务）；也接受 纯轮询 URL 字符串（Key 走 api_key 兜底输入→全局配置）；0=上游提交失败标记：跳过记 error；空=跳过该槽记 empty（槽号保位）",
             })
         return {
-            "required": task_slots,
+            "required": {
+                "all_task_url_keys": ("STRING", {
+                    "label": "全部任务 URL+Key（JSON 合并输入）",
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": '[{"task_url": "https://…/agnesapi?video_id=…", "api_key": "sk-…"}, "0", ""]\n直连 Agnes 视频多任务并发提交 的 all_task_url_keys 输出（20 元素保位 JSON 数组）',
+                    "tooltip": "合并输入（面板置顶，优先于 20 槽逐一连线）：直连 Agnes 视频多任务并发提交 的 all_task_url_keys 输出（20 元素保位 JSON 数组，一行带齐 N 个任务句柄；条目可为 task_url_key 单线双参 JSON / \"0\" / 空 / 纯轮询 URL）；非空时按条目序填充 task_1..task_20 槽（超 20 条截断，\"0\" 条目跳过收取记 error 并默认视频占位填充，空条目记 empty 保位），video_1..20 按序输出；空=走现有 20 槽逐一连线语义（旧工作流零影响）",
+                }),
+                **task_slots,
+            },
             "optional": {
                 "api_key": ("STRING", {
                     "label": "API Key（兜底）",
@@ -170,12 +227,21 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
             },
         }
 
-    def generate(self, task_1="", task_2="", task_3="", task_4="", task_5="", task_6="", task_7="", task_8="", task_9="", task_10="",
+    def generate(self, all_task_url_keys="", task_1="", task_2="", task_3="", task_4="", task_5="", task_6="", task_7="", task_8="", task_9="", task_10="",
                  task_11="", task_12="", task_13="", task_14="", task_15="", task_16="", task_17="", task_18="", task_19="", task_20="",
                  api_key="", timeout=600, max_concurrency=10) -> Tuple:
         # 20 个 task 槽（task_1…task_20）按位取；各槽独立解析（task_url_key JSON / 纯 URL / 0 / 空）
-        raws = [task_1, task_2, task_3, task_4, task_5, task_6, task_7, task_8, task_9, task_10,
-                 task_11, task_12, task_13, task_14, task_15, task_16, task_17, task_18, task_19, task_20]
+        individual = [task_1, task_2, task_3, task_4, task_5, task_6, task_7, task_8, task_9, task_10,
+                      task_11, task_12, task_13, task_14, task_15, task_16, task_17, task_18, task_19, task_20]
+        raws = list(individual)
+        # ── 合并输入优先：all_task_url_keys 非空 → 按条目序填充 20 槽（20 路逐一连线忽略）──
+        merged = str(all_task_url_keys or "").strip()
+        if merged:
+            raws, msrc = _parse_all_tasks(merged)
+            n_individual = sum(1 for r in individual if str(r or "").strip())
+            extra = (f"；task_1..20 逐一连线 {n_individual} 槽与合并输入并存，按置顶优先语义合并输入生效、逐一连线忽略"
+                     if n_individual else "")
+            print(f"[Agnes 视频任务批量收取] 合并输入 all_task_url_keys 生效（{msrc}{extra}）：按条目序填充 20 槽")
         entries = [_parse_entry(r)[:2] for r in raws]   # [(task_url, api_key), ×20]
         fallback_key = str(api_key or "").strip() or str(get_api_key() or "").strip()
         max_conc = max(1, min(MAX_TASKS, int(max_concurrency or 10)))
@@ -192,7 +258,7 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
 
         # ── 全空：整批跳过，零 API 调用 ──
         if not any(u for u, _k in entries):
-            print("[Agnes 视频任务批量收取] [跳过] 全部 20 个 task 输入为空：请连接 视频任务提交 的 task_url_key 输出（task_i ↔ 视频 i），零 API 调用")
+            print("[Agnes 视频任务批量收取] [跳过] 全部 20 个 task 输入为空（合并输入与槽连线均为空）：请连接 Agnes 视频多任务并发提交 的 all_task_url_keys 输出（一根线），或 Agnes 视频任务提交 的 task_url_key 输出（task_i ↔ 视频 i），零 API 调用")
             videos = [self._video_for("empty", "未连接 task 输入（槽号保位）", i) for i in _all_slots()]
             return tuple(videos) + (_status_json([], [], [], _all_slots(), []),
                                     json.dumps([""] * MAX_TASKS, ensure_ascii=False))
@@ -206,7 +272,7 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
             if not url:
                 zero.append((slot, "empty", "未连接 task 输入（槽号保位）"))
             elif url == "0":
-                zero.append((slot, "error", "上游 Agnes 视频任务提交 未成功（task_url=0 标记）：原因见该提交节点 status（如 503 队列满→等 5-10 分钟重跑 提交 节点）"))
+                zero.append((slot, "error", "上游 提交 未成功（task_url=0 标记，含 视频多任务并发提交 的 task_url_key 数组条目）：原因见该提交节点 status/details（如 503 队列满→等 5-10 分钟重跑提交节点）；本槽跳过收取，默认视频占位填充"))
             else:
                 k = key or fallback_key
                 if not k:

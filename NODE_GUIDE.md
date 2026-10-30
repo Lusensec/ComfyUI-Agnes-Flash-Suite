@@ -612,7 +612,8 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| task_1…task_20 | STRING ×20 | ""（各槽） | 20 个任务输入，**task_i ↔ video_i 一一对应**（第 i 输入出第 i 路视频）：① 视频任务提交 的 task_url_key 单线双参 JSON（{"task_url","api_key"}，一行带齐 URL+Key，N 个提交实例直连 N 槽 0 中间节点，各槽 Key 可全不同——条目自带 Key 只作用于本任务）② 纯轮询 URL 字符串（Key 走 api_key 兜底输入→全局配置）③ "0"=上游提交失败标记（该槽跳过收取，记 error）④ 未连接/空=该槽跳过（记 empty，槽号保位）；全空=整批跳过（零 API 调用） |
+| all_task_url_keys | STRING（多行） | "" | **合并输入（面板置顶，优先于 20 槽逐一连线）**：直连「Agnes 视频多任务并发提交」的 all_task_url_keys 输出（20 元素保位 JSON 数组，一行带齐 N 个任务句柄）；非空时按条目序填充 task_1..task_20 槽（超 20 条截断，video_1..20 按序输出）：条目可为 ① task_url_key 单线双参 JSON（{"task_url","api_key"}）② "0"=上游提交失败标记（该槽跳过收取记 error，**默认视频占位填充**）③ 空（记 empty 槽号保位）④ 纯轮询 URL；空=走下方 20 槽逐一连线旧语义（旧工作流零影响） |
+| task_1…task_20 | STRING ×20 | ""（各槽） | 20 个任务输入，**task_i ↔ video_i 一一对应**（第 i 输入出第 i 路视频）：① 视频任务提交 的 task_url_key 单线双参 JSON（{"task_url","api_key"}，一行带齐 URL+Key，N 个提交实例直连 N 槽 0 中间节点，各槽 Key 可全不同——条目自带 Key 只作用于本任务）② 纯轮询 URL 字符串（Key 走 api_key 兜底输入→全局配置）③ "0"=上游提交失败标记（该槽跳过收取记 error，默认视频占位填充）④ 未连接/空=该槽跳过（记 empty，槽号保位）；全空=整批跳过（零 API 调用） |
 | api_key | STRING | （留空=全局） | 条目未自带 api_key 时的兜底 Key（可直连某 提交 节点的 api_key 穿透输出，单 Key 场景全体共用）；条目自带 Key 的优先用自带 |
 | timeout | INT | 600 | 单任务最长等待（秒，默认 10 分钟，同 单收取）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查未完成任务（全批 settled 才返回） |
 | max_concurrency | INT | 10 | 线程池并发（同时轮询任务数 1-20，默认 10）：非空条目超过该值时排队执行；轮询是轻 GET，10 并发压力很小 |
@@ -622,12 +623,16 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 - status: 整批执行状态 JSON（槽号 1 起保位）：{"success":[completed 槽],"failed":[服务端失败/下载失败/缺 Key/网络异常槽],"processing":[到 timeout 未完成槽],"empty":[空输入槽],"error":["0" 标记槽],"details":{槽:原因}}；可连 文本拆分（JSON 数组模式）拆成名单做对接分析
 - all_video_paths: 20 元素 JSON 数组（与 video_i 槽下标一一对应）：completed=本地落盘路径（下载失败时=服务端 URL），其余=空串；JSON 一行带走 20 条路径清单（手动拷片/投喂其他工具/台账记录）
 
-> 批量收取用法：视频提示词批量 ×3 分段 → 视频任务提交 ×60（分 3 波，每波 20 实例）
+> 批量收取用法 A（20 槽逐一连线，60 镜线）：视频提示词批量 ×3 分段 → 视频任务提交 ×60（分 3 波，每波 20 实例）
 > → 每波 20 个实例的 task_url_key 输出 直连 1 个 视频任务批量收取 实例的 task_1…task_20
 > （0 个中间合并节点，各槽 Key 可全不同）
-> → 3 实例 × 20 路 video 直连 Save Video 全量落盘。与 单收取 的差别：一个节点收 20 任务
-> （总时长≈max(各视频渲染时长)，非逐任务右键的 sum）；processing 槽再次右键运行本节点
-> 即继续查（completed 任务重查秒回不重下），不重复计费。
+> → 3 实例 × 20 路 video 直连 Save Video 全量落盘。
+> 批量收取用法 B（合并输入，提交侧单节点，20 镜/波）：视频提示词批量（分段）
+> → Agnes 视频多任务并发提交（all_prompts 一根线，提示词串行 × 池顺序短路）
+> → all_task_url_keys 一根线直连 1 个 批量收取 实例的 all_task_url_keys 合并输入
+> （0 中间节点；"0" 条目跳过收取并默认视频占位填充）→ 20 路 video 按序直连 Save Video。
+> 与 单收取 的差别：一个节点收 20 任务（总时长≈max(各视频渲染时长)，非逐任务右键的 sum）；
+> processing 槽再次右键运行本节点即继续查（completed 任务重查秒回不重下），不重复计费。
 
 ---
 
@@ -643,14 +648,17 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | include_global | BOOLEAN | 否 | 启用时把当前全局 Key（API Key 配置节点 / 环境变量 AGNES_API_KEY / api_key_config.json / config.yaml，同 单提交 节点回退链）作为**末尾条目**并入池（已在池中则不重复，全局 Key 为空则跳过）——「单账号」场景免手贴，池退化为 1 条目（行为等同 单提交 节点） |
 
 **输出（4 路，均 STRING）：**
-- pool_json: 规范化池 JSON（一行数组）：直连「Agnes 视频任务并发提交」的池输入；无有效条目="0" 标记（下游见 "0" 零请求短路，同 单提交 "0" 标记族语义）
+- pool_json: 规范化池 JSON（一行数组）：直连「Agnes 视频任务并发提交」/「Agnes 视频多任务并发提交」的池输入；无有效条目="0" 标记（下游见 "0" 零请求短路，同 单提交 "0" 标记族语义）
 - pool_count: 池内有效条目数（"0"=空池）
 - pool_report: 掩码清单（每条目一行：`#i 名称 | 请求地址(空=全局) | sk-…****…`）：人工核对池内容，Key 已掩码可安全显示
 - status: 配置结果：`ok: 池内 N 条（含并入全局说明）` / `error: 原因`（JSON 解析错误 / 无有效条目 / 池为空）
 
-> 池线接法：API Key 池配置（pool_json）→ 视频任务并发提交 ×N（N=镜头数/池容量）
+> 池线接法 A（逐镜头多实例）：API Key 池配置（pool_json）→ 视频任务并发提交 ×N（N=镜头数/池容量）
 > → task_url_key 直连 批量收取 task_1…task_20（各槽 Key=各胜出条目 Key，互不干扰，批量收取 零改动）
 > → status/pool_report 逐条目 JSON 直接人工查看（或接 LLM 对话节点做台账）。
+> 池线接法 B（多任务单节点，20 镜/波）：API Key 池配置（pool_json）
+> → 视频多任务并发提交（all_prompts 直连 视频提示词批量 all_video_prompts，提示词串行 × 池短路）
+> → all_task_url_keys 一根线直连 批量收取 all_task_url_keys 合并输入。
 
 ---
 
@@ -687,6 +695,42 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 > 何时用：单 Key 提交全 503 video_queue_full（分钟级持续态）且池内条目分属**不同容量池**
 > （不同账号/国内国外不同平台端点）——一端满、另一端绿窗时任务直接落地；
 > 池内条目若共享同一平台全局限额，并发探测收益有限（仍可用，顺序短路保证成功时零浪费）。
+
+---
+
+### 🎞️ Agnes 视频多任务并发提交 (AgnesVideoTaskSubmitBatch)
+
+**功能：** 视频任务多端点池**多任务**提交（异步两段式·提交段，**提示词串行 × 池短路**）：
+「Agnes 视频任务并发提交」的多任务版本——1 路 all_prompts 合并输入（JSON 数组 ≤20 条，
+直连「Agnes 视频提示词批量」任一分段 all_video_prompts 输出）替代单提示词输入；节点内部
+**挨个循环**每个提示词——一次只提交一个（绝不同双提示词并发，队列压力 = 逐个「并发提交」
+实例节拍），每条提示词走多端点 Key 池顺序短路（#1 成功即停零浪费，retries 机制同 并发提交，
+复用现成 submit_video_task_pool 实现）。单条失败=该槽 "0" 标记，继续下一条不整批中止。
+最坏总时长 = N 条 × (1+retries) × 30 秒（retries=5 默认 → 单条最坏 ≈3 分钟，20 条全批最坏 ≈60 分钟）。
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| all_prompts | STRING（多行） | "" | 合并输入：① JSON 数组（直连 视频提示词批量 all_video_prompts，一波 20 条；条目从上到下挨个串行提交，最多 20 条超出截断，空项跳过）② 单条纯文本（视为 1 任务）③ 空=整批跳过（零 API 调用） |
+| pool_json | STRING（多行） | "" | 直连「Agnes API Key 池配置」的 pool_json 输出（多组 Base URL+Key 条目 JSON 数组）；"0" 标记=上游池无有效条目（全槽 0 标记零请求短路）；条目 base_url 可空=跟随全局 |
+| model | COMBO | agnes-video-2.5-flash | 视频生成模型（整批共用） |
+| resolution | COMBO | 720P | 输出分辨率：固定 720P（展示项，同 并发提交） |
+| aspect_ratio | COMBO | 16:9 | 画面宽高比（同 并发提交，不支持比例自动就近映射；整批共用） |
+| seconds | INT | 5 | 视频时长（秒，4-12 直控；与上游 视频提示词批量 duration 保持一致；整批共用） |
+| seed | INT | 0 | 随机种子（0=每条随机，固定值可复现；整批共用同一种子） |
+| retries | INT | 5 | 与 并发提交 retries 同机制（**作用于每条提示词**）：一轮=按池序全条目试探一次，整轮全灭固定 30 秒/轮退避（±15% 抖动；Retry-After 头优先）；默认 5（单条 6 轮、最坏 150 秒）；上限 120（单条最坏 3600 秒/60 分钟）；400/401/403/404 条目标 dead 后续轮跳过 |
+
+**输出（22 槽，均 STRING；顺序对齐「Agnes 视频提示词批量」video_prompt_1..20 + status + all_video_prompts，提示词槽 i ↔ 任务句柄槽 i）：**
+- task_url_key_1…task_url_key_20: 第 i 条提示词（all_prompts 非空条目顺序编号）的任务句柄：成功=单线双参 JSON `{"task_url","api_key"}`（与 并发提交 task_url_key 同格式，可直连 批量收取 task_i 槽或 单收取）；**失败="0" 标记**（全轮全灭/池不可用，收取端见 0 自动跳过并默认视频占位填充，原因见 status details）；空槽（条目不足 20/该位空条目）=空字符串（槽号 1 起保位）
+- status: 整批执行状态 JSON：`{"success":[成功槽号],"failed":[失败槽号],"empty":[未使用槽号],"details":{槽号:失败原因}}`；可直接连 文本拆分（JSON 数组模式）拆名单做对接分析，或接 LLM 对话解读哪些槽需重跑
+- all_task_url_keys: 20 元素保位 JSON 数组（与 20 路 task_url_key_i 同序逐槽一致：成功条目=单线双参 JSON 对象、失败条目=字符串 "0"、空槽=空字符串；零提示词输入=空字符串整体）——**一根线直连「Agnes 视频任务批量收取」的 all_task_url_keys 合并输入**，或接 LLM 对话整批台账/存档
+
+> 接法（视频线·分波全量异步，20 镜/波）：API Key 池配置（pool_json）
+> → Agnes 视频多任务并发提交（all_prompts 直连 视频提示词批量 all_video_prompts）
+> → all_task_url_keys 一根线直连 批量收取 all_task_url_keys 合并输入
+> （等价：20 路 task_url_key_i 直连 批量收取 task_1…task_20 逐一接法）
+> → 20 路 video 按序直连 Save Video。
+> 何时用：一波 20 镜要**全部异步提交**但又不想拉 20 个 并发提交 实例——本节点单实例串行
+> 逐条提交（RPM 压力同单实例节拍），60 镜=3 实例各接一段 all_video_prompts 分波。
 
 ---
 
