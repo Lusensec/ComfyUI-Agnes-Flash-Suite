@@ -1117,16 +1117,15 @@ all_prompts 空项=跳过该槽（槽号保位）；单槽失败不影响其他�
 ### 💬 Agnes LLM 对话 (AgnesNovelLLMChat)
 
 **功能：** 与 Agnes 对话模型自由对话（通用 LLM 文本节点：扩写/改写/批量转换/任意指令），
-可选系统提示词、Thinking 开关与思考等级。
+纯用户消息交互（无系统提示词输入，角色/行为设定写在「提示词」消息内）、Thinking 开关与思考等级。
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| prompt | STRING(多行) | "" | 用户消息 |
+| prompt | STRING(多行) | "" | 用户消息（角色/行为设定直接写在本消息开头，如「你是一名资深编剧。请…」） |
 | base_url | STRING | （留空=跟随全局） | 请求地址 Base URL |
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 对话模型（2.5-flash 默认 / 3.0-flash Agent） |
 | temperature | FLOAT | 0.7 | 采样温度 |
-| system_prompt（可选） | STRING(多行) | "" | 系统提示词（角色/行为设定） |
 | enable_thinking（可选） | BOOLEAN | 关 | Thinking 模式开关（消耗更多 token） |
 | reasoning_effort（可选） | COMBO | auto | 思考强度：auto/none/low/medium/high/max |
 | retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |

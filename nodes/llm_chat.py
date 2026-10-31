@@ -2,7 +2,7 @@
 Agnes LLM 对话节点
 =================
 与 Agnes 对话模型进行文本对话（默认 agnes-2.5-flash）。
-支持通过可选的系统提示词与对话消息进行多轮交互。
+纯用户消息交互：无系统提示词输入（角色/行为设定请写在「提示词」消息内）。
 """
 
 from typing import Any, Dict, Tuple
@@ -13,7 +13,7 @@ from ._output_docs import OutputDocsMixin
 
 
 class AgnesNovelLLMChat(OutputDocsMixin):
-    """Agnes AI LLM 对话节点：与 Agnes 对话模型多轮交互（可带系统提示词）；「重试次数/请求超时」可 widget 调（长思考拉高超时）。"""
+    """Agnes AI LLM 对话节点：与 Agnes 对话模型对话（纯用户消息，无系统提示词输入；角色/行为设定写在「提示词」内）；「重试次数/请求超时」可 widget 调（长思考拉高超时）。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING", "STRING")
@@ -60,12 +60,6 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                 }),
             },
             "optional": {
-                "system_prompt": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": "系统提示词指令...",
-                    "tooltip": "系统提示词：设定 AI 的行为/角色",
-                }),
                 "enable_thinking": ("BOOLEAN", {
                     "default": False,
                     "label_on": "开启",
@@ -102,7 +96,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         api_key: str = "",
         model: str = CHAT_MODEL,
         temperature: float = 0.7,
-        system_prompt: str = "",
+        system_prompt: str = "",  # 保留签名位（旧实例 widget 值按位传入不崩），运行时不再使用
         enable_thinking: bool = False,
         reasoning_effort: str = "auto",
         retries: int = 3,
@@ -120,8 +114,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
             messages = []
-            if system_prompt.strip():
-                messages.append({"role": "system", "content": system_prompt.strip()})
+            # 无系统提示词输入（已移除）：角色/行为设定由用户写在「提示词」消息内
             messages.append({"role": "user", "content": prompt})
 
             ctk = {"enable_thinking": True} if enable_thinking else None

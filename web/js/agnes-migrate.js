@@ -26,8 +26,9 @@
  *    秒数由旧 帧数/帧率 推导（round，4-12 钳位），模型固定 Agnes Video 2.5-flash
  * 指纹：长度匹配 + 位置值特征（旧 [4]=含":"的宽高比串 / 旧参考视频 [4]=数值帧数；
  * 新结构 [4]="720P" 无冒号 → 不再命中，幂等）。
- * flex：折叠态实例 widgets_values 末尾可能多 1 个隐藏值（长度 oldLen+1），
- * 自动剥离并原样保留在迁移结果末尾。
+ * flex：折叠态实例 widgets_values 末尾可能多 0..n 个隐藏值（[false,true] 状态
+ * 数组，INT/BOOL stepper 持久化；实测 10 widget 实例尾带 2 个=12 项），剥离并原样保留在
+ * 迁移结果末尾；旧式单隐藏值（长度 oldLen+1 尾值任意类型）兼容保留。
  * ① dropIdx 条目限定旧档位值指纹（[4]/[6] = "1K"/"2K"）：新增「重试次数」尾参后，
  * 新结构文生/关键帧 10 项、参考视频 13 项与旧档位实例同长度，靠该指纹避免误删；
  * 「重试次数」为纯尾部新增 widget，旧实例载入时自动补默认值 5，无需迁移条目。
@@ -181,17 +182,25 @@
         {
             cls: "AgnesVideoTaskCollectBatch", oldLen: 24, newLen: 25,
             insertAt: 22, flex: true
-        }
+        },
         // 拼图：save_dir 在面板末位（optional 尾部纯追加，同「重试次数」模式），
         // 旧实例无错位，缺失尾值自动补默认 ""（=默认目录），无需迁移条目。
+        // —— LLM 对话：system_prompt 输入移除（中位删格 idx5）——
+        // 旧 10 项 [提示词,base_url,key,模型,温度,系统提示词,thinking,思考等级,重试,超时]
+        // → 新 9 项（丢 idx5；flex 剥离多个 [false,true] 状态尾值后重排）；
+        // 新 9 项实例长度不命中 10，幂等；更早 9 项（bd4a137 前无 重试/超时）实例
+        // 不命中=已知遗留兜底（删节点重加）
+        {
+            cls: "AgnesNovelLLMChat", oldLen: 10, newLen: 9, dropIdx: 5, flex: true
+        }
     ];
 
-    function applyOne(node, conf, body, extra) {
+    function applyOne(node, conf, body, extras) {
         var migrated;
         if (typeof conf.map === "function") {
             migrated = conf.map(body);
         } else if (conf.dropIdx !== undefined) {
-            // 中位删格（视频 1K/2K 档位移除）：丢 dropIdx，其余原样前移
+            // 中位删格（视频 1K/2K 档位移除；LLM 对话 system_prompt 移除）：丢 dropIdx，其余原样前移
             migrated = body.filter(function (_, i) { return i !== conf.dropIdx; });
         } else if (conf.insertAt !== undefined) {
             // 中位插格（视频「保存目录」widget 插在 轮询超时/重试次数 上方）：
@@ -203,7 +212,9 @@
             migrated = [""];
             for (var i = conf.tailStart; i < conf.oldLen; i++) migrated.push(body[i]);
         }
-        if (extra !== null) migrated.push(extra);
+        if (extras && extras.length) {
+            for (var e = 0; e < extras.length; e++) migrated.push(extras[e]);
+        }
         node.widgets_values = migrated;
         // 同步已创建的 widget 对象（Vue/旧版前端序列化可能读 widget.value）
         if (node.widgets) {
@@ -226,16 +237,23 @@
                 if (node.comfyClass !== conf.cls || used[m]) continue;
                 var wv = node.widgets_values;
                 if (!Array.isArray(wv)) return;
-                var extra = null;
+                var extras = [];
                 var body = wv;
-                if (conf.flex && wv.length === conf.oldLen + 1) {
-                    extra = wv[wv.length - 1]; // 折叠态末尾隐藏值：剥离并保留
+                if (conf.flex) {
+                    // 折叠态末尾隐藏值：INT/BOOL stepper 会持久化 [false,true] 状态数组，
+                    // 可能 0..n 个（旧实例 10 widget + 2 个状态尾=12）；逐个剥离保留
+                    while (wv.length > conf.oldLen && Array.isArray(wv[wv.length - 1])) {
+                        extras.unshift(wv.pop());
+                    }
+                    if (wv.length === conf.oldLen + 1) {
+                        extras.unshift(wv.pop()); // 旧式单隐藏值
+                    }
                     body = wv.slice(0, conf.oldLen);
                 }
                 if (body.length !== conf.oldLen) continue;
                 if (conf.fingerprint && !conf.fingerprint(body)) continue;
                 used[m] = true;
-                if (applyOne(node, conf, body, extra)) {
+                if (applyOne(node, conf, body, extras)) {
                     hit = true;
                     break; // 重扫（后面可能还有同类的下一段）
                 }
@@ -291,7 +309,7 @@
                     return origQueuePrompt.apply(this, arguments);
                 };
             }
-            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；批量收取置顶合并输入 23→24；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash；新增 保存目录 save_dir：文生 10→11 / 关键帧 11→12 / 参考 18→19 / 单收取 3→4 / 批量收取 24→25 中位插格）");
+            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；批量收取置顶合并输入 23→24；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash；新增 保存目录 save_dir：文生 10→11 / 关键帧 11→12 / 参考 18→19 / 单收取 3→4 / 批量收取 24→25 中位插格；LLM 对话 移除 system_prompt：10→9 中位删格 idx5）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 迁移扩展注册失败（不影响节点功能）:", e);
         }
