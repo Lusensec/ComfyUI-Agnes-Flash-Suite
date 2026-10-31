@@ -43,7 +43,7 @@ from typing import Tuple
 
 from ._output_docs import OutputDocsMixin
 from .text2video import _VIDEO_MODE, _VIDEO_OUTPUT_TYPE, _make_result
-from .video_task_collect import _VHS_EMPTY, _get_output_dir, _make_placeholder_video
+from .video_task_collect import _VHS_EMPTY, _get_output_dir, _make_placeholder_video, _resolve_save_dir
 
 MAX_SLOTS = 20
 DEFAULT_COLUMNS = 5
@@ -155,6 +155,13 @@ class AgnesVideoMosaic(OutputDocsMixin):
             optional[f"video_{i}"] = ("VIDEO", {
                 "tooltip": f"第 {i} 个视频槽（可选，不连线=该槽自动跳过不红）：直连 Agnes 视频任务批量收取 的 video_i（原生 VIDEO）；all_video_paths 总输入连上时本组槽忽略",
             })
+        optional["save_dir"] = ("STRING", {
+            "label": "保存目录",
+            "multiline": False,
+            "default": "",
+            "placeholder": "留空=ComfyUI\\output\\agnes_videos\\；可填绝对/相对路径",
+            "tooltip": "矩阵视频保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\\agnes_videos\\，含 NO_VIDEO_ 占位文件）；填写=矩阵 mp4 与占位文件写到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录）",
+        })
         return {
             "required": {
                 "columns": ("INT", {
@@ -221,7 +228,8 @@ class AgnesVideoMosaic(OutputDocsMixin):
                  video_6=None, video_7=None, video_8=None, video_9=None, video_10=None,
                  video_11=None, video_12=None, video_13=None, video_14=None, video_15=None,
                  video_16=None, video_17=None, video_18=None, video_19=None, video_20=None,
-                 columns: int = DEFAULT_COLUMNS, cell_width: int = 0) -> Tuple:
+                 columns: int = DEFAULT_COLUMNS, cell_width: int = 0, save_dir: str = "") -> Tuple:
+        out_dir = _resolve_save_dir(save_dir)
         import numpy as np
         import av
         from PIL import Image as PILImage, ImageDraw
@@ -250,7 +258,7 @@ class AgnesVideoMosaic(OutputDocsMixin):
         # ── 全无效 → 黑帧占位 + status 标注（队列不打断，同 批量收取 0 标记族语义）──
         if not sources:
             print(f"[Agnes 视频拼图] [跳过] 无有效视频输入（{source} 全空/全 URL）→ 2 秒黑帧占位，零解码")
-            return self._result(_make_placeholder_video("empty", _get_output_dir()),
+            return self._result(_make_placeholder_video("empty", out_dir),
                                 "0/%d" % total, "error: 无有效视频输入（all_video_paths 空且 video_1..20 全未连接，或条目全为服务端 URL）→ 黑帧占位")
 
         # ── 探测 + 源准备（失败的槽→黑格，status 附原因）──
@@ -287,7 +295,7 @@ class AgnesVideoMosaic(OutputDocsMixin):
         valid = [it for it in items if it[1] is not None]
         if not valid:
             print(f"[Agnes 视频拼图] [错误] 全部 {len(items)} 条解码失败（{'; '.join(failed[:5])}）→ 2 秒黑帧占位")
-            return self._result(_make_placeholder_video("error", _get_output_dir()),
+            return self._result(_make_placeholder_video("error", out_dir),
                                 "0/%d" % total, "error: 全部条目解码失败：" + "；".join(failed[:5]))
         if fps_out is None:
             fps_out = float(DEFAULT_FPS)
@@ -340,7 +348,6 @@ class AgnesVideoMosaic(OutputDocsMixin):
             return st["last"]
 
         # ── 逐帧合成 + H.264 编码（ultrafast；缺 libx264 回退 mpeg4）──
-        out_dir = _get_output_dir()
         out_path = os.path.join(out_dir, f"agnes_mosaic_{int(time.time())}.mp4")
         container = av.open(out_path, mode="w")
         codec_name, codec_note = "libx264", ""

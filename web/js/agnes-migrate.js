@@ -33,6 +33,10 @@
  * 「重试次数」为纯尾部新增 widget，旧实例载入时自动补默认值 5，无需迁移条目。
  * 图像模型单项化（2.1/2.0 下线）：5 个图像节点同长度重映射，仅把 model 槽位旧值
  * （agnes-image-2.1/2.0-flash）换成 agnes-image-2.5-flash，指纹限定旧模型值，幂等。
+ * ③ 新增「保存目录」save_dir：一段式 3 节点+单收取+批量收取为 mid-insert（insertAt 位补 ""
+ * 其后原值整体下移，引擎新增 insertAt 分支）：文生视频 10→11、关键帧 11→12、
+ * 参考视频 18→19、单收取 3→4、批量收取 24→25（更早 23 项实例先 23→24 再链式 24→25）；
+ * 拼图 save_dir 面板末位（纯尾部追加，同「重试次数」模式，无需迁移条目）。
  * 仍报错的兜底：删节点重加（右键 Agnes Novel → 对应节点）后重连。
  */
 (function () {
@@ -152,7 +156,34 @@
             cls: "AgnesTurnaroundBatch", oldLen: 7, newLen: 7,
             fingerprint: function (wv) { return isOldImageModel(wv[3]); },
             map: function (wv) { return remapImageModel(wv, 3); }
+        },
+        // —— 视频 ③：新增「保存目录」save_dir（中位插入，插在 轮询超时/重试次数 上方；
+        //    旧实例该位补 ""（=默认 output/agnes_videos/），其后原值整体下移一格；
+        //    新结构长度+1，不命中旧指纹，幂等）——
+        {
+            cls: "AgnesNovelTextToVideo", oldLen: 10, newLen: 11,
+            insertAt: 8, flex: true
+        },
+        {
+            cls: "AgnesNovelImageToVideo", oldLen: 11, newLen: 12,
+            insertAt: 8, flex: true
+        },
+        {
+            cls: "AgnesVideoReference", oldLen: 18, newLen: 19,
+            insertAt: 8, flex: true
+        },
+        {
+            cls: "AgnesVideoTaskCollect", oldLen: 3, newLen: 4,
+            insertAt: 2, flex: true
+        },
+        // 批量收取 24 项=现结构；更早的 23 项实例先命中上方 23→24 规则（补 all_task_url_keys），
+        // 重扫再命中本条 24→25（补 save_dir），两段链式完成
+        {
+            cls: "AgnesVideoTaskCollectBatch", oldLen: 24, newLen: 25,
+            insertAt: 22, flex: true
         }
+        // 拼图：save_dir 在面板末位（optional 尾部纯追加，同「重试次数」模式），
+        // 旧实例无错位，缺失尾值自动补默认 ""（=默认目录），无需迁移条目。
     ];
 
     function applyOne(node, conf, body, extra) {
@@ -162,6 +193,12 @@
         } else if (conf.dropIdx !== undefined) {
             // 中位删格（视频 1K/2K 档位移除）：丢 dropIdx，其余原样前移
             migrated = body.filter(function (_, i) { return i !== conf.dropIdx; });
+        } else if (conf.insertAt !== undefined) {
+            // 中位插格（视频「保存目录」widget 插在 轮询超时/重试次数 上方）：
+            // insertAt 位补 ""，其后原值整体下移一格
+            migrated = body.slice(0, conf.insertAt).concat(
+                conf.insertVal !== undefined ? conf.insertVal : "",
+                body.slice(conf.insertAt));
         } else {
             migrated = [""];
             for (var i = conf.tailStart; i < conf.oldLen; i++) migrated.push(body[i]);
@@ -254,7 +291,7 @@
                     return origQueuePrompt.apply(this, arguments);
                 };
             }
-            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；批量收取置顶合并输入 23→24；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash）");
+            console.log("[AgnesFlashSuite] Agnes 旧实例 widget 值迁移扩展已注册（批量节点 61→12 / 27→8 / 26→7；批量收取置顶合并输入 23→24；视频节点三段：丢 1K/2K 档位 10→9 / 13→12 → 帧数帧率改秒数+720P 重排 9→9 / 12→12；图像节点模型单项化：旧 2.1/2.0 值重映射到 2.5-flash；新增 保存目录 save_dir：文生 10→11 / 关键帧 11→12 / 参考 18→19 / 单收取 3→4 / 批量收取 24→25 中位插格）");
         } catch (e) {
             console.warn("[AgnesFlashSuite] 迁移扩展注册失败（不影响节点功能）:", e);
         }

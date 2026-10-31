@@ -63,7 +63,7 @@ from typing import Tuple
 from ..api import AgnesClient, get_api_key
 from ._output_docs import OutputDocsMixin
 from .text2video import _VIDEO_MODE, _VIDEO_OUTPUT_TYPE, _make_result
-from .video_task_collect import _make_placeholder_video, _get_output_dir, _VHS_EMPTY
+from .video_task_collect import _make_placeholder_video, _get_output_dir, _VHS_EMPTY, _resolve_save_dir
 
 MAX_TASKS = 20
 
@@ -131,7 +131,7 @@ def _parse_all_tasks(raw) -> Tuple[list, str]:
     return (raws, f"JSON 数组（{len(obj)} 条" + ("，超出 20 已截断" if truncated else "") + "）")
 
 
-def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
+def _no_video(state: str, detail: str, slot: int = 0, out_dir: str = None) -> Tuple:
     """无文件态（failed/processing/empty/0 标记/缺 Key）的 video 侧输出。
 
     与 单收取 _no_video 同约定：原生 VIDEO 环境出 NO_VIDEO_ 前缀黑帧占位
@@ -143,7 +143,7 @@ def _no_video(state: str, detail: str, slot: int = 0) -> Tuple:
     status = f"{state}: {detail}"
     if _VIDEO_MODE == "comfy_api":
         try:
-            out_dir = _get_output_dir()
+            out_dir = out_dir or _get_output_dir()
             # 槽号入状态标签：每槽独立编码一个占位（NO_VIDEO_{state}_{slot}_{ts}.mp4），
             # 文件名可辨识到槽，且无「共享 base 再复制/删除」的并发竞态
             tag = state if not slot else f"{state}_{slot}"
@@ -208,13 +208,20 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
                     "placeholder": "sk-...",
                     "tooltip": "条目未自带 api_key（纯 URL 输入）时的兜底 Key：可连某 提交 节点的 api_key 穿透输出；留空则跟随全局配置（API Key 配置节点/环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）。task_url_key 输入自带 Key 的优先用自带",
                 }),
+                "save_dir": ("STRING", {
+                    "label": "保存目录",
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "留空=ComfyUI\\output\\agnes_videos\\；可填绝对/相对路径",
+                    "tooltip": "视频文件保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\\agnes_videos\\，含 NO_VIDEO_ 占位文件）；填写=本批所有落盘文件到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录）",
+                }),
                 "timeout": ("INT", {
                     "label": "轮询超时（每任务）",
                     "default": 600,
                     "min": 60,
                     "max": 7200,
                     "step": 60,
-                    "tooltip": "单任务最长等待（秒，默认 600=10 分钟，与 单收取 一致）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查未完成任务（completed 任务重查秒回不重下）；全批 settled 才返回",
+                    "tooltip": "单任务最长等待（秒，默认 600=10 分钟，与 单收取 一致）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查未完成任务；全批 settled 才返回",
                 }),
                 "max_concurrency": ("INT", {
                     "label": "并发数",
@@ -229,7 +236,8 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
 
     def generate(self, all_task_url_keys="", task_1="", task_2="", task_3="", task_4="", task_5="", task_6="", task_7="", task_8="", task_9="", task_10="",
                  task_11="", task_12="", task_13="", task_14="", task_15="", task_16="", task_17="", task_18="", task_19="", task_20="",
-                 api_key="", timeout=600, max_concurrency=10) -> Tuple:
+                 api_key="", save_dir="", timeout=600, max_concurrency=10) -> Tuple:
+        out_dir = _resolve_save_dir(save_dir)
         # 20 个 task 槽（task_1…task_20）按位取；各槽独立解析（task_url_key JSON / 纯 URL / 0 / 空）
         individual = [task_1, task_2, task_3, task_4, task_5, task_6, task_7, task_8, task_9, task_10,
                       task_11, task_12, task_13, task_14, task_15, task_16, task_17, task_18, task_19, task_20]
@@ -259,7 +267,7 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
         # ── 全空：整批跳过，零 API 调用 ──
         if not any(u for u, _k in entries):
             print("[Agnes 视频任务批量收取] [跳过] 全部 20 个 task 输入为空（合并输入与槽连线均为空）：请连接 Agnes 视频多任务并发提交 的 all_task_url_keys 输出（一根线），或 Agnes 视频任务提交 的 task_url_key 输出（task_i ↔ 视频 i），零 API 调用")
-            videos = [self._video_for("empty", "未连接 task 输入（槽号保位）", i) for i in _all_slots()]
+            videos = [self._video_for("empty", "未连接 task 输入（槽号保位）", i, out_dir) for i in _all_slots()]
             return tuple(videos) + (_status_json([], [], [], _all_slots(), []),
                                     json.dumps([""] * MAX_TASKS, ensure_ascii=False))
 
@@ -300,11 +308,10 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
             else:
                 failed.append(slot)
             details[slot] = detail
-            videos[slot - 1], _st = self._video_for(state, detail, slot)
+            videos[slot - 1], _st = self._video_for(state, detail, slot, out_dir)
             print(f"[Agnes 视频任务批量收取] #{slot} [{state}] {detail}（零请求）")
 
         # ── 线程池并发收取（每线程各建 client：Key 按条目走，Session 非线程安全）──
-        out_dir = _get_output_dir()
 
         def _worker(slot, url, key):
             client = AgnesClient(key)
@@ -340,14 +347,14 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
                     if slot in success:
                         # completed：video=环境动态类型真实文件（可直连 Save Video）
                         videos[slot - 1], _st = self._video_for_file(
-                            results[slot].get("save_path") or "", slot)
+                            results[slot].get("save_path") or "", slot, out_dir)
                     else:
-                        videos[slot - 1], _st = self._video_for(slot_state, details.get(slot, ""), slot)
+                        videos[slot - 1], _st = self._video_for(slot_state, details.get(slot, ""), slot, out_dir)
 
         # ── 槽位补全（防御：理论上 20 槽全部已落位）──
         for i in _all_slots():
             if videos[i - 1] is None:
-                videos[i - 1], _ = _no_video("empty", "未处理槽（防御）", i)
+                videos[i - 1], _ = _no_video("empty", "未处理槽（防御）", i, out_dir)
 
         success.sort(); failed.sort(); processing.sort(); empty.sort(); error.sort()
         status_json = _status_json(success, failed, processing, empty, error,
@@ -360,14 +367,14 @@ class AgnesVideoTaskCollectBatch(OutputDocsMixin):
         return tuple(videos) + (status_json, all_paths_json)
 
     # ── video 槽构造 ──
-    def _video_for(self, state: str, detail: str, slot: int) -> Tuple:
+    def _video_for(self, state: str, detail: str, slot: int, out_dir: str = None) -> Tuple:
         """无文件态（failed/processing/empty/error）的 video 槽：占位/空值（同 单收取 B1 约定）。"""
-        return _no_video(state, detail, slot)
+        return _no_video(state, detail, slot, out_dir)
 
-    def _video_for_file(self, save_path: str, slot: int) -> Tuple:
+    def _video_for_file(self, save_path: str, slot: int, out_dir: str = None) -> Tuple:
         """completed 的 video 槽：环境动态类型引用本地文件（原生=VideoFromFile 惰性引用）。"""
         if not save_path:
-            return _no_video("failed", "completed 但无本地文件（下载失败）", slot)
+            return _no_video("failed", "completed 但无本地文件（下载失败）", slot, out_dir)
         return (_make_result(save_path, "720P")[0], f"completed: #{slot}")
 
 

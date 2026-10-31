@@ -35,9 +35,9 @@ from typing import Tuple
 from ..api import AgnesClient, get_api_key
 from ._output_docs import OutputDocsMixin
 from .text2video import _VIDEO_MODE, _VIDEO_OUTPUT_TYPE, _make_result
+from ._video_common import _get_output_dir, _resolve_save_dir  # noqa: F401  # re-export：batch/mosaic 经本模块取用
 
 # 输出目录：与 文生视频 节点一致（ComfyUI output/agnes_videos/）
-_COMFYUI_OUTPUT_DIR = None
 
 # VHS 档无文件态的空视频引用（同 文生视频 _error 的 vhs 分支）
 _VHS_EMPTY = {"filename": "", "subfolder": "", "type": "output"}
@@ -76,17 +76,6 @@ def _make_placeholder_video(state: str, out_dir: str) -> str:
     return path
 
 
-def _get_output_dir() -> str:
-    global _COMFYUI_OUTPUT_DIR
-    if _COMFYUI_OUTPUT_DIR is not None:
-        return _COMFYUI_OUTPUT_DIR
-    try:
-        from folder_paths import get_output_directory
-        base = get_output_directory()
-    except ImportError:
-        base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
-    _COMFYUI_OUTPUT_DIR = os.path.join(base, "agnes_videos")
-    return _COMFYUI_OUTPUT_DIR
 
 
 class AgnesVideoTaskCollect(OutputDocsMixin):
@@ -122,6 +111,13 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
                     "placeholder": "sk-...",
                     "tooltip": "Agnes AI API Key：轮询查询需 Bearer 鉴权，可直连 Agnes 视频任务提交 的 api_key 穿透输出（提交端实际用的 Key，免再配）；留空则跟随全局配置（API Key 配置节点/环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）；域名已在 task_url 里，无需再填请求地址",
                 }),
+                "save_dir": ("STRING", {
+                    "label": "保存目录",
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "留空=ComfyUI\\output\\agnes_videos\\；可填绝对/相对路径",
+                    "tooltip": "视频文件保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\\agnes_videos\\，含 NO_VIDEO_ 占位文件）；填写=落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录）",
+                }),
                 "timeout": ("INT", {
                     "label": "轮询超时",
                     "default": 600,
@@ -133,7 +129,7 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
             },
         }
 
-    def _no_video(self, state: str, detail: str) -> Tuple:
+    def _no_video(self, state: str, detail: str, out_dir: str = None) -> Tuple:
         """无文件态（failed/processing/empty/0 标记/缺 Key）的 video 侧输出。
 
         原生 VIDEO 环境：video 槽必须交接真实文件（空引用会令下游 SaveVideo
@@ -144,7 +140,7 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
         status = f"{state}: {detail}"
         if _VIDEO_MODE == "comfy_api":
             try:
-                placeholder = _make_placeholder_video(state, _get_output_dir())
+                placeholder = _make_placeholder_video(state, out_dir or _get_output_dir())
             except Exception as e:
                 print(f"[Agnes 视频任务收取] [错误] {status}（占位不可用：{e}；回退红错）")
                 raise RuntimeError(f"[Agnes 视频任务收取] {status}")
@@ -159,24 +155,26 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
         self,
         task_url: str = "",
         api_key: str = "",
+        save_dir: str = "",
         timeout: int = 600,
     ) -> Tuple:
+        out_dir = _resolve_save_dir(save_dir)
         url = str(task_url or "").strip()
         if not url:
-            return self._no_video("empty", "未连接 task_url 输入（可直连 Agnes 视频任务提交 的 task_url 输出）")
+            return self._no_video("empty", "未连接 task_url 输入（可直连 Agnes 视频任务提交 的 task_url 输出）", out_dir)
         if url == "0":
             # 上游 提交 节点失败标记（task_url=0=未生成任务）：跳过整个收取过程（零轮询零下载），
             # status 直接输出 error 内容；原生视频环境 video 槽不能给空引用（SaveVideo 会崩），
             # 故红错文案指明根因去向，VHS/STRING 环境返回空值 + error 状态（不崩）
-            return self._no_video("error", "上游 Agnes 视频任务提交 未成功（task_url=0 标记）：原因见该节点 status 输出（如 503 队列满→等 5-10 分钟重跑 提交 节点）；提交成功后再次右键运行本节点收片")
+            return self._no_video("error", "上游 Agnes 视频任务提交 未成功（task_url=0 标记）：原因见该节点 status 输出（如 503 队列满→等 5-10 分钟重跑 提交 节点）；提交成功后再次右键运行本节点收片", out_dir)
 
         if not api_key.strip():
             api_key = get_api_key()
         if not api_key.strip():
-            return self._no_video("failed", "缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）")
+            return self._no_video("failed", "缺少 API Key：请在节点内填写，或在「Agnes API Key 配置」节点配置（免费 Key：https://platform.agnes-ai.com/）", out_dir)
 
         client = AgnesClient(api_key)
-        result = client.collect_video_task(url, timeout=timeout, output_dir=_get_output_dir())
+        result = client.collect_video_task(url, timeout=timeout, output_dir=out_dir)
         state = result["status"]
         if state == "completed":
             # 完成态：video 输出=环境动态类型（原生=VideoFromFile 惰性引用，SaveVideo 读盘重编码；零解码零内存开销）
@@ -184,9 +182,9 @@ class AgnesVideoTaskCollect(OutputDocsMixin):
             print(f"[Agnes 视频任务收取] 完成：{result['save_path']}（服务端 URL: {result['video_url'][:80]}…，video 输出可直连 Save Video）")
             return (video_out, f"completed: {result['video_url']}")
         if state == "failed":
-            return self._no_video("failed", result["error"])
+            return self._no_video("failed", result["error"], out_dir)
         print(f"[Agnes 视频任务收取] 生成中（{result['error'].split('，')[0]}），可再次运行本节点继续查询")
-        return self._no_video("processing", f"{result['error'].split('，')[0]}，可再次运行本节点继续查询")
+        return self._no_video("processing", f"{result['error'].split('，')[0]}，可再次运行本节点继续查询", out_dir)
 
 
 NODE_CLASS_MAPPINGS = {"AgnesVideoTaskCollect": AgnesVideoTaskCollect}

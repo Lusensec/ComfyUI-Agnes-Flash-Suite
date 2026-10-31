@@ -499,6 +499,7 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | aspect_ratio | COMBO | 16:9 | 画面宽高比：16:9 横屏 / 9:16 竖屏（API 文档列 16:9/9:16，可选缺省服务端自动处理；节点下拉保留 12 种，不支持的比例自动就近映射） |
 | seconds | INT | 5 | 视频时长（秒，4-12 直控）：一镜一主动作，时长内不换场景不切镜；与 Agnes 视频提示词生成 的 duration 保持一致 |
 | seed | INT | 0 | 随机种子（0=每次随机，固定值可复现结果）；随机用输入框旁骰子按钮。本节点已禁用前端自动附加的「生成后控制」英文下拉（ComfyUI 内核按 seed 输入自动挂载、提示为硬编码英文，无法本地化；图像节点不受影响） |
+| save_dir | STRING | （空） | 保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\agnes_videos\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录） |
 | max_wait_seconds | INT | 600 | 轮询超时 |
 | retries | INT | 5 | 重试次数：提交遇 503 队列满/429 限流的自动重试次数（0=不重试）。固定 30 秒/次（默认 5 次累计 150 秒/2.5 分钟；睡眠带 ±15% 随机抖动错峰，30 次上限累计 900 秒/15 分钟；503 响应带 Retry-After 头时优先按服务端指定秒数退避） |
 
@@ -533,6 +534,7 @@ keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）�
 | aspect_ratio | COMBO | 16:9 | 画面宽高比：16:9 横屏 / 9:16 竖屏（API 文档列 16:9/9:16，可选缺省服务端自动处理；节点下拉保留 12 种，不支持的比例自动就近映射） |
 | seconds | INT | 5 | 视频时长（秒，4-12 直控）：一镜一主动作，时长内不换场景不切镜；与 Agnes 视频提示词生成 的 duration 保持一致 |
 | seed | INT | 0 | 随机种子（0=每次随机）；已禁用「生成后控制」英文下拉（同文生视频） |
+| save_dir | STRING | （空） | 保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\agnes_videos\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录） |
 | max_wait_seconds | INT | 600 | 轮询超时 |
 | retries | INT | 5 | 重试次数：提交遇 503 队列满/429 限流的自动重试次数（0=不重试）。固定 30 秒/次（默认 5 次累计 150 秒/2.5 分钟；睡眠带 ±15% 随机抖动错峰，30 次上限累计 900 秒/15 分钟；503 响应带 Retry-After 头时优先按服务端指定秒数退避） |
 | end_frame_image | IMAGE | - | 关键帧·尾帧（可选，last_frame；不接=仅按首帧生成） |
@@ -563,6 +565,7 @@ keyframe 首尾帧模式，接尾帧=首尾帧过渡（image→image 运动）�
 | aspect_ratio | COMBO | 16:9 | 画面宽高比：16:9 横屏 / 9:16 竖屏（API 文档列 16:9/9:16，可选缺省服务端自动处理；节点下拉保留 12 种，不支持的比例自动就近映射） |
 | seconds | INT | 5 | 视频时长（秒，4-12 直控）：一镜一主动作，时长内不换场景不切镜；与 Agnes 视频提示词生成 的 duration 保持一致 |
 | seed | INT | 0 | 随机种子（0=每次随机）；已禁用「生成后控制」英文下拉（同文生视频） |
+| save_dir | STRING | （空） | 保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\agnes_videos\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录） |
 | max_wait_seconds | INT | 600 | 轮询超时 |
 | retries | INT | 5 | 重试次数：提交遇 503 队列满/429 限流的自动重试次数（0=不重试）。固定 30 秒/次（默认 5 次累计 150 秒/2.5 分钟；睡眠带 ±15% 随机抖动错峰，30 次上限累计 900 秒/15 分钟；503 响应带 Retry-After 头时优先按服务端指定秒数退避） |
 | image_1 ~ image_5 | IMAGE | - | 参考图片（一张必接或可只接音频；上限 5 张） |
@@ -621,6 +624,7 @@ completed 自动下载 mp4（3 次重试 2/5/10s），输出视频（环境动�
 |------|------|--------|------|
 | task_url | STRING | "" | 完整轮询 URL：直连 Agnes 视频任务提交 的 task_url 输出（含域名，跨域名可查）；留空=整节点跳过（status 输出 empty）；收到 "0"=上游提交失败标记，跳过收取、status 输出 error 内容 |
 | api_key | STRING | sk-你的Key | 轮询查询需 Bearer 鉴权，可直连 视频任务提交 的 api_key 穿透输出（提交端实际用的 Key，免再配）；留空跟随全局；域名已在 task_url 里，无需再填请求地址 |
+| save_dir | STRING | （空） | 保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\agnes_videos\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录） |
 | timeout | INT | 600 | 本节点最长等待（秒，默认 10 分钟）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查（任务还在服务端）；视频一般 3-10 分钟出片，默认 10 分钟通常一趟收完，慢了就再点一次 |
 
 **输出（含输出描述）：**
@@ -642,6 +646,7 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | all_task_url_keys | STRING（多行） | "" | **合并输入（面板置顶，优先于 20 槽逐一连线）**：直连「Agnes 视频多任务并发提交」的 all_task_url_keys 输出（20 元素保位 JSON 数组，一行带齐 N 个任务句柄）；非空时按条目序填充 task_1..task_20 槽（超 20 条截断，video_1..20 按序输出）：条目可为 ① task_url_key 单线双参 JSON（{"task_url","api_key"}）② "0"=上游提交失败标记（该槽跳过收取记 error，**默认视频占位填充**）③ 空（记 empty 槽号保位）④ 纯轮询 URL；空=走下方 20 槽逐一连线旧语义（旧工作流零影响） |
 | task_1…task_20 | STRING ×20 | ""（各槽） | 20 个任务输入，**task_i ↔ video_i 一一对应**（第 i 输入出第 i 路视频）：① 视频任务提交 的 task_url_key 单线双参 JSON（{"task_url","api_key"}，一行带齐 URL+Key，N 个提交实例直连 N 槽 0 中间节点，各槽 Key 可全不同——条目自带 Key 只作用于本任务）② 纯轮询 URL 字符串（Key 走 api_key 兜底输入→全局配置）③ "0"=上游提交失败标记（该槽跳过收取记 error，默认视频占位填充）④ 未连接/空=该槽跳过（记 empty，槽号保位）；全空=整批跳过（零 API 调用） |
 | api_key | STRING | （留空=全局） | 条目未自带 api_key 时的兜底 Key（可直连某 提交 节点的 api_key 穿透输出，单 Key 场景全体共用）；条目自带 Key 的优先用自带 |
+| save_dir | STRING | （空） | 保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\agnes_videos\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录） |
 | timeout | INT | 600 | 单任务最长等待（秒，默认 10 分钟，同 单收取）：到点仍生成中=processing（不算失败），再次右键运行本节点即继续查未完成任务（全批 settled 才返回） |
 | max_concurrency | INT | 10 | 线程池并发（同时轮询任务数 1-20，默认 10）：非空条目超过该值时排队执行；轮询是轻 GET，10 并发压力很小 |
 
@@ -777,6 +782,7 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | video_1..video_20 | VIDEO（可选）×20 | （不连线=跳过不红） | 第 i 个视频槽：直连 批量收取 `video_i`（原生 VIDEO 类型）；总输入连上时本组忽略 |
 | columns | INT | 5 | 矩阵列数（行数=⌈有效视频数/列数⌉，同 图像拼图 动态定行数）：默认 5（20 镜=4 行）；1=纵向长条（逐镜播放式） |
 | cell_width | INT | 0 | 单元格宽（px）：0=自动（源最大宽÷列数，下限 160 上限 1280；20 镜 720P 16:9 列 5 ≈256）；固定值=所有格等宽等比缩高 |
+| save_dir | STRING | （空） | 保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\agnes_videos\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录） |
 
 **输出：**
 - mosaic_video: 矩阵视频（H.264 mp4，自动保存到 `output/agnes_videos/agnes_mosaic_*.mp4`；类型随环境：原生 ComfyUI=VIDEO（节点面板**内嵌播放**，可再连 Save Video 自定义前缀存档）/ VHS=VHS_VIDEOINFO / 无视频节点=本地路径字符串）

@@ -23,6 +23,7 @@ from ..api import (
     tensor_to_pil,
 )
 from ._output_docs import OutputDocsMixin
+from ._video_common import _resolve_save_dir
 
 # 支持的宽高比（宽:高）
 ASPECT_RATIOS = [
@@ -176,6 +177,13 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
                     "control_after_generate": False,
                     "tooltip": "随机种子（0=每次随机，固定值可复现结果）；随机请用输入框旁的骰子按钮（本节点已禁用前端自动附加的「生成后控制」英文下拉）",
                 }),
+                "save_dir": ("STRING", {
+                    "label": "保存目录",
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "留空=ComfyUI\\output\\agnes_videos\\；可填绝对/相对路径",
+                    "tooltip": "视频文件保存目录：留空=默认 ComfyUI 输出目录/agnes_videos（即 output\\agnes_videos\\）；填写=视频落盘到指定目录（绝对路径，或相对 ComfyUI 根目录；子目录自动创建，创建失败回退默认目录）",
+                }),
                 "max_wait_seconds": ("INT", {
                     "label": "轮询超时",
                     "default": 600,
@@ -214,6 +222,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
         aspect_ratio: str = "16:9",
         seconds: int = SECONDS_DEFAULT,
         seed: int = 0,
+        save_dir: str = "",
         max_wait_seconds: int = 600,
         retries: int = 5,
         end_frame_image=None,
@@ -231,7 +240,7 @@ class AgnesNovelImageToVideo(OutputDocsMixin):
 
         # 分辨率固定 720P（widget 展示用）；输出标注按宽高比给出像素
         size = video_size_label(aspect_ratio)
-        output_dir = _get_output_dir()
+        output_dir = _resolve_save_dir(save_dir)
 
         try:
             has_end_frame = end_frame_image is not None
