@@ -6,7 +6,7 @@ import requests
 import json
 import re
 import traceback
-from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
+from ..api import AgnesClient, get_api_key, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, FOLLOW_GLOBAL, resolve_chat_params
 
 
 class AgnesAssetExtractor:
@@ -34,13 +34,13 @@ class AgnesAssetExtractor:
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key，从 https://platform.agnes-ai.com 获取"
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
+                "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                    "default": FOLLOW_GLOBAL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）；选「跟随全局（默认）」= 解析「Agnes API Key 配置」的全局对话模型（未配置则回落 2.5-flash）"
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效；auto/空 = 跟随全局（Key 配置节点设置时），否则跟随模型默认"
                 }),
             },
             "optional": {
@@ -162,6 +162,7 @@ class AgnesAssetExtractor:
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            model, _tv, reasoning_effort = resolve_chat_params(model, reasoning_effort=reasoning_effort)
             raw, meta = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,

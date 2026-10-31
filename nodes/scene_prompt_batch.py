@@ -44,7 +44,7 @@ from ..api import (
     get_api_key,
     CHAT_MODEL,
     AVAILABLE_CHAT_MODELS,
-    REASONING_EFFORTS,
+    REASONING_EFFORTS, FOLLOW_GLOBAL
 )
 from .prompt_generator import AgnesScenePromptGenerator, STYLE_OPTIONS
 from ._output_docs import OutputDocsMixin
@@ -112,7 +112,7 @@ class AgnesScenePromptBatch(OutputDocsMixin):
             }),
             "style": (list(STYLE_OPTIONS), {
                 "default": "cinematic",
-                "tooltip": "图像风格（整批共用）：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画",
+                "tooltip": "图像风格（整批共用）：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画；「Agnes 创作风格配置」画风对照：二次元2D/国漫手绘≈anime，国风3D/现代都市/真人古风≈cinematic，水墨仙侠≈watercolor，像素复古/剪纸皮影≈cinematic 硬边剪影，Q版萌系≈anime 圆润线稿",
             }),
             "characters_json": ("STRING", {
                 "multiline": True,
@@ -156,8 +156,8 @@ class AgnesScenePromptBatch(OutputDocsMixin):
                 "placeholder": "sk-xxxxxxxx",
                 "tooltip": "Agnes AI API Key，留空=自动加载全局配置",
             }),
-            "model": (AVAILABLE_CHAT_MODELS, {
-                "default": CHAT_MODEL,
+            "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                "default": FOLLOW_GLOBAL,
                 "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）",
             }),
             "reasoning_effort": (list(REASONING_EFFORTS), {

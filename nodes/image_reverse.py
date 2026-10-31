@@ -14,7 +14,7 @@ from ..api import (
     AVAILABLE_CHAT_MODELS,
     REASONING_EFFORTS,
     normalize_reasoning_effort,
-    tensor_to_pil,
+    tensor_to_pil, FOLLOW_GLOBAL, resolve_chat_params
 )
 from ._output_docs import OutputDocsMixin
 
@@ -51,13 +51,13 @@ class AgnesNovelImageReverse(OutputDocsMixin):
                     "placeholder": "sk-...",
                     "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml）",
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "视觉模型（用于图像分析）：默认 agnes-2.5-flash，可选 3.0/2.5/2.0-flash",
+                "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                    "default": FOLLOW_GLOBAL,
+                    "tooltip": "视觉模型（用于图像分析）：默认 agnes-2.5-flash，可选 3.0/2.5/2.0-flash；选「跟随全局（默认）」= 解析「Agnes API Key 配置」的全局对话模型（未配置则回落 2.5-flash）",
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型视觉识别）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型视觉识别）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效；auto/空 = 跟随全局（Key 配置节点设置时），否则跟随模型默认",
                 }),
             },
             "optional": {
@@ -93,6 +93,7 @@ class AgnesNovelImageReverse(OutputDocsMixin):
             pil_img = tensor_to_pil(image)
 
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            model, _tv, reasoning_effort = resolve_chat_params(model, reasoning_effort=reasoning_effort)
             effort = normalize_reasoning_effort(reasoning_effort)
 
             # 生成详细版提示词（detailed）

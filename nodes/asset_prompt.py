@@ -25,7 +25,7 @@ from ..api import (
     AVAILABLE_CHAT_MODELS,
     REASONING_EFFORTS,
     normalize_reasoning_effort,
-    format_chat_meta,
+    format_chat_meta, FOLLOW_GLOBAL, resolve_chat_params
 )
 from ._output_docs import OutputDocsMixin
 
@@ -85,7 +85,7 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                 }),
                 "style": (list(STYLE_OPTIONS), {
                     "default": "cinematic",
-                    "tooltip": "生图风格尾词：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画",
+                    "tooltip": "生图风格尾词：cinematic=电影感 / anime=动漫 / realistic=写实 / watercolor=水彩 / oil_painting=油画；「Agnes 创作风格配置」画风对照：二次元2D/国漫手绘≈anime，国风3D/现代都市/真人古风≈cinematic，水墨仙侠≈watercolor，像素复古/剪纸皮影≈cinematic 硬边剪影，Q版萌系≈anime 圆润线稿",
                 }),
                 "base_url": ("STRING", {
                     "multiline": False,
@@ -99,13 +99,13 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key，留空=自动加载全局配置",
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）",
+                "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                    "default": FOLLOW_GLOBAL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）；选「跟随全局（默认）」= 解析「Agnes API Key 配置」的全局对话模型（未配置则回落 2.5-flash）",
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效；auto/空 = 跟随全局（Key 配置节点设置时），否则跟随模型默认",
                 }),
             },
             "optional": {
@@ -172,10 +172,11 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            model, _tv, reasoning_effort = resolve_chat_params(model, 0.4, reasoning_effort, fallback_temperature=0.4)
             raw, meta = client.chat(
                 messages=[{"role": "user", "content": self._build_user_prompt(asset_json, subject_type, style)}],
                 model=model,
-                temperature=0.4,
+                temperature=_tv,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
                 retries=retries,

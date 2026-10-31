@@ -1454,3 +1454,63 @@ def get_global_config() -> Dict[str, Any]:
 
 def set_global_model(model_type: str, model_name: str) -> None:
     _GLOBAL_CONFIG[model_type] = model_name
+
+# ─────────────────────────────────────────────────────────────
+# LLM 全局参数层（「Agnes API Key 配置」节点写入 api_key_config.json）：
+# 节点 model combo 选「跟随全局（默认）」/ temperature 填 0 / reasoning_effort
+# 留 auto（或空）= 哨兵 → 读本层 json 的 chat_model/temperature/reasoning_effort；
+# json 未设置该参数 → 回落节点自身默认。池节点保持纯凭证池，不承载模型参数。
+# ─────────────────────────────────────────────────────────────
+FOLLOW_GLOBAL = "跟随全局（默认）"
+
+
+def _load_global_llm_params() -> dict:
+    """读取 api_key_config.json 的 LLM 全局参数（Key 配置节点写入的扩展键）。"""
+    out = {"chat_model": "", "temperature": None, "reasoning_effort": ""}
+    try:
+        if os.path.exists(_API_KEY_CONFIG_FILE):
+            with open(_API_KEY_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            out["chat_model"] = str(data.get("chat_model", "") or "").strip()
+            t = data.get("temperature", None)
+            try:
+                out["temperature"] = float(t) if t not in (None, "") else None
+            except Exception:
+                out["temperature"] = None
+            out["reasoning_effort"] = str(data.get("reasoning_effort", "") or "").strip()
+    except Exception:
+        pass
+    return out
+
+
+def resolve_chat_params(model: str = "", temperature=None, reasoning_effort: str = "",
+                       fallback_model: str = None, fallback_temperature: float = 0.7,
+                       fallback_effort: str = "auto"):
+    """LLM 节点模型参数哨兵解析（节点显式值 → 全局 json → 节点默认）。
+
+    - model == FOLLOW_GLOBAL（或空）→ 全局 chat_model → fallback_model/CHAT_MODEL
+    - temperature == 0/None/空（0=「跟随全局」哨兵）→ 全局 temperature → fallback_temperature
+    - reasoning_effort in ("", "auto") → 全局 reasoning_effort（已归一）→ fallback_effort
+    返回 (model, temperature, reasoning_effort)。
+    """
+    g = _load_global_llm_params()
+
+    m = (model or "").strip()
+    if m in ("", FOLLOW_GLOBAL):
+        m = g["chat_model"] or (fallback_model or CHAT_MODEL)
+    else:
+        m = m
+
+    try:
+        tv = float(temperature) if temperature not in (None, "") else None
+    except Exception:
+        tv = None
+    if tv in (None, 0.0):
+        tv = g["temperature"] if g["temperature"] not in (None, 0.0) else fallback_temperature
+
+    e = (reasoning_effort or "").strip()
+    if e in ("", "auto"):
+        ge = g["reasoning_effort"]
+        e = normalize_reasoning_effort(ge) if ge else fallback_effort
+
+    return m, tv, e

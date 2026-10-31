@@ -12,6 +12,7 @@ import os
 from typing import Tuple
 
 from ._output_docs import OutputDocsMixin
+from ..api import AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, FOLLOW_GLOBAL
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(PLUGIN_DIR, "api_key_config.json")
@@ -44,8 +45,15 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
                     data = json.load(f)
                     existing_key = data.get("api_key", "")
                     existing_base_url = data.get("base_url", "")
+                    existing_chat_model = data.get("chat_model", "")
+                    existing_temp = data.get("temperature", 0)
+                    try:
+                        existing_temp = float(existing_temp) if existing_temp not in (None, "") else 0.0
+                    except Exception:
+                        existing_temp = 0.0
+                    existing_effort = data.get("reasoning_effort", "")
         except Exception:
-            pass
+            existing_chat_model, existing_temp, existing_effort = "", 0.0, ""
 
         return {
             "required": {
@@ -69,11 +77,28 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
                     "label_off": "否 - 保存 / 更新 Key",
                     "tooltip": "选「是」时删除配置文件中已保存的 API Key。",
                 }),
+                "chat_model": ((["不设置"] + list(AVAILABLE_CHAT_MODELS) + [FOLLOW_GLOBAL]), {
+                    "label": "对话模型（全局）",
+                    "default": existing_chat_model if existing_chat_model in AVAILABLE_CHAT_MODELS else "不设置",
+                    "tooltip": "LLM 全局对话模型：保存后，各 LLM 节点 model 选「跟随全局（默认）」时按此值解析；「不设置」= 不覆盖（节点回落自身默认 2.5-flash）",
+                }),
+                "temperature": ("FLOAT", {
+                    "label": "生成温度（全局）",
+                    "default": existing_temp,
+                    "min": 0.0, "max": 2.0, "step": 0.05,
+                    "tooltip": "LLM 全局生成温度：0=不设置（节点回落自身默认）；各 LLM 节点 temperature 填 0 时按此值解析",
+                }),
+                "reasoning_effort": ((["不设置"] + [x for x in REASONING_EFFORTS if x != "auto"]), {
+                    "label": "思考强度（全局）",
+                    "default": existing_effort if existing_effort in ("none", "low", "medium", "high", "max") else "不设置",
+                    "tooltip": "LLM 全局思考强度：各 LLM 节点 reasoning_effort 留 auto/空 时按此值解析；「不设置」= 不覆盖",
+                }),
             },
             "hidden": {},
         }
 
-    def save_key(self, base_url: str = "", api_key: str = "", clear_key: bool = False) -> Tuple[str, str, str, str]:
+    def save_key(self, base_url: str = "", api_key: str = "", clear_key: bool = False,
+                 chat_model: str = "不设置", temperature: float = 0.0, reasoning_effort: str = "不设置") -> Tuple[str, str, str, str]:
         """
         在插件配置文件中保存或清除 API Key 与 Base URL。
         """
@@ -89,8 +114,17 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
 
         url = (base_url or "").strip().rstrip("/")
 
-        # 保存到 JSON 配置文件
+        # 保存到 JSON 配置文件（LLM 全局参数：不设置/0/auto = 不落键，旧 json 缺键天然兼容）
         config_data = {"api_key": key, "base_url": url}
+        if chat_model in AVAILABLE_CHAT_MODELS:
+            config_data["chat_model"] = chat_model
+        try:
+            if float(temperature or 0) > 0:
+                config_data["temperature"] = float(temperature)
+        except Exception:
+            pass
+        if reasoning_effort in ("none", "low", "medium", "high", "max"):
+            config_data["reasoning_effort"] = reasoning_effort
         try:
             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
@@ -114,13 +148,20 @@ class AgnesNovelAPIKeyConfig(OutputDocsMixin):
         except Exception:
             pass
 
+        extras = []
+        if "chat_model" in config_data:
+            extras.append(f"对话模型 {config_data['chat_model']}")
+        if "temperature" in config_data:
+            extras.append(f"温度 {config_data['temperature']}")
+        if "reasoning_effort" in config_data:
+            extras.append(f"思考 {config_data['reasoning_effort']}")
+        status_ok = f"[OK] 已保存 API Key 与 Base URL。" + (" 全局 LLM 参数：" + " / ".join(extras) if extras else "")
+        print(f"[Agnes 全局配置] {status_ok}")
         return (
             url or "https://api.agnes-ai.cn/v1 (default)",
             key,
             masked,
-            f"[OK] API Key 已保存到 {os.path.basename(CONFIG_FILE)}"
-            + (f"，Base URL = {url}" if url else "")
-            + "。其他 Agnes 节点现在会自动加载此配置。",
+            status_ok,
         )
 
 NODE_CLASS_MAPPINGS = {"AgnesNovelAPIKeyConfig": AgnesNovelAPIKeyConfig}

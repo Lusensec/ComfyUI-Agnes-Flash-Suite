@@ -26,7 +26,7 @@ from ..api import (
     AVAILABLE_CHAT_MODELS,
     REASONING_EFFORTS,
     normalize_reasoning_effort,
-    format_chat_meta,
+    format_chat_meta, FOLLOW_GLOBAL, resolve_chat_params
 )
 from ._output_docs import OutputDocsMixin
 
@@ -103,13 +103,13 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key，留空=自动加载全局配置",
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）",
+                "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                    "default": FOLLOW_GLOBAL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）；选「跟随全局（默认）」= 解析「Agnes API Key 配置」的全局对话模型（未配置则回落 2.5-flash）",
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效；auto/空 = 跟随全局（Key 配置节点设置时），否则跟随模型默认",
                 }),
             },
             "optional": {
@@ -175,10 +175,11 @@ class AgnesTurnaroundPromptGenerator(OutputDocsMixin):
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            model, _tv, reasoning_effort = resolve_chat_params(model, 0.4, reasoning_effort, fallback_temperature=0.4)
             raw, meta = client.chat(
                 messages=[{"role": "user", "content": self._build_user_prompt(subject_prompt, subject_type)}],
                 model=model,
-                temperature=0.4,
+                temperature=_tv,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
                 retries=retries,

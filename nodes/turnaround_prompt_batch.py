@@ -34,7 +34,7 @@ from ..api import (
     get_api_key,
     CHAT_MODEL,
     AVAILABLE_CHAT_MODELS,
-    REASONING_EFFORTS,
+    REASONING_EFFORTS, FOLLOW_GLOBAL
 )
 from .turnaround_prompt import AgnesTurnaroundPromptGenerator, SUBJECT_TYPES
 from ._output_docs import OutputDocsMixin
@@ -102,8 +102,8 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
                 "placeholder": "sk-xxxxxxxx",
                 "tooltip": "Agnes AI API Key，留空=自动加载全局配置",
             }),
-            "model": (AVAILABLE_CHAT_MODELS, {
-                "default": CHAT_MODEL,
+            "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                "default": FOLLOW_GLOBAL,
                 "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）",
             }),
             "reasoning_effort": (list(REASONING_EFFORTS), {

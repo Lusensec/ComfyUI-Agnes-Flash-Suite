@@ -29,7 +29,7 @@ Agnes 剧本生成节点（漫剧短视频）
 import re
 import time
 import traceback
-from ..api import AgnesClient, get_api_key, get_base_url, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort
+from ..api import AgnesClient, get_api_key, get_base_url, BASE_URL, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, FOLLOW_GLOBAL, resolve_chat_params
 
 
 class AgnesScreenplayGenerator:
@@ -91,9 +91,9 @@ class AgnesScreenplayGenerator:
                     "placeholder": "sk-xxxxxxxx",
                     "tooltip": "Agnes AI API Key"
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）"
+                "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                    "default": FOLLOW_GLOBAL,
+                    "tooltip": "文本生成模型（对话默认 agnes-2.5-flash；agnes-3.0-flash 适合 Agent/工具编排）；选「跟随全局（默认）」= 解析「Agnes API Key 配置」的全局对话模型（未配置则回落 2.5-flash）"
                 }),
                 "tag": ("STRING", {
                     "default": "逆袭爽文",
@@ -115,7 +115,7 @@ class AgnesScreenplayGenerator:
                     "tooltip": "目标总时长（秒），场次按节奏估算（快≈6s/场、中≈9s/场、慢≈13s/场）"
                 }),
                 "temperature": ("FLOAT", {
-                    "default": 0.8,
+                    "default": 0.0,
                     "min": 0.0,
                     "max": 1.0,
                     "step": 0.05,
@@ -123,7 +123,7 @@ class AgnesScreenplayGenerator:
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
+                    "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效；auto/空 = 跟随全局（Key 配置节点设置时），否则跟随模型默认"
                 }),
             },
             "optional": {
@@ -139,7 +139,7 @@ class AgnesScreenplayGenerator:
                     "min": 0,
                     "max": 10,
                     "step": 1,
-                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时；0=跟随全局（Key 配置节点设置时），否则回落节点默认",
                 }),
                 "timeout": ("INT", {
                     "label": "请求超时（秒）",
@@ -148,6 +148,12 @@ class AgnesScreenplayGenerator:
                     "max": 3600,
                     "step": 30,
                     "tooltip": "单次 API 调用等待上限（秒），默认 300：长思考模式（thinking 高档位）/长上下文可拉高到 3600",
+                }),
+                "style_block": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": "直连 Agnes 创作风格配置 的 风格说明块 输出（可选）",
+                    "tooltip": "风格规范块（可选）：直连「Agnes 创作风格配置」的 风格说明块 输出——全局创意基调（视觉风格/题材/节奏/情绪/画幅）随本节点生成一并注入；留空=不注入",
                 }),
             },
         }
@@ -179,7 +185,7 @@ class AgnesScreenplayGenerator:
             }
         return extra
 
-    def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters="", retries=3, timeout=300):
+    def generate(self, story_outline="", base_url="", api_key="", tag="逆袭爽文", emotion="爽", rhythm="快节奏", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", characters="", retries=3, timeout=300, style_block=""):
         if not (story_outline or "").strip():
             skip_msg = "[跳过] 故事大纲为空：请连接 Agnes 文本输入 的文本输出，或直接粘贴故事大纲"
             print(f"[Agnes 漫剧剧本] {skip_msg}")
@@ -200,6 +206,7 @@ class AgnesScreenplayGenerator:
         rhythm_req, sec_lo, sec_hi, sec_avg = self.RHYTHM_MAP.get(rhythm, self.RHYTHM_MAP["中速"])
         target_scenes = max(3, round(target_duration / sec_avg))
         characters_block = f"\n角色设定（剧本中的对白/动作请保持这些角色一致）：\n{characters}\n" if characters.strip() else ""
+        style_block_txt = f"\n创作风格规范（全篇视觉风格/题材基调/节奏/情绪/画幅请遵循）：\n{style_block.strip()}\n" if str(style_block or "").strip() else ""
 
         if not api_key.strip():
             api_key = get_api_key()
@@ -220,6 +227,7 @@ class AgnesScreenplayGenerator:
 故事大纲：
 {story_outline}
 {characters_block}
+{style_block_txt}
 【剧本格式】
 1. 剧本第一行写「核心钩子」：一句话点出全剧最抓人的悬念/爽点/情绪点
 2. 然后分场写作，每场四行、各占一行：
@@ -247,6 +255,7 @@ class AgnesScreenplayGenerator:
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            model, temperature, reasoning_effort = resolve_chat_params(model, temperature, reasoning_effort, fallback_temperature=0.8)
             raw, meta = client.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,

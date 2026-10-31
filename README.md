@@ -38,9 +38,9 @@ ComfyUI 实测截图：
 
 文本类（20 个）：
 
-- 🔑 Agnes API Key 配置
+- 🔑 Agnes API Key 配置：保存 Base URL + API Key；新增 LLM 全局参数（对话模型 / 生成温度 / 思考强度）——各 LLM 节点 model 选「跟随全局（默认）」、temperature 填 0、reasoning_effort 留 auto/空 时按此解析（未设置回落节点默认）；池节点保持纯凭证池不承载模型参数
 - 🔑 Agnes API Key 池配置：多组「Base URL + API Key」条目（国内 + 国外不同账号等）聚合成一份池 JSON（api_key 必填、base_url 可空=跟随全局、name 仅展示，重复 Key 自动去重；可选并入当前全局 Key 为末尾条目——单账号场景免手贴），纯数据节点零 API 调用；无有效条目输出 "0" 标记（下游并发提交 零请求短路）；输出 7 路（面板自上而下）：置顶 3 路随机条目 base_url / full_key（完整未掩码 Key，可直连单端点 提交/收取 的 api_key 输入）/ masked_key（掩码，人工核对抽到哪条；每次运行重新随机，3 路与 pool_json 同批同条，无有效条目=空串）+ pool_json（直连 视频任务并发提交/多任务并发提交）+ pool_count + pool_report（掩码清单）+ status
-- 🪄 Agnes 风格选择节点：视觉风格 × 导演风格双轴，纯本地组合
+- 🪄 Agnes 创作风格配置节点（旧名 风格选择）：5 创意轴（视觉风格 × 题材 tag × 节奏 × 情绪 × 画幅 + 自由补充），参数命名与值域与下游一一对应（tag/节奏/情绪 与 剧本生成 同名同值域可直连，风格说明块 接 剧本生成·风格规范块 可选槽），纯本地组合零 API 调用
 - 📥 Agnes 文本输入节点：管线文本起点
 - 📝 Agnes 解说剧本生成节点：影视解说文案/口播稿
 - 🎭 Agnes 剧本生成节点：漫剧短视频分场剧本（钩子+画面/对白/氛围）
@@ -118,6 +118,12 @@ ComfyUI 实测截图：
 3. 文件：`api_key_config.json`（由「🔑 Agnes API Key 配置」节点写入/缓存）
 
 也可在内置 `config.yaml` 的 `api_key` 字段填写（优先级最低）。
+
+> **LLM 全局参数层**：「🔑 Agnes API Key 配置」节点除 Key/地址外还可保存
+> 对话模型 / 生成温度 / 思考强度（写入 `api_key_config.json` 扩展键）。各 LLM 节点
+> 的模型参数支持"跟随全局"哨兵：`model` 选「跟随全局（默认）」、`temperature` 填 0、
+> `reasoning_effort` 留 auto/空 → 解析全局值；全局未设置该参数时回落节点自身默认。
+> 想统一全管线模型基调（如一键切 3.0-flash）只配一次；个别节点覆盖填显式值即可。
 
 ## 配置
 

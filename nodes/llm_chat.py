@@ -8,7 +8,7 @@ Agnes LLM 对话节点
 from typing import Any, Dict, Tuple
 import traceback
 
-from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta
+from ..api import AgnesClient, get_api_key, CHAT_MODEL, AVAILABLE_CHAT_MODELS, REASONING_EFFORTS, normalize_reasoning_effort, format_chat_meta, FOLLOW_GLOBAL, resolve_chat_params
 from ._output_docs import OutputDocsMixin
 
 
@@ -47,16 +47,16 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "placeholder": "sk-...",
                     "tooltip": "Agnes AI API Key（留空则跟随全局配置：环境变量 AGNES_API_KEY / api_key_config.json / config.yaml；申请地址 platform.agnes-ai.com）",
                 }),
-                "model": (AVAILABLE_CHAT_MODELS, {
-                    "default": CHAT_MODEL,
-                    "tooltip": "Agnes chat model: agnes-2.5-flash（默认对话/视觉/工具）/ agnes-3.0-flash（Agent 编程、工具编排，Thinking 7 档）",
+                "model": (AVAILABLE_CHAT_MODELS + [FOLLOW_GLOBAL], {
+                    "default": FOLLOW_GLOBAL,
+                    "tooltip": "Agnes chat model: agnes-2.5-flash（默认对话/视觉/工具）/ agnes-3.0-flash（Agent 编程、工具编排，Thinking 7 档）；选「跟随全局（默认）」= 解析「Agnes API Key 配置」的全局对话模型（未配置则回落 2.5-flash）",
                 }),
                 "temperature": ("FLOAT", {
-                    "default": 0.7,
+                    "default": 0.0,
                     "min": 0.0,
                     "max": 2.0,
                     "step": 0.05,
-                    "tooltip": "采样温度（越高越发散/有创意）",
+                    "tooltip": "采样温度（越高越发散/有创意）；0=跟随全局（Key 配置节点设置时），否则回落节点默认",
                 }),
             },
             "optional": {
@@ -68,7 +68,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                 }),
                 "reasoning_effort": (list(REASONING_EFFORTS), {
                     "default": "auto",
-                    "tooltip": "思考强度：2.5-flash 支持 none/low/medium/high/max；3.0-flash 支持 7 档；auto=不传该参数（跟随模型默认）",
+                    "tooltip": "思考强度：2.5-flash 支持 none/low/medium/high/max；3.0-flash 支持 7 档；auto=不传该参数（跟随模型默认）；auto/空 = 跟随全局（Key 配置节点设置时），否则跟随模型默认",
                 }),
                 "retries": ("INT", {
                     "label": "重试次数",
@@ -113,6 +113,7 @@ class AgnesNovelLLMChat(OutputDocsMixin):
 
         try:
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
+            model, temperature, reasoning_effort = resolve_chat_params(model, temperature, reasoning_effort, fallback_temperature=0.7)
             messages = []
             # 无系统提示词输入（已移除）：角色/行为设定由用户写在「提示词」消息内
             messages.append({"role": "user", "content": prompt})
