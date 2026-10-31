@@ -118,7 +118,27 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
                 "tooltip": f"并发速率限制：线程池大小（同时请求数 1-{MAX_SLOTS}，默认 10）。非空提示词超过该值时排队执行；频繁 429/503 就调小",
             }),
         })
-        return {"required": required, "optional": {}}
+        return {
+            "required": required,
+            "optional": {
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "逐条生效的失败重试次数（0=不重试，单条请求一次即止）：429 限流/5xx 自动退避（3/6/12s…），默认 3；整批最坏总时长≈条数×(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单条 API 调用等待上限（秒），默认 300：长思考/长上下文可拉高到 3600",
+                }),
+            },
+        }
 
     @staticmethod
     def _parse_all_prompts(raw):
@@ -153,7 +173,7 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
 
     def generate(self, all_prompts="", subject_type="角色",
                  base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto",
-                 max_concurrency=10):
+                 max_concurrency=10, retries=3, timeout=300):
         items, source, truncated = self._parse_all_prompts(all_prompts)
         p = items
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or 10)))
@@ -202,6 +222,8 @@ class AgnesTurnaroundPromptBatch(OutputDocsMixin):
                 api_key=api_key,
                 model=model,
                 reasoning_effort=reasoning_effort,
+                retries=retries,
+                timeout=timeout,
             )[0]
 
         results = [""] * MAX_SLOTS

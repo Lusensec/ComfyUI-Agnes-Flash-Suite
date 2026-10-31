@@ -60,9 +60,27 @@ class AgnesNovelImageReverse(OutputDocsMixin):
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型视觉识别）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
                 }),
             },
+            "optional": {
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：大图 base64/长思考可拉高到 3600",
+                }),
+            },
         }
 
-    def reverse(self, image=None, model: str = CHAT_MODEL, base_url: str = "", api_key: str = "", reasoning_effort: str = "auto") -> Tuple[str, str]:
+    def reverse(self, image=None, model: str = CHAT_MODEL, base_url: str = "", api_key: str = "", reasoning_effort: str = "auto", retries: int = 3, timeout: int = 300) -> Tuple[str, str]:
         # 运行时回退：widget 值为空时从全局配置（api_key_config.json 等）取 API Key
         if not api_key.strip():
             api_key = get_api_key()
@@ -78,10 +96,10 @@ class AgnesNovelImageReverse(OutputDocsMixin):
             effort = normalize_reasoning_effort(reasoning_effort)
 
             # 生成详细版提示词（detailed）
-            detailed = client.reverse_prompt(pil_img, model=model, detail="detailed", reasoning_effort=effort)
+            detailed = client.reverse_prompt(pil_img, model=model, detail="detailed", reasoning_effort=effort, retries=retries, timeout=timeout)
 
             # 生成简洁版提示词（brief）
-            brief = client.reverse_prompt(pil_img, model=model, detail="brief", reasoning_effort=effort)
+            brief = client.reverse_prompt(pil_img, model=model, detail="brief", reasoning_effort=effort, retries=retries, timeout=timeout)
 
             return (detailed.strip(), brief.strip())
         except Exception as e:

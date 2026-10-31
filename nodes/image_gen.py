@@ -91,6 +91,24 @@ class AgnesImageGen:
                     "tooltip": "单次请求生成张数（1-4）：当前 Agnes 服务端对所有图像模型限单张（n>1 返回 400，节点自动降级为 1 张并打印提示）；API 解锁多张后 n 直接生效。n>1 成功时输出批量张量（同主体多张变体；多资产请多节点实例各出 1 张）",
                 }),
             },
+            "optional": {
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 5,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…），默认 5；最坏总时长≈(1+重试次数)×请求超时+退避和",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：大图（3K/4K）/队列高峰期可拉高到 3600",
+                }),
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING", "STRING",)
@@ -119,7 +137,7 @@ class AgnesImageGen:
             extra["resolution"] = {"description": "本次输出的实际分辨率（WxH）"}
         return extra
 
-    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL, aspect_ratio="16:9", n=1):
+    def generate(self, prompt="", base_url="", api_key="", width=1920, height=1080, quality="1K", model=IMAGE_MODEL, aspect_ratio="16:9", n=1, retries=5, timeout=300):
         n = max(1, min(4, int(n or 1)))
         if not (prompt or "").strip():
             import torch as _torch
@@ -154,6 +172,8 @@ class AgnesImageGen:
                     size=size_arg,
                     ratio=ratio_arg,
                     n=nn,
+                    retries=retries,
+                    timeout=timeout,
                 )
 
             try:

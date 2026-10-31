@@ -464,7 +464,10 @@ class AgnesClient:
         次数由节点「重试次数」参数控制）；
         queue_hint 覆盖队列满建议文案。其他可重试状态维持 3/6/12 秒短退避（120 秒封顶）。
         """
-        max_retries = max_retries or self._MAX_RETRIES
+        # 显式 0=只发一次不重试（节点「重试次数」widget 可传 0）；None=默认 _MAX_RETRIES
+        if max_retries is None:
+            max_retries = self._MAX_RETRIES
+        max_retries = max(1, int(max_retries))
         last_error = None
         total_waited = 0
         for attempt in range(1, max_retries + 1):
@@ -548,6 +551,8 @@ class AgnesClient:
         chat_template_kwargs: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
         return_meta: bool = False,
+        timeout: int = 300,
+        retries: int = 3,
     ):
         """Call the chat completions endpoint.
 
@@ -557,6 +562,10 @@ class AgnesClient:
 
         max_tokens 默认 None = 不传该参数，输出长度上限由模型/服务端默认决定，
         模型自然停止（finish_reason=stop）；仅在需要显式限制输出长度时传值。
+
+        timeout=单次请求超时（秒，默认 300；长思考/长上下文可拉高）；
+        retries=失败重试次数（0=只发一次不重试，默认 3；429/5xx 退避 3/6/12s），
+        由节点「重试次数/请求超时」widget 透传。
         """
         url = f"{self.base_url}/chat/completions"
         payload = {
@@ -572,7 +581,9 @@ class AgnesClient:
             payload["chat_template_kwargs"] = chat_template_kwargs
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
-        resp = self._request_with_retry("POST", url, "Chat", json_payload=payload)
+        resp = self._request_with_retry(
+            "POST", url, "Chat", json_payload=payload,
+            timeout=timeout, max_retries=retries + 1)
 
         data = resp.json()
         try:
@@ -608,6 +619,8 @@ class AgnesClient:
         model: str = IMAGE_MODEL,
         ratio: Optional[str] = None,
         return_base64: bool = False,
+        timeout: int = 300,
+        retries: int = 5,
     ) -> List[Image.Image]:
         """Generate images via the Agnes image generation API.
 
@@ -651,10 +664,11 @@ class AgnesClient:
                     "response_format": "url",
                 }
 
-        # 生图队列满（503）/限流（429）：分钟级退避重试（15/30/60/120 秒）
+        # 生图队列满（503）/限流（429）：分钟级退避重试（15/30/60/120 秒），
+        # 次数与单次请求超时由节点「重试次数/请求超时」widget 透传（默认 5 次=原 _MAX_RETRIES_QUEUE 行为）
         resp = self._request_with_retry(
             "POST", url, "Image", json_payload=payload,
-            max_retries=self._MAX_RETRIES_QUEUE)
+            timeout=timeout, max_retries=retries + 1)
 
         data = resp.json()
         images = []
@@ -1099,6 +1113,8 @@ class AgnesClient:
         model: str = CHAT_MODEL,
         detail: str = "detailed",
         reasoning_effort: Optional[str] = None,
+        timeout: int = 300,
+        retries: int = 3,
     ) -> str:
         """
         Analyze an image and generate a prompt that could reproduce it.
@@ -1148,6 +1164,8 @@ class AgnesClient:
             model=model,
             temperature=0.3,
             reasoning_effort=normalize_reasoning_effort(reasoning_effort),
+            timeout=timeout,
+            retries=retries,
         )
 
 

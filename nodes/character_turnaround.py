@@ -93,6 +93,22 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
                     "placeholder": "额外的风格/质量补充词...",
                     "tooltip": "追加在提示词末尾的补充要求（可选）",
                 }),
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 5,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…），默认 5；最坏总时长≈(1+重试次数)×请求超时+退避和",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：大图档位可拉高到 3600",
+                }),
             },
         }
 
@@ -106,6 +122,8 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
         aspect_ratio: str = "21:9",
         reference_image=None,
         extra_prompt: str = "",
+        retries: int = 5,
+        timeout: int = 300,
     ):
         subject_desc = (subject_desc or "").strip()
         if not subject_desc:
@@ -148,6 +166,8 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
                     ratio=ratio_arg,
                     n=1,
                     model=model,
+                    retries=retries,
+                    timeout=timeout,
                 )
             else:
                 pil_images = client.generate_image(
@@ -157,6 +177,8 @@ class AgnesSubjectTurnaround(OutputDocsMixin):
                     size=size_arg,
                     n=1,
                     model=model,
+                    retries=retries,
+                    timeout=timeout,
                 )
 
             if not pil_images:

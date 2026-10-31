@@ -83,6 +83,22 @@ class AgnesScenePromptGenerator:
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：长思考模式（thinking 高档位）/长上下文可拉高到 3600",
+                }),
             }
         }
 
@@ -111,7 +127,7 @@ class AgnesScenePromptGenerator:
             }
         return extra
 
-    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", costumes_json="", props_json="", weather_json="", reasoning_effort="auto"):
+    def generate_prompt(self, scene_text="", base_url="", api_key="", style="cinematic", model=CHAT_MODEL, characters_json="", locations_json="", costumes_json="", props_json="", weather_json="", reasoning_effort="auto", retries=3, timeout=300):
         if not (scene_text or "").strip():
             skip_msg = "[跳过] 分镜文本为空：请连接 Agnes 总导演 / Agnes 场景切分 的分镜输出，或直接粘贴分镜文本"
             print(f"[Agnes 分镜提示词] {skip_msg}")
@@ -204,6 +220,8 @@ class AgnesScenePromptGenerator:
                 temperature=0.4,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
+                retries=retries,
+                timeout=timeout,
             )
             meta_line = format_chat_meta(meta)
 

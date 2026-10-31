@@ -108,7 +108,24 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
                 }),
             },
-            "optional": {},
+            "optional": {
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：长思考模式（thinking 高档位）/长上下文可拉高到 3600",
+                }),
+            },
         }
 
     @classmethod
@@ -138,7 +155,8 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
         return t.strip().strip('"')
 
     def generate(self, asset_json="", subject_type="角色", style="cinematic",
-                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto") -> Tuple[str, str]:
+                 base_url="", api_key="", model=CHAT_MODEL, reasoning_effort="auto",
+                 retries=3, timeout=300) -> Tuple[str, str]:
         asset_json = (asset_json or "").strip()
         if not asset_json:
             err = "[错误] asset_json 为空：请连接 Agnes 文本拆分的输出槽，或手动粘贴单条资产 JSON"
@@ -160,6 +178,8 @@ class AgnesAssetPromptGenerator(OutputDocsMixin):
                 temperature=0.4,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
+                retries=retries,
+                timeout=timeout,
             )
             meta_line = format_chat_meta(meta)
             prompt = self._clean_prompt(raw)

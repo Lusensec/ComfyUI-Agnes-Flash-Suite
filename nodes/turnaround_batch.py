@@ -128,7 +128,27 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
                 "tooltip": f"并发速率限制：线程池大小（同时请求数 1-{MAX_SLOTS}，默认 10）。非空提示词超过该值时排队执行；频繁 429/503 就调小",
             }),
         })
-        return {"required": prompts, "optional": {}}
+        return {
+            "required": prompts,
+            "optional": {
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 5,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "逐条生效的失败重试次数（0=不重试，单张请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…），默认 5；整批最坏总时长≈条数×(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单张 API 调用等待上限（秒），默认 300：大图档位/队列高峰期可拉高到 3600",
+                }),
+            },
+        }
 
     @staticmethod
     def _parse_all_prompts(raw):
@@ -161,7 +181,7 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
         return items, source, truncated
 
     def generate(self, all_prompts="", base_url="", api_key="", model=IMAGE_MODEL, quality="2K",
-                 aspect_ratio="21:9", max_concurrency=10):
+                 aspect_ratio="21:9", max_concurrency=10, retries=5, timeout=300):
         items, source, truncated = self._parse_all_prompts(all_prompts)
         p = items
         max_conc = max(1, min(MAX_SLOTS, int(max_concurrency or 10)))
@@ -217,10 +237,12 @@ class AgnesTurnaroundBatch(OutputDocsMixin):
             client = AgnesClient(api_key, base_url=base_url.strip() or None)
             if model in NEW_IMAGE_MODELS:
                 pils = client.generate_image(prompt=text, model=model,
-                                             size=size_arg, ratio=ratio_arg, n=1)
+                                             size=size_arg, ratio=ratio_arg, n=1,
+                                             retries=retries, timeout=timeout)
             else:
                 pils = client.generate_image(prompt=text, model=model,
-                                             size=size_arg, n=1)
+                                             size=size_arg, n=1,
+                                             retries=retries, timeout=timeout)
             if not pils:
                 raise RuntimeError("服务器未返回图片")
             img = pils[0]

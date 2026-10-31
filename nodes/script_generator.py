@@ -59,7 +59,24 @@ class AgnesScriptGenerator:
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=完全关闭思考 / low / medium / high / max；2.0 旧模型不生效"
                 }),
             },
-            "optional": {}
+            "optional": {
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：长思考模式（thinking 高档位）/长上下文可拉高到 3600",
+                }),
+            }
         }
 
     RETURN_TYPES = ("STRING", "STRING")
@@ -87,7 +104,7 @@ class AgnesScriptGenerator:
             }
         return extra
 
-    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto"):
+    def generate(self, story_outline="", base_url="", api_key="", style="casual", target_duration=180, temperature=0.8, model=CHAT_MODEL, reasoning_effort="auto", retries=3, timeout=300):
         if not (story_outline or "").strip():
             skip_msg = "[跳过] 故事大纲为空：请连接 Agnes 文本输入 的文本输出，或直接粘贴故事大纲"
             print(f"[Agnes 剧本] {skip_msg}")
@@ -140,6 +157,8 @@ class AgnesScriptGenerator:
                 temperature=temperature,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
+                retries=retries,
+                timeout=timeout,
             )
 
             # 清理

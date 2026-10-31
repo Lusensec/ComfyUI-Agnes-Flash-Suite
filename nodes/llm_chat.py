@@ -13,7 +13,7 @@ from ._output_docs import OutputDocsMixin
 
 
 class AgnesNovelLLMChat(OutputDocsMixin):
-    """Agnes AI LLM 对话节点：与 Agnes 对话模型多轮交互（可带系统提示词）。"""
+    """Agnes AI LLM 对话节点：与 Agnes 对话模型多轮交互（可带系统提示词）；「重试次数/请求超时」可 widget 调（长思考拉高超时）。"""
 
     CATEGORY = "Agnes Novel"
     RETURN_TYPES = ("STRING", "STRING")
@@ -76,6 +76,22 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                     "default": "auto",
                     "tooltip": "思考强度：2.5-flash 支持 none/low/medium/high/max；3.0-flash 支持 7 档；auto=不传该参数（跟随模型默认）",
                 }),
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：长思考模式（thinking 高档位）/长上下文可拉高到 3600",
+                }),
             },
         }
 
@@ -89,6 +105,8 @@ class AgnesNovelLLMChat(OutputDocsMixin):
         system_prompt: str = "",
         enable_thinking: bool = False,
         reasoning_effort: str = "auto",
+        retries: int = 3,
+        timeout: int = 300,
     ) -> Tuple[str, str]:
         if not prompt.strip():
             return ("[错误] 提示词为空：请输入消息", "提示词为空，已跳过。")
@@ -116,6 +134,8 @@ class AgnesNovelLLMChat(OutputDocsMixin):
                 chat_template_kwargs=ctk,
                 reasoning_effort=effort,
                 return_meta=True,
+                retries=retries,
+                timeout=timeout,
             )
             meta_line = format_chat_meta(meta)
             if not (response or "").strip():

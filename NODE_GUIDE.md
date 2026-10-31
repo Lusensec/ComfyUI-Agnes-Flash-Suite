@@ -67,6 +67,13 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 > （auto/none/low/medium/high/max；auto=不传参数跟随模型默认）；
 > 2.5-flash 5 档，3.0-flash 7 档（本套件暴露 5 档），2.0 旧模型不生效。
 
+> 请求超时与重试：全部 20 个发 API 请求的节点（LLM 14 + 生图 5 + 图像反推，批量节点含内）
+> 面板末尾新增两个用户 widget——「重试次数」（默认 LLM/视觉 3、生图 5；0-10，0=请求一次即止；
+> 总尝试次数=1+重试次数）与「请求超时（秒）」（默认 300；30-3600 步长 30）。
+> 429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；生图 503 队列满/429
+> 分钟级退避（15/30/60/120s…）；批量节点逐条生效（最坏总时长≈条数×(1+重试次数)×请求超时）。
+> widget 追加在面板末尾：旧实例载入自动落默认值，无需迁移、无需重新接线。
+
 > 结论：新 2.5 系列图像模型**支持 ratio 宽高比**（8 种，配合 1K-4K 档位），
 > 图像/视频节点的 aspect_ratio 下拉均可直接使用；新模型不再支持 n/strength/
 > seed（图）等参数，节点中保留这些输入框是为了兼容旧模型和习惯；使用新模型时
@@ -136,6 +143,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - log_text: 处理日志（成功=段落数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
@@ -159,6 +168,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - log_text: 处理日志（成功=分镜数+响应元数据 finish_reason/token 消耗；空响应=⚠️警示；失败=异常+堆栈）
@@ -188,6 +199,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - characters_json: 角色信息 JSON
@@ -224,6 +237,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | costumes_json | STRING | "" | 服装信息 JSON（可连 资产提取 服装JSON，可选）；留空=不注入该资产块 |
 | props_json | STRING | "" | 道具列表 JSON（可连 资产提取 道具JSON，可选）；留空=不注入该资产块 |
 | weather_json | STRING | "" | 天气/氛围 JSON（可连 资产提取 天气JSON，可选）；留空=不注入该资产块 |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - detailed_prompt: 英文提示词
@@ -252,6 +267,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（auto/none/low/medium/high/max；2.0 旧模型不生效） |
 | max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-60，默认 10）；非空分镜超过该值时排队执行，频繁 429/503 就调小 |
+| retries | INT | 3 | 逐条生效的失败重试次数（0=不重试，单条请求一次即止）：429/5xx 自动指数退避（3/6/12s…）；整批最坏总时长≈条数×(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单条 API 调用等待上限（秒，默认 300）：长思考/长上下文可拉高到 3600 |
 
 **输出：**
 - detailed_prompt_1 ~ detailed_prompt_60: 每个分镜（all_scenes 条目序号）的英文生图提示词（可逐个连 Agnes 文生图/图生图 出关键帧）
@@ -294,6 +311,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（可选输入；2.0 旧模型不生效） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - video_prompt: 英文视频提示词（80-150 词：主体运动/运镜/运动节奏/时序一致性/光线氛围/风格/质量尾词）；直连 **Agnes 关键帧生视频 / 文生视频 / 参考视频生成** 的 prompt 输入；失败=[Error] 前缀（原因见 log_text）
@@ -325,6 +344,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（2.0 旧模型不生效） |
 | max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-20，默认 10）；非空提示词超过该值时排队执行，频繁 429/503 就调小 |
+| retries | INT | 3 | 逐条生效的失败重试次数（0=不重试，单条请求一次即止）：429/5xx 自动指数退避（3/6/12s…）；整批最坏总时长≈条数×(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单条 API 调用等待上限（秒，默认 300）：长思考/长上下文可拉高到 3600 |
 
 **输出：**
 - video_prompt_1 ~ video_prompt_20: 每条（all_prompts 条目序号）的英文视频提示词（槽号与同波 分镜图批量 image_N 天然对齐）；一对一连 **Agnes 关键帧生视频** prompt 输入；空槽（条目不足 20）=空字符串；单条异常=[Error] 前缀（原因见 status）
@@ -362,6 +383,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | quality | COMBO | 1K | 画质档位：1K/2K/3K/4K（新图像模型 agnes-image-2.5-flash 按档位出图，2K 性价比最高） |
 | aspect_ratio | COMBO | 16:9 | 宽高比（与视频节点一致）：新接口与 quality 档位组合出图，如 16:9 + 2K = 2624×1472；支持 1:1/3:4/4:3/16:9/9:16/2:3/3:2/21:9；旧接口不生效 |
 | n | INT | 1 | 单次请求生成张数 1-4：当前服务端对所有图像模型限单张（n>1 自动降级 1 张并打印提示），API 解锁后直接生效；多资产请多节点实例各出 1 张 |
+| retries | INT | 5 | 失败重试次数（0=不重试，请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：大图档位/队列高峰期可拉高到 3600 |
 
 **输出（含输出描述）：**
 - image: 图像张量（n=1 单张；n>1 批量，连接 SaveImage 或视频/三视图节点）
@@ -397,6 +420,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | strength | FLOAT | 0.75 | 变化强度 0-1：API 无 strength 参数，节点转成提示词指令（越低越贴近原图，1.0=完全按提示词改变） |
 | n | INT | 1 | 单次生成张数：2.5 模型 API 固定出 1 张（1-4 仅旧接口） |
 | reference_image_2..6 | IMAGE（可选）×5 | （不连=跳过） | 额外参考图（合计最多 6 张）：多图合成时各图角色需在 prompt 中指明 |
+| retries | INT | 5 | 失败重试次数（0=不重试，请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：大图档位/队列高峰期可拉高到 3600 |
 
 **输出：**
 - images: 编辑/生成后的图像张量（可连 SaveImage 或视频节点）
@@ -430,6 +455,8 @@ ComfyUI 节点规格中，**输入（widgets）自带 tooltip/placeholder/label 
 | api_key | STRING | sk-你的Key | Agnes AI API Key |
 | model | COMBO | agnes-image-2.5-flash | 图像生成模型 |
 | max_concurrency | INT | 10 | 并发速率限制：线程池大小（1-20，默认 10）；非空提示词超过该值时排队执行，频繁 429/503 就调小 |
+| retries | INT | 5 | 逐条生效的失败重试次数（0=不重试，单张请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…）；整批最坏总时长≈条数×(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单张 API 调用等待上限（秒，默认 300）：大图档位/队列高峰期可拉高到 3600 |
 
 **输出：**
 - image_1 ~ image_20: 每个分镜（all_prompts 条目序号）的关键帧张量（可接 SaveImage 存档，或逐镜连 Agnes 关键帧生视频）
@@ -785,6 +812,8 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | target_duration | INT | 180 | 目标时长（秒） |
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none=关闭思考 / low / medium / high / max（2.0 旧模型不生效） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - script: 解说文案
@@ -815,6 +844,8 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | temperature | FLOAT | 0.8 | 生成温度（0-1） |
 | reasoning_effort | COMBO | auto | 思考等级（2.5/3.0 文本模型）：auto/none/low/medium/high/max |
 | characters（可选） | STRING(多行) | "" | 角色列表：每行「名字：一句人设」，让对白/动作保持角色一致 |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - script: 漫剧剧本（核心钩子 + 分场四行结构：场景行/画面/对白/氛围）
@@ -849,6 +880,8 @@ completed 自动下载到 output/agnes_videos/（3 次重试）。
 | aspect_ratio | COMBO | 21:9 | 三视图推荐宽幅 21:9 / 16:9 |
 | reference_image | IMAGE | - | 可选：定妆图/已有设定图，连接后走图生图保持一致 |
 | extra_prompt | STRING | "" | 可选：追加风格/质量补充词 |
+| retries | INT | 5 | 失败重试次数（0=不重试，请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：大图档位/队列高峰期可拉高到 3600 |
 
 **输出：**
 - image: 三视图张量（可存图或作为后续视频节点参考）
@@ -878,6 +911,8 @@ all_prompts 空项=跳过该槽（不发请求，输出黑图占位，槽号保�
 | quality | COMBO | 2K | 档位：1K/2K/3K/4K |
 | aspect_ratio | COMBO | 21:9 | 三视图推荐宽幅（21:9 / 16:9） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空提示词超过该值时排队；频繁 429/503 就调小，配额充足可拉满 |
+| retries | INT | 5 | 逐条生效的失败重试次数（0=不重试，单张请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…）；整批最坏总时长≈条数×(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单张 API 调用等待上限（秒，默认 300）：大图档位/队列高峰期可拉高到 3600 |
 
 **输出（22 路）：**
 - image_1..image_20：各槽（all_prompts 第 i 条）三视图张量（成功=真实图；跳过/失败=512×512 黑图占位），可接 SaveImage 存档或作参考图
@@ -913,6 +948,8 @@ all_prompts 空项=跳过该槽（不发请求，输出黑图占位，槽号保�
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型 |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - 三视图提示词: 完整三视图英文提示词（主体全部细节保留 + 分栏布局「左 1/3 特写 + 右 2/3 三视图」+ 虚幻引擎渲染风格/PBR/柔和漫射光 + 纯白背景干净极简无阴影 + 8K 质量尾词），可连 三视图生成 或复制后手工修改
@@ -945,6 +982,8 @@ all_prompts 空项=跳过该槽（槽号保位）；单槽失败不影响其他�
 | model | COMBO | agnes-2.5-flash | 文本生成模型（整批共用） |
 | reasoning_effort | COMBO | auto | 思考等级（整批共用） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空提示词超过该值时排队；频繁 429/503 就调小 |
+| retries | INT | 3 | 逐条生效的失败重试次数（0=不重试，单条请求一次即止）：429/5xx 自动指数退避（3/6/12s…）；整批最坏总时长≈条数×(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单条 API 调用等待上限（秒，默认 300）：长思考/长上下文可拉高到 3600 |
 
 **输出（22 路）：**
 - three_view_prompt_1..three_view_prompt_20：各槽（all_prompts 第 i 条）完整三视图英文提示词（主体全部细节 + 分栏布局「左 1/3 特写 + 右 2/3 三视图」
@@ -1084,6 +1123,8 @@ all_prompts 空项=跳过该槽（槽号保位）；单槽失败不影响其他�
 | system_prompt（可选） | STRING(多行) | "" | 系统提示词（角色/行为设定） |
 | enable_thinking（可选） | BOOLEAN | 关 | Thinking 模式开关（消耗更多 token） |
 | reasoning_effort（可选） | COMBO | auto | 思考强度：auto/none/low/medium/high/max |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - AI回复: 完整回复文本
@@ -1112,6 +1153,8 @@ all_prompts 空项=跳过该槽（槽号保位）；单槽失败不影响其他�
 | api_key | STRING | sk-你的Key | Agnes AI API Key，留空自动加载全局 |
 | model | COMBO | agnes-2.5-flash | 文本生成模型（agnes-2.5-flash 默认 / agnes-3.0-flash Agent / agnes-2.0-flash 旧版） |
 | reasoning_effort | COMBO | auto | 思考等级（Agnes 2.5/3.0 文本模型） |
+| retries | INT | 3 | 失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动指数退避重试（3/6/12s…封顶 120s）；最坏总时长≈(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单次 API 调用等待上限（秒，默认 300）：长思考模式（thinking 高档位）/长上下文可拉高到 3600 |
 
 **输出：**
 - 英文资产生成提示词: 保留 JSON 全部描述字段（专名拼音化）+ 构图指令 + 风格/质量尾词，直接喂生图
@@ -1152,6 +1195,8 @@ all_items 空项=跳过该槽（槽号保位，与旧 20 槽行为一致）；�
 | model | COMBO | agnes-2.5-flash | 文本生成模型（整批共用） |
 | reasoning_effort | COMBO | auto | 思考等级（整批共用） |
 | max_concurrency | INT | 10 | 并发速率限制（线程池大小，1-20）：非空资产 JSON 超过该值时排队；频繁 429/503 就调小 |
+| retries | INT | 3 | 逐条生效的失败重试次数（0=不重试，单条请求一次即止）：429/5xx 自动指数退避（3/6/12s…）；整批最坏总时长≈条数×(1+重试次数)×请求超时 |
+| timeout | INT | 300 | 单条 API 调用等待上限（秒，默认 300）：长思考/长上下文可拉高到 3600 |
 
 **输出（22 路）：**
 - english_prompt_1..english_prompt_20：各槽（all_items 第 i 条）英文资产生图提示词（保留 JSON 全部描述字段 + 构图指令 + 风格/质量尾词），

@@ -179,12 +179,28 @@ class AgnesVideoPromptGenerator(OutputDocsMixin):
                     "default": "auto",
                     "tooltip": "思考等级 reasoning_effort（Agnes 2.5/3.0 文本模型）：auto=跟随模型默认 / none / low / medium / high / max；2.0 旧模型不生效",
                 }),
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 3,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：429 限流/5xx 服务端错误自动退避重试（3/6/12s…），默认 3；最坏总时长≈(1+重试次数)×请求超时",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：长思考模式（thinking 高档位）/长上下文可拉高到 3600",
+                }),
             },
         }
 
     def generate(self, shot_text="", dialogue="", style="cinematic", mode="keyframe",
                  duration=5, base_url="", api_key="", model=CHAT_MODEL,
-                 reasoning_effort="auto"):
+                 reasoning_effort="auto", retries=3, timeout=300):
         shot_text = (shot_text or "").strip()
         if not shot_text:
             skip_msg = "[跳过] 分镜文本为空：请连接 Agnes 分镜提示词批量生成 的 detailed_prompt_N / all_prompts 单条输出，或直接粘贴分镜描述"
@@ -211,6 +227,8 @@ class AgnesVideoPromptGenerator(OutputDocsMixin):
                 temperature=0.4,
                 reasoning_effort=normalize_reasoning_effort(reasoning_effort),
                 return_meta=True,
+                retries=retries,
+                timeout=timeout,
             )
             meta_line = format_chat_meta(meta)
             prompt = _clean_video_prompt(raw)

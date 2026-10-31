@@ -149,6 +149,22 @@ class AgnesNovelImageToImage(OutputDocsMixin):
                 "reference_image_6": ("IMAGE", {
                     "tooltip": "额外参考图 6（多图输入，合计最多 6 张）",
                 }),
+                "retries": ("INT", {
+                    "label": "重试次数",
+                    "default": 5,
+                    "min": 0,
+                    "max": 10,
+                    "step": 1,
+                    "tooltip": "失败重试次数（0=不重试，请求一次即止）：503 生图队列满/429 限流分钟级退避（15/30/60/120s…），默认 5；最坏总时长≈(1+重试次数)×请求超时+退避和",
+                }),
+                "timeout": ("INT", {
+                    "label": "请求超时（秒）",
+                    "default": 300,
+                    "min": 30,
+                    "max": 3600,
+                    "step": 30,
+                    "tooltip": "单次 API 调用等待上限（秒），默认 300：多图参考/大图档位可拉高到 3600",
+                }),
             },
         }
 
@@ -168,6 +184,8 @@ class AgnesNovelImageToImage(OutputDocsMixin):
         reference_image_4=None,
         reference_image_5=None,
         reference_image_6=None,
+        retries: int = 5,
+        timeout: int = 300,
     ):
         size = compute_size(quality, aspect_ratio)
         w, h = map(int, size.split("x"))
@@ -211,6 +229,8 @@ class AgnesNovelImageToImage(OutputDocsMixin):
                     ratio=aspect_ratio,
                     n=n,
                     model=model,
+                    retries=retries,
+                    timeout=timeout,
                 )
             else:
                 # 旧接口：size 传 WxH 像素
@@ -221,6 +241,8 @@ class AgnesNovelImageToImage(OutputDocsMixin):
                     size=size,
                     n=n,
                     model=model,
+                    retries=retries,
+                    timeout=timeout,
                 )
 
             if not pil_images:
